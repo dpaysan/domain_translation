@@ -16,4 +16,4 @@ def get_data_list(
                 list_of_data_locs.append(os.path.join(root_dir, file))
             else:
                 list_of_data_locs.append(file)
-    return list_of_data_locs
+    return sorted(list_of_data_locs)

@@ -14,38 +14,10 @@ def p_norm_loss(
         raise NotImplementedError
 
 
-def kl_divergence(mu: Tensor, logvar: Tensor) -> Tensor:
-    # kld = torch.mean(
-    #   -0.5 * torch.sum(1 + 2 * log_var - mu ** 2 - log_var.exp(), dim=1), dim=0
-    # )
-    kl_loss = 1 + logvar * 2 - mu.square() - logvar.mul_(2).exp()
-    kl_loss = torch.sum(kl_loss) * -0.5
-    return kl_loss
-
-
-def accuracy_loss(input: Tensor, target: Tensor, reduction: str = "mean") -> Tensor:
-    r""" Value function assessing the prediction accuracy of a probabilistic classifier.
-
-    Parameters
-    ----------
-    input
-    target
-    reduction
-
-    Returns
-    -------
-
-    """
-    n_classes = target.size()[1]
-    hot_one_encoded_input = np.zeros(input.size(), n_classes)
-    hot_one_encoded_input[np.arange(input.size()), input] = 1
-    # hot_one_encoded_input = torch.from_numpy(hot_one_encoded_input)
-    acc_loss = torch.sum(torch.log(target[hot_one_encoded_input]))
-    if reduction == "mean":
-        return acc_loss / len(input)
-    elif reduction not in ["none", "sum"]:
-        raise NotImplementedError
-    return acc_loss
+def kl_divergence(mu: Tensor, logsigma: Tensor) -> Tensor:
+    kld = 1 + logsigma * 2 - mu.square() - logsigma.mul_(2).exp()
+    kld = torch.sum(kld) * -0.5
+    return kld
 
 
 class KLDLoss(nn.Module):
@@ -66,17 +38,3 @@ def vae_loss(inputs: Tensor, outputs: Tensor, mu: Tensor, log_var: Tensor) -> Te
     kl_loss = torch.sum(kl_loss) * -0.5
     vae_loss = torch.mean(recon_loss + kl_loss)
     return vae_loss
-
-
-class BCELoss_transformed(nn.Module):
-    def __init__(self):
-        super(BCELoss_transformed, self).__init__()
-        self.bce_loss = nn.BCELoss()
-
-    def forward(self, inputs: Tensor, recons: Tensor) -> Tensor:
-        batch_size, input_size, _ = inputs.size()
-        inputs = inputs.view(batch_size, -1)
-        recons = recons.view(batch_size, -1)
-        recon_loss = self.bce_loss(inputs, recons)
-        recon_loss *= input_size * input_size
-        return recon_loss

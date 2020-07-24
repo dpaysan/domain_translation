@@ -17,6 +17,7 @@ def visualize_vae_performance(
     data_key: str = "images",
     label_key: str = "label",
     label_dict: dict = None,
+    n_samples:int = 16
 ) -> Tuple[Figure, Figure, Figure]:
     device = get_device()
     vae_model.to(device)
@@ -28,10 +29,10 @@ def visualize_vae_performance(
     # samples=None
 
     input_fig, output_fig, sample_fig = visualize_model_performance(
-        inputs=inputs,
-        outputs=outputs,
-        labels=labels,
-        samples=samples,
+        inputs=inputs[:n_samples],
+        outputs=outputs[:n_samples],
+        labels=labels[:n_samples],
+        samples=samples[:n_samples],
         label_dict=label_dict,
     )
     return input_fig, output_fig, sample_fig

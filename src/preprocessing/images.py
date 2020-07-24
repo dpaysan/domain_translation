@@ -4,6 +4,7 @@ from numpy import ndarray
 import cv2
 from skimage import io
 import numpy as np
+import pandas as pd
 
 from src.utils.basic.io import get_data_list
 
@@ -34,8 +35,11 @@ def resize_images(images: List[ndarray], size: Tuple[int, int] = (64, 64)):
     return scaled_images
 
 
-def read_images_from_disk(image_dir: str) -> Tuple[List[str], List[ndarray]]:
-    image_locs = sorted(get_data_list(image_dir, absolute_path=True))
+def read_images_from_disk(
+    image_dir: str, image_locs: List = None
+) -> Tuple[List[str], List[ndarray]]:
+    if image_locs is None:
+        image_locs = sorted(get_data_list(image_dir, absolute_path=True))
     image_names = sorted(get_data_list(image_dir, absolute_path=False))
     images = []
     for image_loc in image_locs:
@@ -56,7 +60,24 @@ def get_mean_and_std_of_images(images: List[ndarray]) -> dict:
     return stats
 
 
-def run_and_visualize_preprocessing_pipelin(
+def get_only_images_with_labels(
+    image_dir: str, label_fname: str, id_column: str = "nucleus_id"
+):
+    image_ids = get_data_list(
+        root_dir=image_dir, absolute_path=False, file_ending=False
+    )
+    image_locs = get_data_list(root_dir=image_dir)
+    image_df = pd.DataFrame.from_dict({id_column: image_ids, "image_loc": image_locs})
+    label_ids = pd.read_csv(label_fname, index_col=0)
+    image_df = image_df.merge(label_ids, on=id_column)
+    _, images = read_images_from_disk(
+        image_dir=image_dir, image_locs=list(image_df.loc[:, "image_loc"])
+    )
+    image_names = [image_name + ".tif" for image_name in list(image_df.loc[:, id_column])]
+    return image_names, images
+
+
+def run_and_visualize_preprocessing_pipeline(
     image_dir: str = "../../data/nuclear_crops_all_experiments/images/",
 ):
     image_names, images = read_images_from_disk(image_dir=image_dir)
@@ -80,9 +101,21 @@ def run_and_visualize_preprocessing_pipelin(
         image_names=image_names,
         save_dir="../../data/nuclear_crops_all_experiments/scaled_max_intensity_resized_images/",
     )
+
+    image_names, labeled_images = get_only_images_with_labels(
+        image_dir="../../data/nuclear_crops_all_experiments/scaled_max_intensity_resized_images/",
+        label_fname="../../data/nuclear_crops_all_experiments/simple_image_labels.csv",
+        id_column="nucleus_id",
+    )
+    save_images_to_disk(
+        images=labeled_images,
+        image_names=image_names,
+        save_dir="../../data/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images/",
+    )
+
     # stats = get_mean_and_std_of_images(resized_images)
     # io.imsave(fname='mean_image.tif', arr=stats['mean'])
 
 
 if __name__ == "__main__":
-    run_and_visualize_preprocessing_pipelin()
+    run_and_visualize_preprocessing_pipeline()

@@ -1,6 +1,5 @@
-from typing import Iterable, Tuple
-from src.data.datasets import TorchCellImageDataSet
-from src.data.datasets import TorchTransformableSubset
+from typing import Iterable, Tuple, List
+from src.data.datasets import TorchTransformableSubset, TorchNucleiImageDataset
 
 import logging
 from torchvision.transforms import Compose
@@ -9,25 +8,19 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-def init_cell_dataset(
-    data_dir: str,
-    label_codes: dict = None,
-    label_weights: dict = None,
-    transform: Compose = None,
-) -> TorchCellImageDataSet:
-    logging.debug("Load data set from {}".format(data_dir))
-    cell_dataset = TorchCellImageDataSet(
-        data_dir=data_dir,
-        label_codes=label_codes,
-        label_weights=label_weights,
-        transform=transform,
-    )
-    logging.debug("Samples loaded: {}".format(len(cell_dataset)))
-    return cell_dataset
+def init_nuclei_image_dataset(
+    image_dir:str,
+    label_fname:str,
+    transform_pipeline: Compose = None,
+)->TorchNucleiImageDataset:
+    logging.debug("Load images set from {} and label information from {}.".format(image_dir, label_fname))
+    nuclei_dataset = TorchNucleiImageDataset(image_dir=image_dir, label_fname=label_fname, transform_pipeline=transform_pipeline)
+    logging.debug("Samples loaded: {}".format(len(nuclei_dataset)))
+    return nuclei_dataset
 
 
 def stratified_train_val_test_split(
-    dataset: TorchCellImageDataSet, splits: Iterable, random_state: int
+    dataset: Dataset, splits: Iterable, random_state: int
 ) -> Tuple[
     TorchTransformableSubset, TorchTransformableSubset, TorchTransformableSubset
 ]:

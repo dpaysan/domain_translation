@@ -21,9 +21,8 @@ class TorchNucleiImageDataset(Dataset):
 
         self.image_dir = image_dir
         labels = pd.read_csv(label_fname, index_col=0)
-        self.labels_dict = dict(
-            zip(list(labels["nucleus_id"]), list(labels["binary_label"]))
-        )
+        labels = labels.sort_values(by='nucleus_id')
+        self.labels = np.array(labels.loc[:, 'binary_label'])
         self.image_locs = get_data_list(self.image_dir)
         self.transform_pipeline = transform_pipeline
 
@@ -32,14 +31,11 @@ class TorchNucleiImageDataset(Dataset):
 
     def __getitem__(self, index: int) -> dict:
         img_loc = self.image_locs[index]
-        nucleus_id = os.path.split(img_loc)[1]
-        nucleus_id = nucleus_id[:nucleus_id.index(".")]
-
         image = self.process_image(image_loc=img_loc)
         if self.transform_pipeline is not None:
             image = self.transform_pipeline(image)
 
-        label = np.array(self.labels_dict[nucleus_id]).astype(int)
+        label = np.array(self.labels[index]).astype(int)
         label = torch.from_numpy(label)
 
         sample = {"image": image, "label": label}
