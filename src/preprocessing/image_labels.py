@@ -1,4 +1,7 @@
 import pandas as pd
+from collections import Counter
+
+from src.utils.basic.general import get_class_weights
 
 
 def get_compressed_image_labels(
@@ -26,5 +29,12 @@ def get_compressed_image_labels(
     return
 
 
+def get_image_label_class_weights(
+    simple_labels_fname: str = "../../data/nuclear_crops_all_experiments/simple_image_labels.csv",
+) -> dict:
+    return get_class_weights(simple_labels_fname=simple_labels_fname)
+
+
 if __name__ == "__main__":
     get_compressed_image_labels()
+    get_image_label_class_weights()

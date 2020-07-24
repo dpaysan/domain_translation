@@ -206,7 +206,7 @@ class AugmentedVAE(BaseVAE, ABC):
                         kernel_size=4,
                         stride=2,
                         padding=1,
-                        bias=False
+                        bias=False,
                     ),
                     nn.BatchNorm2d(self.hidden_dims[i]),
                     nn.LeakyReLU(self.lrelu_slope, inplace=True),
@@ -216,10 +216,19 @@ class AugmentedVAE(BaseVAE, ABC):
         # Output of encoder are of shape 1024x2x2 -- NO its 1024x4x4
         self.encoder = nn.Sequential(*encoder_modules)
 
-        self.fc1 = nn.Sequential(nn.Linear(self.hidden_dims[-1] * 2 * 2, self.latent_dim), nn.BatchNorm1d(self.latent_dim))
-        self.fc2 = nn.Sequential(nn.Linear(self.hidden_dims[-1] * 2 * 2, self.latent_dim), nn.BatchNorm1d(self.latent_dim))
+        self.fc1 = nn.Sequential(
+            nn.Linear(self.hidden_dims[-1] * 2 * 2, self.latent_dim),
+            nn.BatchNorm1d(self.latent_dim),
+        )
+        self.fc2 = nn.Sequential(
+            nn.Linear(self.hidden_dims[-1] * 2 * 2, self.latent_dim),
+            nn.BatchNorm1d(self.latent_dim),
+        )
 
-        self.d1 = nn.Sequential(nn.Linear(self.latent_dim, hidden_dims[-1] * 2 * 2), nn.BatchNorm1d(self.hidden_dims[-1]*2*2))
+        self.d1 = nn.Sequential(
+            nn.Linear(self.latent_dim, hidden_dims[-1] * 2 * 2),
+            nn.BatchNorm1d(self.hidden_dims[-1] * 2 * 2),
+        )
 
         # decoder
 
@@ -233,7 +242,7 @@ class AugmentedVAE(BaseVAE, ABC):
                         kernel_size=4,
                         stride=2,
                         padding=1,
-                        bias=False
+                        bias=False,
                     ),
                     nn.BatchNorm2d(hidden_dims[-2 - i]),
                     nn.LeakyReLU(self.lrelu_slope, inplace=True),
@@ -247,7 +256,7 @@ class AugmentedVAE(BaseVAE, ABC):
                     kernel_size=4,
                     stride=2,
                     padding=1,
-                    bias=False
+                    bias=False,
                 ),
                 nn.Sigmoid(),
             )

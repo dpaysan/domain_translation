@@ -94,7 +94,7 @@ def get_image_grid_plot(
                 break
             else:
                 image = images[i * grid_height + j][0]
-                image = np.rint(image*255).astype(np.uint8)
+                image = np.rint(image * 255).astype(np.uint8)
                 image = Image.fromarray(image)
                 axes[i, j].imshow(image, cmap="gray")
                 if labels is not None and len(labels) > i * grid_height + j:

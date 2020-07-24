@@ -332,7 +332,7 @@ def train_combined_architecture(
                 best_loss = epoch_total_loss
                 best_model_weights = copy.deepcopy(model.state_dict())
                 torch.save(model, output_dir + "/augmented_ae.pth")
-                early_stopping_counter=0
+                early_stopping_counter = 0
             elif phase == "val" and epoch_total_loss > best_loss:
                 early_stopping_counter += 1
         logging.debug("===" * 20)

@@ -1,5 +1,7 @@
 import datetime
 import time
+import pandas as pd
+from collections import Counter
 
 
 def get_timestamp():
@@ -43,3 +45,14 @@ def key_in_dict(keys, dictionary):
             return False
 
     return True
+
+
+def get_class_weights(simple_labels_fname: str) -> dict:
+    labels = pd.read_csv(simple_labels_fname)
+    counter = Counter(list(labels.loc[:, "binary_label"]))
+    n_samples = len(labels)
+    weights = {}
+    for c, counts in counter.items():
+        weights[c] = n_samples / counts
+    print(weights)
+    return weights

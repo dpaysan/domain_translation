@@ -18,15 +18,19 @@ def get_transformation_dict_for_train_val_test():
     train_transforms = Compose(
         [
             ToPILImage(),
-            #Resize(64),
+            # Resize(64),
             RandomHorizontalFlip(),
             RandomVerticalFlip(),
             ToTensor(),
         ]
     )
-    val_transforms = Compose([ToPILImage(),
-                              #Resize(64),
-                              ToTensor()])
+    val_transforms = Compose(
+        [
+            ToPILImage(),
+            # Resize(64),
+            ToTensor(),
+        ]
+    )
     test_transforms = val_transforms
     transformation_dict = {
         "train": train_transforms,
