@@ -25,23 +25,22 @@ class TorchNucleiImageDataset(Dataset):
             zip(list(labels["nucleus_id"]), list(labels["binary_label"]))
         )
         self.image_locs = get_data_list(self.image_dir)
-
-        if transform_pipeline is not None:
-            self.transform_pipeline = transform_pipeline
+        self.transform_pipeline = transform_pipeline
 
     def __len__(self) -> int:
         return len(self.image_locs)
 
     def __getitem__(self, index: int) -> dict:
         img_loc = self.image_locs[index]
-        nucleus_id = os.path.split(img_loc)[1][:, "."]
+        nucleus_id = os.path.split(img_loc)[1]
+        nucleus_id = nucleus_id[:nucleus_id.index(".")]
 
         image = self.process_image(image_loc=img_loc)
         if self.transform_pipeline is not None:
             image = self.transform_pipeline(image)
 
-        label = self.labels_dict[nucleus_id]
-        label = torch.LongTensor(label)
+        label = np.array(self.labels_dict[nucleus_id]).astype(int)
+        label = torch.from_numpy(label)
 
         sample = {"image": image, "label": label}
         return sample
@@ -62,18 +61,20 @@ class TorchSeqDataset(Dataset):
     def __init__(self, seq_data_and_labels_fname: str, transform_pipeline: Compose = None):
         super(TorchSeqDataset, self).__init__()
         self.seq_data_and_labels_fname = seq_data_and_labels_fname
-        self.seq_data_and_labels = pd.read_csv(self.seq_data_and_labels_fname)
+        self.seq_data_and_labels = pd.read_csv(self.seq_data_and_labels_fname, index_col=0)
+
+        self.transform_pipeline = transform_pipeline
 
     def __len__(self) -> int:
         return len(self.seq_data_and_labels)
 
     def __getitem__(self, index: int) -> dict:
-        seq_data = self.seq_data_and_labels.loc[index, self.seq_data_and_labels.columns != 'binary_label']
+        seq_data = self.seq_data_and_labels.iloc[index, 0:-1]
         seq_data = np.array(seq_data)
         seq_data = torch.from_numpy(seq_data)
 
-        label = self.seq_data_and_labels.loc[index, 'binary_label']
-        label = torch.LongTensor(label)
+        label = np.array(self.seq_data_and_labels.iloc[index, -1]).astype(int)
+        label = torch.from_numpy(label)
 
         sample = {'seq_data': seq_data, 'label': label}
         return sample
