@@ -1,28 +1,253 @@
 import copy
+import logging
+import os
+import time
 from typing import Tuple, List
 
-from torch import nn, device
-import os
-from src.utils.torch.general import get_device
-import time
 import numpy as np
-import logging
 import torch
+from torch import nn, device
+from torch.autograd import Variable
 from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader
 from tqdm import tnrange, tqdm_notebook
+
+from src.functions.loss_functions import KLDLoss, kl_divergence
+from src.functions.metrics import accuracy
+from src.helper.models import DomainModelConfiguration
 from src.utils.basic.visualization import visualize_model_performance
-from src.functions.loss_functions import KLDLoss, BCELoss_transformed
+from src.utils.torch.general import get_device
+from torch.nn import Module
+
+
+def train_autoencoders_two_domains(
+    domain_model_configurations: List[DomainModelConfiguration],
+    latent_dcm: Module,
+    latent_dcm_loss: Module,
+    latent_clf: Module = None,
+    latent_clf_optimizer: Optimizer = None,
+    latent_clf_loss: Module = None,
+    alpha: float = 1.0,
+    device: str = "cuda:0",
+    use_dcm: bool = True,
+    use_clf: bool = True,
+)->dict:
+
+    # Expects 2 model configurations (one for each domain)
+    model_configuration_i = domain_model_configurations[0]
+    model_configuration_j = domain_model_configurations[1]
+
+    # Get all parameters of the configuration for domain i
+    vae_i = model_configuration_i.model
+    optimizer_i = model_configuration_i.optimizer
+    inputs_i = model_configuration_i.inputs
+    labels_i = model_configuration_i.labels
+    recon_loss_fct_i = model_configuration_i.recon_loss_function
+    train_i = model_configuration_i.train
+
+    # Get all parameters of the configuration for domain j
+    vae_j = model_configuration_j.model
+    optimizer_j = model_configuration_j.optimizer
+    inputs_j = model_configuration_j.inputs
+    labels_j = model_configuration_j.labels
+    recon_loss_fct_j = model_configuration_j.recon_loss_function
+    train_j = model_configuration_j.train
+
+    # Set VAE models to train if defined in respective configuration
+    if train_i:
+        vae_i.train()
+        vae_i.to(device)
+        vae_i.zero_grad()
+    if train_j:
+        vae_j.train()
+        vae_j.to(device)
+        vae_j.zero_grad()
+
+    # The discriminator will not be trained but only used to compute the adversarial loss for the AE updates
+    latent_dcm.eval()
+    latent_dcm.to(device)
+
+    if use_clf:
+        assert latent_clf is not None
+        latent_clf.train()
+        latent_clf.to(device)
+        latent_clf.zero_grad()
+
+    # Forward pass of the VAE
+    inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
+    recons_i, latents_i, mu_i, logvar_i = vae_i(inputs_i)
+    recons_j, latents_j, mu_j, logvar_j = vae_j(inputs_j)
+
+    if use_dcm:
+        labels_i, labels_j = (
+            Variable(labels_i).to(device),
+            Variable(labels_j).to(device),
+        )
+
+        # Add class label to latent representations to ensure that latent representations encode generic information
+        # independent from the used data modality (see Adversarial AutoEncoder paper)
+        dcm_input_i = torch.cat(
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 1)), dim=1
+        )
+        dcm_input_j = torch.cat(
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 1)), dim=1
+        )
+
+    else:
+        dcm_input_i = latents_i
+        dcm_input_j = latents_j
+
+    dcm_output_i = latent_dcm(dcm_input_i)
+    dcm_output_j = latent_dcm(dcm_input_j)
+
+    domain_labels_i = torch.zeros(dcm_output_i.size(0)).long()
+    domain_labels_j = torch.ones(dcm_output_j.size(0)).long()
+
+    # Forward pass latent classifier if it is supposed to be trained and used to assess the integration of the learned
+    # latent spaces
+    if use_clf:
+        clf_output_i = latent_clf(latents_i)
+        clf_output_j = latent_clf(latents_j)
+
+    # Compute losses
+
+    recon_loss_i = recon_loss_fct_i(recons_i, inputs_i)
+    recon_loss_j = recon_loss_fct_j(recons_j, inputs_j)
+
+    kl_loss = kl_divergence(mu_i, logvar_i) + kl_divergence(mu_j, logvar_j)
+
+    # Calculate adversarial loss - by mixing labels indicating domain with output predictions to "confuse" the
+    # discriminator and encourage learning autoencoder that make the distinction between the modalities in the latent
+    # space as difficult as possible for the discriminator
+    dcm_loss = 0.5 * latent_dcm_loss(
+        dcm_output_i, domain_labels_j
+    ) + 0.5 * latent_dcm_loss(dcm_output_j, domain_labels_i)
+
+    total_loss = alpha * (recon_loss_i + recon_loss_j) + kl_loss + dcm_loss
+
+    # Add loss of latent classifier if this is trained
+    if use_clf:
+        clf_loss = 0.5 * (
+            latent_clf_loss(clf_output_i, labels_i)
+            + latent_clf_loss(clf_output_j, labels_j)
+        )
+        total_loss += clf_loss
+
+    # Backpropagate loss and update parameters
+    total_loss.backward()
+    if train_i:
+        optimizer_i.step()
+    if train_j:
+        optimizer_j.step()
+    if use_clf:
+        latent_clf_optimizer.step()
+
+    # Get summary statistics
+    batch_size_i = inputs_i.size(0)
+    batch_size_j = inputs_j.size(0)
+    latent_size_i = mu_i.size(0)
+    latent_size_j = mu_j.size(0)
+    summary_stats = {
+        "recon_loss_i": recon_loss_i * batch_size_i,
+        "recon_loss_j": recon_loss_j * batch_size_j,
+        "dcm_loss": dcm_loss * (batch_size_i + batch_size_j),
+        "kl_loss": kl_loss * (latent_size_i + latent_size_j),
+        "total_loss": total_loss,
+    }
+    return summary_stats
+
+
+def train_latent_dcm_two_domains(domain_model_configurations:List[DomainModelConfiguration], latent_dcm:nn.Module, latent_dcm_optimizer:Optimizer, latent_dcm_loss:Module, use_dcm:bool,
+                                 device:str='cuda:0'):
+
+    # Get the model configurations for the two domains
+    model_configuration_i = domain_model_configurations[0]
+    model_configuration_j = domain_model_configurations[1]
+
+    # Get all parameters of the configuration for domain i
+    vae_i = model_configuration_i.model
+    optimizer_i = model_configuration_i.optimizer
+    inputs_i = model_configuration_i.inputs
+    labels_i = model_configuration_i.labels
+    recon_loss_fct_i = model_configuration_i.recon_loss_function
+
+    # Get all parameters of the configuration for domain j
+    vae_j = model_configuration_j.model
+    optimizer_j = model_configuration_j.optimizer
+    inputs_j = model_configuration_j.inputs
+    labels_j = model_configuration_j.labels
+    recon_loss_fct_j = model_configuration_j.recon_loss_function
+
+    # Set VAE models to eval for the training of the discriminator
+    vae_i.eval()
+    vae_j.eval()
+
+    # Send models and data to device
+    inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
+
+    vae_i.to(device)
+    vae_j.to(device)
+
+    # Reset gradients
+    latent_dcm.zero_grad()
+
+    # Forward pass
+    _, latents_i, _, _ = vae_i(inputs_i)
+    _, latents_j, _, _ = vae_j(inputs_j)
+
+    if use_dcm:
+        labels_i, labels_j = (
+            Variable(labels_i).to(device),
+            Variable(labels_j).to(device),
+        )
+
+        # Add class label to latent representations to ensure that latent representations encode generic information
+        # independent from the used data modality (see Adversarial AutoEncoder paper)
+        dcm_input_i = torch.cat(
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 1)), dim=1
+        )
+        dcm_input_j = torch.cat(
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 1)), dim=1
+        )
+
+    else:
+        dcm_input_i = latents_i
+        dcm_input_j = latents_j
+
+    dcm_output_i = latent_dcm(dcm_input_i)
+    dcm_output_j = latent_dcm(dcm_input_j)
+
+    domain_labels_i = torch.zeros(dcm_output_i.size(0)).long()
+    domain_labels_j = torch.ones(dcm_output_j.size(0)).long()
+
+    dcm_loss = 0.5 * (latent_dcm_loss(dcm_output_i, domain_labels_i) + latent_dcm_loss(dcm_output_j, domain_labels_j))
+
+    # Backpropagate loss and update parameters
+    dcm_loss.backward()
+    latent_dcm_optimizer.step()
+
+    # Get summary statistics
+    batch_size_i = inputs_i.size(0)
+    batch_size_j = inputs_j.size(0)
+
+    accuracy_i = accuracy(dcm_output_i, domain_labels_i)
+    accuracy_j = accuracy(dcm_output_j, domain_labels_j)
+
+    summary_stats = {'dcm_loss':dcm_loss, 'accuracy_i':accuracy_i, 'accuracy_j':accuracy_j}
+    return summary_stats
+
+
+
+
 
 
 def train_architecture(
-    vae: nn.Module,
+    # dict consists of dictionary domain_name:(model:..., optimizer:..., data_loader_dict:..., data_key:..., label_key:...)
+    domain_model_and_data_dict: dict[dict],
     latent_classifier: nn.Module,
     data_loaders_dict: dict,
-    vae_optimizer: Optimizer,
     latent_optimizer: Optimizer,
     loss_dict: dict,
-    data_key: str = "image",
-    label_key: str = "label",
     n_epochs: int = 500,
     early_stopping: int = -1,
     device: device = None,
@@ -602,7 +827,6 @@ def get_loss_dict(
     latent_clf_weight: float = 1.0,
     regularizer_weight: float = 1.0,
 ) -> dict:
-
     device = get_device()
 
     if vae_loss == "l2":

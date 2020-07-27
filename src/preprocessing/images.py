@@ -1,10 +1,11 @@
 import os
 from typing import List, Tuple
-from numpy import ndarray
+
 import cv2
-from skimage import io
 import numpy as np
 import pandas as pd
+from numpy import ndarray
+from skimage import io
 
 from src.utils.basic.io import get_data_list
 
@@ -73,7 +74,9 @@ def get_only_images_with_labels(
     _, images = read_images_from_disk(
         image_dir=image_dir, image_locs=list(image_df.loc[:, "image_loc"])
     )
-    image_names = [image_name + ".tif" for image_name in list(image_df.loc[:, id_column])]
+    image_names = [
+        image_name + ".tif" for image_name in list(image_df.loc[:, id_column])
+    ]
     return image_names, images
 
 

@@ -5,7 +5,6 @@ from torchvision.transforms import (
     RandomVerticalFlip,
     ToPILImage,
     ToTensor,
-    Resize,
 )
 
 

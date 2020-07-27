@@ -1,12 +1,13 @@
 from typing import List, Tuple
 
-from PIL import Image
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure, Axes
-from torch import Tensor
 import numpy as np
+from PIL import Image
+from matplotlib.figure import Figure, Axes
 from numpy import ndarray
+from torch import Tensor
 from torch.utils.data import DataLoader
+
 from src.models.vae import BaseVAE
 from src.utils.torch.general import get_device
 
@@ -17,7 +18,7 @@ def visualize_vae_performance(
     data_key: str = "images",
     label_key: str = "label",
     label_dict: dict = None,
-    n_samples:int = 16
+    n_samples: int = 16,
 ) -> Tuple[Figure, Figure, Figure]:
     device = get_device()
     vae_model.to(device)

@@ -1,9 +1,10 @@
 import os
+from typing import List
+
 from src.experiments.base import BaseExperiment
 from src.models.vae import AugmentedVAE
 from src.utils.basic.visualization import visualize_vae_performance
 from src.utils.torch.exp import train_combined_architecture
-from typing import List
 
 
 class VaeExperiment(BaseExperiment):

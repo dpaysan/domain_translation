@@ -1,5 +1,6 @@
-from src.data.datasets import TorchNucleiImageDataset, TorchSeqDataset
 from torchvision.transforms import Compose
+
+from src.data.datasets import TorchNucleiImageDataset, TorchSeqDataset
 
 
 def test_create_img_dataset(
@@ -57,9 +58,7 @@ def run_all_tests(
 
 
 if __name__ == "__main__":
-    image_dir = (
-        "../../data/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images/"
-    )
+    image_dir = "../../data/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images/"
     image_label_fname = (
         "../../data/nuclear_crops_all_experiments/simple_image_labels.csv"
     )

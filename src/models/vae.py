@@ -2,8 +2,8 @@ from abc import abstractmethod, ABC
 from typing import List, Any, Tuple
 
 import torch
-from torch import nn
 from torch import Tensor
+from torch import nn
 from torch.autograd import Variable
 
 from src.utils.torch.general import get_device

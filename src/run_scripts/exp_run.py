@@ -7,8 +7,9 @@ import argparse
 import importlib
 import logging
 import os
-import sys
 import shutil
+import sys
+
 import yaml
 
 sys.path.append("../../.")

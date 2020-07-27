@@ -1,16 +1,15 @@
 from typing import List
 
-from torch.optim.sgd import SGD
-from torch.optim.adamw import AdamW
-from torch.optim.rmsprop import RMSprop
 from torch.optim import Adam
+from torch.optim.rmsprop import RMSprop
+from torch.optim.sgd import SGD
 
-from src.utils.torch.exp import get_loss_dict
 from src.utils.torch.data import (
     get_data_loader_dict,
     init_cell_dataset,
     stratified_train_val_test_split,
 )
+from src.utils.torch.exp import get_loss_dict
 from src.utils.torch.general import get_transformation_dict_for_train_val_test
 
 
