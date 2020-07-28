@@ -2,26 +2,28 @@ import copy
 import logging
 import os
 import time
-from typing import Tuple, List
+from typing import List
 
+import imageio
 import numpy as np
 import torch
-from torch import nn, device
+from torch import nn
 from torch.autograd import Variable
+from torch.optim.adam import Adam
+from torch.optim.rmsprop import RMSprop
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader
-from tqdm import tnrange, tqdm_notebook
 
 from src.functions.loss_functions import KLDLoss, kl_divergence
 from src.functions.metrics import accuracy
-from src.helper.models import DomainModelConfiguration
-from src.utils.basic.visualization import visualize_model_performance
+from src.helper.models import DomainModelConfig, DomainConfig
+from src.models.latent_models import LatentDiscriminator, LinearClassifier
+from src.models.vae import VanillaConvVAE, VanillaVAE
 from src.utils.torch.general import get_device
-from torch.nn import Module
+from torch.nn import Module, L1Loss, MSELoss, BCELoss, CrossEntropyLoss
 
 
 def train_autoencoders_two_domains(
-    domain_model_configurations: List[DomainModelConfiguration],
+    domain_model_configurations: List[DomainModelConfig],
     latent_dcm: Module,
     latent_dcm_loss: Module,
     latent_clf: Module = None,
@@ -31,8 +33,8 @@ def train_autoencoders_two_domains(
     device: str = "cuda:0",
     use_dcm: bool = True,
     use_clf: bool = True,
-)->dict:
-
+    phase: str = "train",
+) -> dict:
     # Expects 2 model configurations (one for each domain)
     model_configuration_i = domain_model_configurations[0]
     model_configuration_j = domain_model_configurations[1]
@@ -54,14 +56,21 @@ def train_autoencoders_two_domains(
     train_j = model_configuration_j.train
 
     # Set VAE models to train if defined in respective configuration
-    if train_i:
+    if phase == "train" and train_i:
         vae_i.train()
-        vae_i.to(device)
-        vae_i.zero_grad()
-    if train_j:
+    else:
+        vae_i.eval()
+
+    vae_i.to(device)
+    vae_i.zero_grad()
+
+    if phase == "train" and train_j:
         vae_j.train()
-        vae_j.to(device)
-        vae_j.zero_grad()
+    else:
+        vae_j.eval()
+
+    vae_j.to(device)
+    vae_j.zero_grad()
 
     # The discriminator will not be trained but only used to compute the adversarial loss for the AE updates
     latent_dcm.eval()
@@ -69,7 +78,10 @@ def train_autoencoders_two_domains(
 
     if use_clf:
         assert latent_clf is not None
-        latent_clf.train()
+        if phase == "train":
+            latent_clf.train()
+        else:
+            latent_clf.eval()
         latent_clf.to(device)
         latent_clf.zero_grad()
 
@@ -133,14 +145,15 @@ def train_autoencoders_two_domains(
         )
         total_loss += clf_loss
 
-    # Backpropagate loss and update parameters
-    total_loss.backward()
-    if train_i:
-        optimizer_i.step()
-    if train_j:
-        optimizer_j.step()
-    if use_clf:
-        latent_clf_optimizer.step()
+    # Backpropagate loss and update parameters if we are in the training phase
+    if phase == "train":
+        total_loss.backward()
+        if train_i:
+            optimizer_i.step()
+        if train_j:
+            optimizer_j.step()
+        if use_clf:
+            latent_clf_optimizer.step()
 
     # Get summary statistics
     batch_size_i = inputs_i.size(0)
@@ -154,29 +167,34 @@ def train_autoencoders_two_domains(
         "kl_loss": kl_loss * (latent_size_i + latent_size_j),
         "total_loss": total_loss,
     }
+    if use_clf:
+        summary_stats["clf_loss"] = clf_loss
+
     return summary_stats
 
 
-def train_latent_dcm_two_domains(domain_model_configurations:List[DomainModelConfiguration], latent_dcm:nn.Module, latent_dcm_optimizer:Optimizer, latent_dcm_loss:Module, use_dcm:bool,
-                                 device:str='cuda:0'):
-
+def train_latent_dcm_two_domains(
+    domain_model_configurations: List[DomainModelConfig],
+    latent_dcm: nn.Module,
+    latent_dcm_optimizer: Optimizer,
+    latent_dcm_loss: Module,
+    use_dcm: bool,
+    device: str = "cuda:0",
+    phase: str = "train",
+):
     # Get the model configurations for the two domains
     model_configuration_i = domain_model_configurations[0]
     model_configuration_j = domain_model_configurations[1]
 
     # Get all parameters of the configuration for domain i
     vae_i = model_configuration_i.model
-    optimizer_i = model_configuration_i.optimizer
     inputs_i = model_configuration_i.inputs
     labels_i = model_configuration_i.labels
-    recon_loss_fct_i = model_configuration_i.recon_loss_function
 
     # Get all parameters of the configuration for domain j
     vae_j = model_configuration_j.model
-    optimizer_j = model_configuration_j.optimizer
     inputs_j = model_configuration_j.inputs
     labels_j = model_configuration_j.labels
-    recon_loss_fct_j = model_configuration_j.recon_loss_function
 
     # Set VAE models to eval for the training of the discriminator
     vae_i.eval()
@@ -188,8 +206,13 @@ def train_latent_dcm_two_domains(domain_model_configurations:List[DomainModelCon
     vae_i.to(device)
     vae_j.to(device)
 
-    # Reset gradients
-    latent_dcm.zero_grad()
+    # Set latent discriminator to train and reset the parameters if in phase train
+    if phase == "train":
+        latent_dcm.train()
+        latent_dcm.zero_grad()
+
+    # Send the discriminator to the device
+    latent_dcm.to(device)
 
     # Forward pass
     _, latents_i, _, _ = vae_i(inputs_i)
@@ -220,11 +243,15 @@ def train_latent_dcm_two_domains(domain_model_configurations:List[DomainModelCon
     domain_labels_i = torch.zeros(dcm_output_i.size(0)).long()
     domain_labels_j = torch.ones(dcm_output_j.size(0)).long()
 
-    dcm_loss = 0.5 * (latent_dcm_loss(dcm_output_i, domain_labels_i) + latent_dcm_loss(dcm_output_j, domain_labels_j))
+    dcm_loss = 0.5 * (
+        latent_dcm_loss(dcm_output_i, domain_labels_i)
+        + latent_dcm_loss(dcm_output_j, domain_labels_j)
+    )
 
-    # Backpropagate loss and update parameters
-    dcm_loss.backward()
-    latent_dcm_optimizer.step()
+    # Backpropagate loss and update parameters if in phase 'train'
+    if phase == "train":
+        dcm_loss.backward()
+        latent_dcm_optimizer.step()
 
     # Get summary statistics
     batch_size_i = inputs_i.size(0)
@@ -233,632 +260,561 @@ def train_latent_dcm_two_domains(domain_model_configurations:List[DomainModelCon
     accuracy_i = accuracy(dcm_output_i, domain_labels_i)
     accuracy_j = accuracy(dcm_output_j, domain_labels_j)
 
-    summary_stats = {'dcm_loss':dcm_loss, 'accuracy_i':accuracy_i, 'accuracy_j':accuracy_j}
+    summary_stats = {
+        "dcm_loss": dcm_loss * (batch_size_i + batch_size_j),
+        "accuracy_i": accuracy_i,
+        "accuracy_j": accuracy_j,
+    }
     return summary_stats
 
 
+def process_epoch_two_domains(
+    domain_configs: List[DomainConfig],
+    latent_dcm: Module,
+    latent_dcm_optimizer: Optimizer,
+    latent_dcm_loss: Module,
+    latent_clf: Module = None,
+    latent_clf_optimizer: Optimizer = None,
+    latent_clf_loss: Module = None,
+    alpha: float = 1.0,
+    use_dcm: bool = True,
+    use_clf: bool = False,
+    phase: str = "train",
+    device: str = "cuda:0",
+):
+    # Get domain configurations for the two domains
+    domain_config_i = domain_configs[0]
+    domain_model_config_i = domain_config_i.domain_model_config
+    data_loader_dict_i = domain_config_i.data_loader_dict
+    train_loader_i = data_loader_dict_i["train"]
+    data_key_i = domain_config_i.data_key
+    label_key_i = domain_config_i.label_key
+
+    domain_config_j = domain_configs[1]
+    domain_model_config_j = domain_config_j.domain_model_config
+    data_loader_dict_j = domain_config_j.data_loader_dict
+    train_loader_j = data_loader_dict_j["train"]
+    data_key_j = domain_config_j.data_key
+    label_key_j = domain_config_j.label_key
+
+    # Initialize epoch statistics
+    recon_loss_i = 0
+    recon_loss_j = 0
+    dcm_loss = 0
+    clf_loss = 0
+    ae_dcm_loss = 0
+    total_loss = 0
+
+    correct_preds_i = 0
+    n_preds_i = 0
+    correct_preds_j = 0
+    n_preds_j = 0
+
+    # Iterate over batches
+    for index, (samples_i, samples_j) in enumerate(zip(train_loader_i, train_loader_j)):
+        # Set model_configs
+        domain_model_config_i.inputs = samples_i[data_key_i]
+        domain_model_config_i.labels = samples_i[label_key_i]
+
+        domain_model_config_j.inputs = samples_j[data_key_j]
+        domain_model_config_j.inputs = samples_j[label_key_j]
+
+        domain_model_configs = [domain_model_config_i, domain_model_config_j]
+
+        ae_train_summary = train_autoencoders_two_domains(
+            domain_model_configurations=domain_model_configs,
+            latent_dcm=latent_dcm,
+            latent_dcm_loss=latent_dcm_loss,
+            latent_clf=latent_clf,
+            latent_clf_loss=latent_clf_loss,
+            latent_clf_optimizer=latent_clf_optimizer,
+            alpha=alpha,
+            use_dcm=use_dcm,
+            use_clf=use_clf,
+            phase=phase,
+            device=device,
+        )
+        # Update statistics after training the AE
+        recon_loss_i += ae_train_summary["recon_loss_i"]
+        recon_loss_j += ae_train_summary["recon_loss_j"]
+        ae_dcm_loss += ae_train_summary["dcm_loss"]
+        total_loss += ae_train_summary["total_loss"]
+
+        if use_clf:
+            assert latent_clf is None
+            clf_loss += ae_train_summary["clf_loss"]
+
+        clf_train_summary = train_latent_dcm_two_domains(
+            domain_model_configurations=domain_model_configs,
+            latent_dcm=latent_dcm,
+            latent_dcm_loss=latent_dcm_loss,
+            latent_dcm_optimizer=latent_dcm_optimizer,
+            use_dcm=use_dcm,
+            phase=phase,
+            device=device,
+        )
+
+        # Update statistics after training the DCM:
+        dcm_loss += clf_train_summary["dcm_loss"]
+        correct_preds_i += clf_train_summary["accuracy_i"][0]
+        n_preds_i = clf_train_summary["accuracy_i"][1]
+        correct_preds_j += clf_train_summary["accuracy_j"][0]
+        n_preds_j = clf_train_summary["accuracy_j"][1]
+
+    # Get average over batches for statistics
+    recon_loss_i /= n_preds_i
+    recon_loss_j /= n_preds_j
+
+    dcm_loss /= n_preds_i + n_preds_j
+    ae_dcm_loss /= n_preds_i + n_preds_j
+
+    total_loss /= n_preds_i + n_preds_j
+
+    accuracy_i = correct_preds_i / n_preds_i
+    accuracy_j = correct_preds_j / n_preds_j
+
+    epoch_statistics = {
+        "recon_loss_i": recon_loss_i,
+        "recon_loss_j": recon_loss_j,
+        "dcm_loss": dcm_loss,
+        "ae_dcm_loss": ae_dcm_loss,
+        "accuracy_i": accuracy_i,
+        "accuracy_j": accuracy_j,
+        "total_loss": total_loss,
+    }
+
+    if use_clf:
+        clf_loss /= n_preds_i + n_preds_j
+        epoch_statistics["clf_loss"] = clf_loss
+
+    return epoch_statistics
 
 
-
-
-def train_architecture(
-    # dict consists of dictionary domain_name:(model:..., optimizer:..., data_loader_dict:..., data_key:..., label_key:...)
-    domain_model_and_data_dict: dict[dict],
-    latent_classifier: nn.Module,
-    data_loaders_dict: dict,
-    latent_optimizer: Optimizer,
-    loss_dict: dict,
-    n_epochs: int = 500,
-    early_stopping: int = -1,
-    device: device = None,
-    output_dir: str = "../../data/exps/",
-) -> Tuple[nn.Module, nn.Module, dict]:
-    if early_stopping < 0:
-        early_stopping = n_epochs
-
+def train_val_test_loop_two_domains(
+    output_dir: str,
+    domain_configs: List[DomainConfig],
+    latent_dcm: Module = None,
+    latent_dcm_optimizer: Optimizer = None,
+    latent_dcm_loss: Module = None,
+    latent_clf: Module = None,
+    latent_clf_optimizer: Optimizer = None,
+    latent_clf_loss: Module = None,
+    alpha: float = 1.0,
+    use_dcm: bool = True,
+    use_clf: bool = False,
+    num_epochs: int = 500,
+    save_freq: int = 10,
+    early_stopping: int = 20,
+    device: str = None,
+):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    # Get available device, if cuda is available the GPU will be used
     if not device:
         device = get_device()
 
+    # Store start time of the training
     start_time = time.time()
 
-    vae = vae.to(device)
-    latent_classifier = latent_classifier.to(device)
+    # Initialize early stopping counter
+    es_counter = 0
+    if early_stopping < 0:
+        early_stopping = num_epochs
 
-    best_vae_weights = copy.deepcopy(vae.state_dict())
-    best_latent_clf_weights = copy.deepcopy(latent_classifier.state_dict())
+    total_loss_dict = {"train": [], "val": []}
 
-    loss_history = {"train": [], "val": []}
+    # Reserve space to save best model configurations
+    domain_names = [domain_configs[0].name, domain_configs[1].name]
+    best_vae_i_weights = domain_configs[0].domain_model_config.model.cpu().state_dict()
+    best_vae_j_weights = domain_configs[1].domain_model_config.model.cpu().state_dict()
+    best_model_configs = {
+        "vae_i_weights": best_vae_i_weights,
+        "vae_j_weights": best_vae_j_weights,
+    }
+    if latent_dcm is not None:
+        best_latent_dcm_weights = latent_dcm.cpu().state_dict()
+        best_model_configs["dcm_weights"] = best_latent_dcm_weights
+    if latent_clf is not None:
+        best_latent_clf_weights = latent_clf.cpu().state_dict()
+        best_model_configs["clf_weights"] = best_latent_clf_weights
 
-    best_loss = np.infty
-    early_stopping_counter = 0
+    # Initialize current best loss
+    best_total_loss = np.infty
 
-    for epoch in range(n_epochs):
-        logging.debug("Started epoch {}/{}".format(epoch + 1, n_epochs))
+    # Iterate over the epochs
+    for i in range(num_epochs):
+        logging.debug("Started epoch {}/{}".format(i + 1, num_epochs))
         logging.debug("--" * 20)
 
-        if early_stopping_counter > early_stopping:
+        # Check if early stopping is triggered
+        if es_counter > early_stopping:
             logging.debug(
                 "Training was stopped early due to no improvement of the validation"
                 " loss for {} epochs.".format(early_stopping)
             )
             break
 
+        # Iterate over training and validation phase
         for phase in ["train", "val"]:
-            if phase == "train":
-                vae.train()
-                latent_classifier.train()
-            else:
-                vae.eval()
-                latent_classifier.eval()
-
-            running_recon_loss = 0.0
-            running_regularizer_loss = 0.0
-            running_latent_clf_loss = 0.0
-            running_total_loss = 0.0
-
-            for index, data in enumerate(data_loaders_dict[phase]):
-                inputs = data[data_key].to(device)
-                labels = data[label_key].to(device)
-
-                # reset optimizers
-                vae_optimizer.zero_grad()
-                latent_optimizer.zero_grad()
-
-                # compute loss
-                with torch.set_grad_enabled(
-                    phase == "train"
-                ) and torch.autograd.set_detect_anomaly(False):
-                    recon, z, mu, logvar = vae(inputs)
-                    latent_clf_output = latent_classifier(z)
-
-                    recon_loss = loss_dict["vae"](recon, inputs)
-                    regularizer_loss = loss_dict["regularizer"](mu, logvar)
-                    latent_clf_loss = loss_dict["latent_clf"](latent_clf_output, labels)
-
-                    loss = (
-                        recon_loss
-                        + loss_dict["regularizer_weight"] * regularizer_loss
-                        + loss_dict["latent_clf_weight"] * latent_clf_loss
-                    )
-
-                # backpropagate loss
-                if phase == "train":
-                    with torch.autograd.set_detect_anomaly(False):
-                        loss.backward()
-                        vae_optimizer.step()
-                        latent_clf_loss.backward()
-                        latent_optimizer.step()
-
-                # compute batch statistics
-                running_recon_loss += recon_loss.item()
-                running_regularizer_loss += regularizer_loss.item()
-                running_latent_clf_loss += latent_clf_loss.item()
-                running_total_loss += loss.item()
-
-            # compute epoch statistics
-            n_batches = len(data_loaders_dict[phase])
-            epoch_recon_loss = running_recon_loss / n_batches
-            epoch_regularizer_loss = running_regularizer_loss / n_batches
-            epoch_latent_clf_loss = running_latent_clf_loss / n_batches
-            epoch_total_loss = running_total_loss / n_batches
-
-            loss_history[phase].append(epoch_total_loss)
-
-            logging.debug("{} LOSS STATISTICS FOR EPOCH {}: ".format(phase, epoch + 1))
-            logging.debug("Reconstruction Loss: {:.6f}".format(epoch_recon_loss))
-            logging.debug("Regularizer loss: {:.6f}".format(epoch_regularizer_loss))
-            logging.debug(
-                "Latent classifier loss: {:.6f}".format(epoch_latent_clf_loss)
+            epoch_statistics = process_epoch_two_domains(
+                domain_configs=domain_configs,
+                latent_dcm=latent_dcm,
+                latent_dcm_optimizer=latent_dcm_optimizer,
+                latent_dcm_loss=latent_dcm_loss,
+                latent_clf=latent_clf,
+                latent_clf_optimizer=latent_clf_optimizer,
+                latent_clf_loss=latent_clf_loss,
+                alpha=alpha,
+                use_dcm=use_dcm,
+                use_clf=use_clf,
+                phase=phase,
+                device=device,
             )
+
+            logging.debug(
+                "{} LOSS STATISTICS FOR EPOCH {}: ".format(phase.upper(), i + 1)
+            )
+
+            logging.debug(
+                "Reconstruction Loss for {} domain: {:.8f}".format(
+                    domain_names[0], epoch_statistics["recon_loss_i"]
+                )
+            )
+            logging.debug(
+                "Accuracy of DCM for {} domain: {:.8f}".format(
+                    domain_names[0], epoch_statistics["accuracy_i"]
+                )
+            )
+
+            logging.debug(
+                "Reconstruction Loss for {} domain: {:.8f}".format(
+                    domain_names[1], epoch_statistics["recon_loss_j"]
+                )
+            )
+            logging.debug(
+                "Accuracy of DCM for {} domain: {:.8f}".format(
+                    domain_names[1], epoch_statistics["accuracy_j"]
+                )
+            )
+
+            logging.debug(
+                "Latent autoencoder discriminator loss: {:.8f}".format(
+                    epoch_statistics["ae_dcm_loss"]
+                )
+            )
+            logging.debug(
+                "Latent discriminator loss: {:.8f}".format(epoch_statistics["dcm_loss"])
+            )
+            if "clf_loss" in epoch_statistics:
+                logging.debug(
+                    "Latent classifier loss: {:.8f}".format(
+                        epoch_statistics["clf_loss"]
+                    )
+                )
+
             logging.debug("***" * 20)
+
+            epoch_total_loss = epoch_statistics["total_loss"]
             logging.debug("Total loss: {:.6f}".format(epoch_total_loss))
 
-            if phase == "val" and epoch_total_loss < best_loss:
-                best_loss = epoch_total_loss
-                best_vae_weights = copy.deepcopy(vae.state_dict())
-                best_latent_clf_weights = copy.deepcopy(latent_classifier.state_dict())
-                torch.save(vae, output_dir + "/vae.pth")
-                torch.save(latent_classifier, output_dir + "/latent_clf.pth")
-            elif phase == "val" and epoch_total_loss > best_loss:
-                early_stopping_counter += 1
-
-    # Training finished
-    time_elapsed = time.time() - start_time
-    logging.debug(
-        "Training finished after {:.0f}m {:.0f}s".format(
-            time_elapsed // 60, time_elapsed % 60
-        )
-    )
-
-    # Load best models
-    vae.load_state_dict(best_vae_weights)
-    latent_classifier.load_state_dict(best_latent_clf_weights)
-
-    if "test" in data_loaders_dict:
-        running_recon_loss = 0.0
-        running_regularizer_loss = 0.0
-        running_latent_clf_loss = 0.0
-        running_total_loss = 0.0
-        for index, data in enumerate(data_loaders_dict["test"]):
-            inputs = data[data_key].to(device)
-            labels = data[label_key].to(device)
-
-            # compute loss
-            recon, z, mu, logvar = vae(inputs)
-            latent_clf_output = latent_classifier(z)
-
-            recon_loss = loss_dict["vae"](recon, inputs)
-            regularizer_loss = loss_dict["regularizer"](mu, logvar)
-            latent_clf_loss = loss_dict["latent_clf"](latent_clf_output, labels)
-
-            loss = (
-                recon_loss
-                + loss_dict["regularizer_weight"] * regularizer_loss
-                + loss_dict["latent_clf_weight"] * latent_clf_loss
-            )
-
-            # compute batch statistics
-            running_recon_loss += recon_loss.item()
-            running_regularizer_loss += regularizer_loss.item()
-            running_latent_clf_loss += latent_clf_loss.item()
-            running_total_loss += loss.item()
-
-        # compute epoch statistics
-        n_batches = len(data_loaders_dict["test"])
-        epoch_recon_loss = running_recon_loss / n_batches
-        epoch_regularizer_loss = running_regularizer_loss / n_batches
-        epoch_latent_clf_loss = running_latent_clf_loss / n_batches
-        epoch_total_loss = running_total_loss / n_batches
-
-        loss_history["test"] = epoch_total_loss
-
-        logging.debug("{} LOSS STATISTICS: ".format("test"))
-        logging.debug("Reconstruction Loss: {:.6f}".format(epoch_recon_loss))
-        logging.debug("Regularizer loss: {:.6f}".format(epoch_regularizer_loss))
-        logging.debug("Latent classifier loss: {:.6f}".format(epoch_latent_clf_loss))
-        logging.debug("***" * 20)
-        logging.debug("Total loss: {:.6f}".format(epoch_total_loss))
-
-    return vae, latent_classifier, loss_history
-
-
-def train_combined_architecture(
-    model: nn.Module,
-    data_loaders_dict: dict,
-    optimizer: Optimizer,
-    loss_dict: dict,
-    data_key: str = "image",
-    label_key: str = "label",
-    n_epochs: int = 500,
-    early_stopping: int = -1,
-    device: device = None,
-    output_dir: str = "../../data/exps/",
-) -> Tuple[nn.Module, dict]:
-    if early_stopping < 0:
-        early_stopping = n_epochs
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    if not device:
-        device = get_device()
-
-    start_time = time.time()
-
-    model = model.to(device)
-
-    best_model_weights = copy.deepcopy(model.state_dict())
-
-    loss_history = {"train": [], "val": []}
-
-    best_loss = np.infty
-    early_stopping_counter = 0
-
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer=optimizer, mode="min", verbose=True
-    )
-
-    for epoch in range(n_epochs):
-        logging.debug("Started epoch {}/{}".format(epoch + 1, n_epochs))
-        logging.debug("---" * 20)
-
-        if early_stopping_counter > early_stopping:
-            logging.debug(
-                "Training was stopped early due to no improvement of the validation"
-                " loss for {} epochs.".format(early_stopping)
-            )
-            break
-
-        for phase in ["train", "val"]:
-            if phase == "train":
-                model.train()
-            else:
-                model.eval()
-
-            running_recon_loss = 0.0
-            running_regularizer_loss = 0.0
-            running_latent_clf_loss = 0.0
-            running_total_loss = 0.0
-
-            for index, data in enumerate(data_loaders_dict[phase]):
-                inputs = data[data_key].to(device)
-                batch_size = inputs.size()[0]
-                labels = data[label_key].to(device).view(-1)
-
-                # reset optimizers
-                optimizer.zero_grad()
-
-                # compute loss
-                with torch.set_grad_enabled(
-                    phase == "train"
-                ) and torch.autograd.set_detect_anomaly(False):
-                    recon, z, mu, logvar, latent_clf_preds = model(inputs)
-                    recon_loss = loss_dict["recon_loss"](recon, inputs)
-                    regularizer_loss = loss_dict["regularizer_loss"](mu, logvar)
-                    latent_clf_loss = loss_dict["latent_clf_loss"](
-                        latent_clf_preds, labels
-                    )
-
-                    loss = (
-                        recon_loss
-                        + loss_dict["regularizer_weight"] * regularizer_loss
-                        + loss_dict["latent_clf_weight"] * latent_clf_loss
-                    )
-
-                # backpropagate loss
-                if phase == "train":
-                    with torch.autograd.set_detect_anomaly(False):
-                        loss.backward()
-                        optimizer.step()
-
-                # compute batch statistics
-                running_recon_loss += recon_loss.item()
-                running_regularizer_loss += regularizer_loss.item()
-                running_latent_clf_loss += latent_clf_loss.item()
-                running_total_loss += loss.item()
-
-            # compute epoch statistics
-            n_batches = len(data_loaders_dict[phase])
-            epoch_recon_loss = running_recon_loss / n_batches
-            epoch_regularizer_loss = running_regularizer_loss / n_batches
-            epoch_latent_clf_loss = running_latent_clf_loss / n_batches
-            epoch_total_loss = running_total_loss / n_batches
-
-            loss_history[phase].append(epoch_total_loss)
-
-            logging.debug(
-                "{} LOSS STATISTICS FOR EPOCH {}: ".format(phase.upper(), epoch + 1)
-            )
-            logging.debug(
-                "{} Reconstruction Loss: {:.6f}".format(phase.upper(), epoch_recon_loss)
-            )
-            logging.debug(
-                "{} Regularizer loss: {:.6f}".format(
-                    phase.upper(), epoch_regularizer_loss
-                )
-            )
-            logging.debug(
-                "{} Latent classifier loss: {:.6f}".format(
-                    phase.upper(), epoch_latent_clf_loss
-                )
-            )
-            logging.debug("***" * 20)
-            logging.debug(
-                "{} Total loss: {:.6f}".format(phase.upper(), epoch_total_loss)
-            )
-            logging.debug(" ")
+            total_loss_dict[phase].append(epoch_total_loss)
 
             if phase == "val":
-                scheduler.step(epoch_total_loss)
-            if phase == "val" and epoch_total_loss < best_loss:
-                best_loss = epoch_total_loss
-                best_model_weights = copy.deepcopy(model.state_dict())
-                torch.save(model, output_dir + "/augmented_ae.pth")
-                early_stopping_counter = 0
-            elif phase == "val" and epoch_total_loss > best_loss:
-                early_stopping_counter += 1
-        logging.debug("===" * 20)
-        logging.debug(" ")
-
-    # Training finished
-    time_elapsed = time.time() - start_time
-    logging.debug(
-        "Training finished after {:.0f}m {:.0f}s".format(
-            time_elapsed // 60, time_elapsed % 60
-        )
-    )
-
-    # Load best models
-    model.load_state_dict(best_model_weights)
-
-    if "test" in data_loaders_dict:
-        running_recon_loss = 0.0
-        running_regularizer_loss = 0.0
-        running_latent_clf_loss = 0.0
-        running_total_loss = 0.0
-        for index, data in enumerate(data_loaders_dict["test"]):
-            inputs = data[data_key].to(device)
-            labels = data[label_key].to(device).view(-1)
-
-            # compute loss
-            recon, z, mu, logvar, latent_clf_preds = model(inputs)
-
-            recon_loss = loss_dict["recon_loss"](recon, inputs)
-            regularizer_loss = loss_dict["regularizer_loss"](mu, logvar)
-            latent_clf_loss = loss_dict["latent_clf_loss"](latent_clf_preds, labels)
-
-            loss = (
-                recon_loss
-                + loss_dict["regularizer_weight"] * regularizer_loss
-                + loss_dict["latent_clf_weight"] * latent_clf_loss
-            )
-
-            # compute batch statistics
-            running_recon_loss += recon_loss.item()
-            running_regularizer_loss += regularizer_loss.item()
-            running_latent_clf_loss += latent_clf_loss.item()
-            running_total_loss += loss.item()
-
-        # compute epoch statistics
-        n_batches = len(data_loaders_dict["test"])
-        epoch_recon_loss = running_recon_loss / n_batches
-        epoch_regularizer_loss = running_regularizer_loss / n_batches
-        epoch_latent_clf_loss = running_latent_clf_loss / n_batches
-        epoch_total_loss = running_total_loss / n_batches
-
-        loss_history["test"] = epoch_total_loss
-
-        logging.debug("{} LOSS STATISTICS: ".format("TEST"))
-        logging.debug("{} Reconstruction Loss: {:.6f}".format("TEST", epoch_recon_loss))
-        logging.debug(
-            "{} Regularizer loss: {:.6f}".format("TEST", epoch_regularizer_loss)
-        )
-        logging.debug(
-            "{} Latent classifier loss: {:.6f}".format("TEST", epoch_latent_clf_loss)
-        )
-        logging.debug("***" * 20)
-        logging.debug("{} Total loss: {:.6f}".format("TEST", epoch_total_loss))
-        logging.debug(" ")
-        logging.debug(" ")
-
-    return model, loss_history
-
-
-def train_combined_architecture_notebook(
-    model: nn.Module,
-    data_loaders_dict: dict,
-    optimizer: Optimizer,
-    loss_dict: dict,
-    data_key: str = "image",
-    label_key: str = "label",
-    n_epochs: int = 500,
-    early_stopping: int = -1,
-    visualize_performance=100,
-    device: device = None,
-    output_dir: str = "../../data/exps/",
-) -> Tuple[nn.Module, dict]:
-    if early_stopping < 0:
-        early_stopping = n_epochs
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    if not device:
-        device = get_device()
-
-    start_time = time.time()
-
-    model = model.to(device)
-
-    best_model_weights = copy.deepcopy(model.state_dict())
-
-    loss_history = {"train": [], "val": []}
-
-    best_loss = np.infty
-    early_stopping_counter = 0
-
-    for epoch in tnrange(n_epochs, desc="Epoch progress"):
-        logging.debug("Started epoch {}/{}".format(epoch + 1, n_epochs))
-        logging.debug("--" * 20)
-
-        if early_stopping_counter > early_stopping:
-            logging.debug(
-                "Training was stopped early due to no improvement of the validation"
-                " loss for {} epochs.".format(early_stopping)
-            )
-            break
-
-        for phase in ["train", "val"]:
-            logging.debug("Start phase {}".format(phase))
-            if phase == "train":
-                model.train()
-            else:
-                model.eval()
-
-            running_recon_loss = 0.0
-            running_regularizer_loss = 0.0
-            running_latent_clf_loss = 0.0
-            running_total_loss = 0.0
-
-            for j in tqdm_notebook(
-                range(len(data_loaders_dict[phase])), desc="Within-epoch progress"
-            ):
-                data = data_loaders_dict[phase][j]
-                inputs = data[data_key].to(device)
-                labels = data[label_key].to(device)
-
-                # reset optimizers
-                optimizer.zero_grad()
-
-                # compute loss
-                with torch.set_grad_enabled(
-                    phase == "train"
-                ) and torch.autograd.set_detect_anomaly(False):
-                    recons, z, mu, logvar, clf_preds = model(inputs)
-
-                    recon_loss = loss_dict["vae"](recons, inputs)
-                    regularizer_loss = loss_dict["regularizer"](mu, logvar)
-                    latent_clf_loss = loss_dict["latent_clf"](clf_preds, labels)
-
-                    loss = (
-                        recon_loss
-                        + loss_dict["regularizer_weight"] * regularizer_loss
-                        + loss_dict["latent_clf_weight"] * latent_clf_loss
+                # Save model states if current parameters give the best validation loss
+                if epoch_total_loss < best_total_loss:
+                    best_vae_i_weights = copy.deepcopy(
+                        domain_configs[0].domain_model_config.model.cpu().state_dict()
+                    )
+                    best_vae_j_weights = copy.deepcopy(
+                        domain_configs[1].domain_model_config.model.cpu().state_dict()
                     )
 
-                # backpropagate loss
-                if phase == "train":
-                    with torch.autograd.set_detect_anomaly(False):
-                        loss.backward()
-                        optimizer.step()
+                    best_model_configs["best_vae_i_weights"] = best_vae_i_weights
+                    best_model_configs["best_vae_j_weights"] = best_vae_j_weights
 
-                # compute batch statistics
-                running_recon_loss += recon_loss.item()
-                running_regularizer_loss += regularizer_loss.item()
-                running_latent_clf_loss += latent_clf_loss.item()
-                running_total_loss += loss.item()
+                    torch.save(
+                        best_vae_i_weights,
+                        "{}/best_vae_{}.pth".format(output_dir, domain_names[0]),
+                    )
+                    torch.save(
+                        best_vae_j_weights,
+                        "{}/best_vae_{}.pth".format(output_dir, domain_names[1]),
+                    )
 
-            # Visualize performance
-            if epoch % visualize_performance == 0 and phase == "val":
-                latent_representations = model.reparameterize(mu, logvar)
-                samples = model.decode(latent_representations)
-                input_fig, output_fig, sample_fig = visualize_model_performance(
-                    inputs=inputs,
-                    outputs=recons,
-                    samples=samples,
-                    labels=labels,
-                    label_dict=None,
-                )
-                input_fig.show()
-                output_fig.show()
-                sample_fig.show()
+                    if latent_dcm is not None:
+                        best_latent_dcm_weights = copy.deepcopy(
+                            latent_dcm.cpu().state_dict()
+                        )
+                        best_model_configs["dcm_weights"] = best_latent_dcm_weights
+                        torch.save(
+                            best_latent_dcm_weights,
+                            "{}/best_dcm.pth".format(output_dir),
+                        )
+                    if latent_clf is not None:
+                        best_latent_clf_weights = copy.deepcopy(
+                            latent_clf.cpu().state_dict()
+                        )
+                        best_model_configs["clf_weights"] = best_latent_clf_weights
+                        torch.save(
+                            best_latent_clf_weights,
+                            "{}/best_clf.pth".format(output_dir),
+                        )
 
-            # compute epoch statistics
-            n_batches = len(data_loaders_dict[phase])
-            epoch_recon_loss = running_recon_loss / n_batches
-            epoch_regularizer_loss = running_regularizer_loss / n_batches
-            epoch_latent_clf_loss = running_latent_clf_loss / n_batches
-            epoch_total_loss = running_total_loss / n_batches
+                if i % save_freq == 0:
 
-            loss_history[phase].append(epoch_total_loss)
+                    domain_model_configs = [
+                        domain_configs[0].domain_model_config,
+                        domain_configs[1].domain_model_config,
+                    ]
+                    generate_images(
+                        domain_model_configs=domain_model_configs,
+                        epoch=i,
+                        output_dir=output_dir,
+                        device=device,
+                    )
 
-            logging.debug("{} LOSS STATISTICS FOR EPOCH {}: ".format(phase, epoch + 1))
-            logging.debug("Reconstruction Loss: {:.6f}".format(epoch_recon_loss))
-            logging.debug("Regularizer loss: {:.6f}".format(epoch_regularizer_loss))
-            logging.debug(
-                "Latent classifier loss: {:.6f}".format(epoch_latent_clf_loss)
-            )
-            logging.debug("***" * 20)
-            logging.debug("Total loss: {:.6f}".format(epoch_total_loss))
+                    # Save model states regularly
+                    checkpoint_dir = " {}/checkpoint_{}".format(output_dir, i + 1)
+                    os.makedirs(checkpoint_dir, exist_ok=True)
 
-            if phase == "val" and epoch_total_loss < best_loss:
-                best_loss = epoch_total_loss
-                best_model_weights = copy.deepcopy(model.state_dict())
-                torch.save(model, output_dir + "/augmented_ae.pth")
-            elif phase == "val" and epoch_total_loss > best_loss:
-                early_stopping_counter += 1
+                    vae_i_weights = copy.deepcopy(
+                        domain_configs[0].domain_model_config.model.cpu().state_dict()
+                    )
+                    vae_j_weights = copy.deepcopy(
+                        domain_configs[1].domain_model_config.model.cpu().state_dict()
+                    )
+                    torch.save(
+                        vae_i_weights,
+                        "{}/vae_{}.pth".format(checkpoint_dir, domain_names[0]),
+                    )
+                    torch.save(
+                        vae_j_weights,
+                        "{}/vae_{}.pth".format(checkpoint_dir, domain_names[1]),
+                    )
 
-    # Training finished
+                    if latent_dcm is not None:
+                        latent_dcm_weights = copy.deepcopy(
+                            latent_dcm.cpu().state_dict()
+                        )
+                        torch.save(
+                            latent_dcm_weights, "{}/dcm.pth".format(checkpoint_dir)
+                        )
+                    if latent_clf is not None:
+                        latent_clf_weights = copy.deepcopy(
+                            latent_clf.cpu().state_dict()
+                        )
+                        torch.save(
+                            latent_clf_weights, "{}/clf.pth".format(checkpoint_dir)
+                        )
+
+    # Training complete
     time_elapsed = time.time() - start_time
+
+    logging.debug("###" * 20)
     logging.debug(
-        "Training finished after {:.0f}m {:.0f}s".format(
+        "Training completed in {:.f0}m {:0f}s".format(
             time_elapsed // 60, time_elapsed % 60
         )
     )
 
     # Load best models
-    model.load_state_dict(best_model_weights)
+    domain_configs[0].domain_model_config.model.load_state_dict(best_vae_i_weights)
+    domain_configs[1].domain_model_config.model.load_state_dict(best_vae_j_weights)
 
-    if "test" in data_loaders_dict:
-        running_recon_loss = 0.0
-        running_regularizer_loss = 0.0
-        running_latent_clf_loss = 0.0
-        running_total_loss = 0.0
-        for index, data in enumerate(data_loaders_dict["test"]):
-            inputs = data[data_key].to(device)
-            labels = data[label_key].to(device)
+    if latent_dcm is not None:
+        latent_dcm.load_state_dict(best_latent_dcm_weights)
+    if latent_clf is not None:
+        latent_clf.load_state_dict(best_latent_clf_weights)
 
-            # compute loss
-            recon, z, mu, logvar, clf_preds = model(inputs)
+    if "test" in domain_configs[0].data_loader_dict:
+        epoch_statistics = process_epoch_two_domains(
+            domain_configs=domain_configs,
+            latent_dcm=latent_dcm,
+            latent_dcm_optimizer=latent_dcm_optimizer,
+            latent_dcm_loss=latent_dcm_loss,
+            latent_clf=latent_clf,
+            latent_clf_optimizer=latent_clf_optimizer,
+            latent_clf_loss=latent_clf_loss,
+            alpha=alpha,
+            use_dcm=use_dcm,
+            use_clf=use_clf,
+            phase="test",
+            device=device,
+        )
 
-            recon_loss = loss_dict["vae"](recon, inputs)
-            regularizer_loss = loss_dict["regularizer"](mu, logvar)
-            latent_clf_loss = loss_dict["latent_clf"](clf_preds, labels)
+        logging.debug("###" * 20)
+        logging.debug("TEST LOSS STATISTICS: ")
 
-            loss = (
-                recon_loss
-                + loss_dict["regularizer_weight"] * regularizer_loss
-                + loss_dict["latent_clf_weight"] * latent_clf_loss
+        logging.debug(
+            "Reconstruction Loss for {} domain: {:.8f}".format(
+                domain_names[0], epoch_statistics["recon_loss_i"]
+            )
+        )
+        logging.debug(
+            "Accuracy of DCM for {} domain: {:.8f}".format(
+                domain_names[0], epoch_statistics["accuracy_i"]
+            )
+        )
+
+        logging.debug(
+            "Reconstruction Loss for {} domain: {:.8f}".format(
+                domain_names[1], epoch_statistics["recon_loss_j"]
+            )
+        )
+        logging.debug(
+            "Accuracy of DCM for {} domain: {:.8f}".format(
+                domain_names[1], epoch_statistics["accuracy_j"]
+            )
+        )
+
+        logging.debug(
+            "Latent autoencoder discriminator loss: {:.8f}".format(
+                epoch_statistics["ae_dcm_loss"]
+            )
+        )
+        logging.debug(
+            "Latent discriminator loss: {:.8f}".format(epoch_statistics["dcm_loss"])
+        )
+        if "clf_loss" in epoch_statistics:
+            logging.debug(
+                "Latent classifier loss: {:.8f}".format(epoch_statistics["clf_loss"])
             )
 
-            # compute batch statistics
-            running_recon_loss += recon_loss.item()
-            running_regularizer_loss += regularizer_loss.item()
-            running_latent_clf_loss += latent_clf_loss.item()
-            running_total_loss += loss.item()
-
-        # compute epoch statistics
-        n_batches = len(data_loaders_dict["test"])
-        epoch_recon_loss = running_recon_loss / n_batches
-        epoch_regularizer_loss = running_regularizer_loss / n_batches
-        epoch_latent_clf_loss = running_latent_clf_loss / n_batches
-        epoch_total_loss = running_total_loss / n_batches
-
-        loss_history["test"] = epoch_total_loss
-
-        logging.debug("{} LOSS STATISTICS: ".format("test"))
-        logging.debug("Reconstruction Loss: {:.6f}".format(epoch_recon_loss))
-        logging.debug("Regularizer loss: {:.6f}".format(epoch_regularizer_loss))
-        logging.debug("Latent classifier loss: {:.6f}".format(epoch_latent_clf_loss))
         logging.debug("***" * 20)
+
+        epoch_total_loss = epoch_statistics["total_loss"]
         logging.debug("Total loss: {:.6f}".format(epoch_total_loss))
 
-    return model, loss_history
-
-
-def get_loss_dict(
-    vae_loss: str = "mse",
-    latent_clf_loss: str = "ce",
-    latent_clf_class_weights: List = None,
-    regularizer_loss: str = "kld",
-    latent_clf_weight: float = 1.0,
-    regularizer_weight: float = 1.0,
-) -> dict:
-    device = get_device()
-
-    if vae_loss == "l2":
-        vae_loss = nn.MSELoss()
-    elif vae_loss == "l1":
-        vae_loss = nn.L1Loss()
-    elif vae_loss == "bce":
-        vae_loss = nn.BCELoss()
-    else:
-        raise NotImplementedError("Unknown loss type: {}".format(vae_loss))
-
-    if latent_clf_loss == "ce":
-        latent_clf_loss = nn.CrossEntropyLoss(
-            weight=torch.FloatTensor(latent_clf_class_weights).to(device)
-        )
-    elif latent_clf_loss == "bce":
-        latent_clf_loss = nn.BCELoss(
-            weight=torch.FloatTensor(latent_clf_class_weights).to(device)
-        )
-    else:
-        raise NotImplementedError("Unknown loss type: {}".format(vae_loss))
-
-    if regularizer_loss == "kld":
-        regularizer_loss = KLDLoss()
-    else:
-        raise NotImplementedError
-
-    loss_dict = {
-        "recon_loss": vae_loss,
-        "latent_clf_loss": latent_clf_loss,
-        "regularizer_loss": regularizer_loss,
-        "latent_clf_weight": latent_clf_weight,
-        "regularizer_weight": regularizer_weight,
+    # Summarize return parameters
+    trained_models = {
+        "vae_i": domain_configs[0].domain_model_config.model,
+        "vae_j": domain_configs[1].domain_model_config.model,
     }
-    return loss_dict
+    if latent_dcm is not None:
+        trained_models["dcm"] = latent_dcm
+    if latent_clf is not None:
+        trained_models["clf"] = latent_clf
+
+    return trained_models, total_loss_dict
+
+
+def generate_images(
+    domain_model_configs: List[DomainModelConfig],
+    epoch: int,
+    output_dir: str,
+    device: str = "cuda:0",
+):
+    # Todo make more generic
+    image_dir = os.path.join(output_dir, "images")
+    os.makedirs(image_dir, exist_ok=True)
+
+    image_vae = domain_model_configs[0].model
+    rna_vae = domain_model_configs[1].model
+
+    for i in range(5):
+        rna_inputs = domain_model_configs[1].inputs
+        rna_inputs = Variable(rna_inputs.unsqueeze(0)).to(device)
+
+        image_inputs = domain_model_configs[0].inputs
+        image_inputs = Variable(image_inputs.unsqueeze(0)).to(device)
+
+        _, rna_latents, _, _ = rna_vae(rna_inputs)
+        recon_inputs = image_vae.decode(rna_latents)
+        imageio.imwrite(
+            os.path.join(image_dir, "epoch_%s_trans_%s.jpg" % (epoch, i)),
+            np.uint8(recon_inputs.cpu().data.view(64, 64).numpy() * 255),
+        )
+        recon_images, _, _, _ = image_vae(image_inputs)
+        imageio.imwrite(
+            os.path.join(image_dir, "epoch_%s_recon_%s.jpg" % (epoch, i)),
+            np.uint8(recon_images.cpu().data.view(64, 64).numpy() * 255),
+        )
+
+
+def get_optimizer_for_model(optimizer_dict: dict, model: Module) -> Optimizer:
+    optimizer_type = optimizer_dict.pop("type")
+    if optimizer_type == "adam":
+        optimizer = Adam(model.parameters(), **optimizer_dict)
+    elif optimizer_type == "rmsprop":
+        optimizer = RMSprop(model.parameters(), **optimizer_dict)
+    else:
+        raise NotImplementedError('Unknown optimizer type "{}"'.format(optimizer_type))
+    return optimizer
+
+
+def get_domain_configuration(
+    name: str,
+    model_dict: dict,
+    optimizer_dict: dict,
+    recon_loss_fct_dict: dict,
+    data_loader_dict: dict,
+    data_key: str,
+    label_key: str,
+) -> DomainConfig:
+
+    model_type = model_dict.pop("type")
+    if model_type == "VanillaConvVAE":
+        model = VanillaConvVAE(**model_dict)
+    elif model_type == "VanillaVAE":
+        model = VanillaVAE(**model_dict)
+    else:
+        raise NotImplementedError('Unknown model type "{}"'.format(model_type))
+
+    optimizer = get_optimizer_for_model(optimizer_dict=optimizer_dict, model=model)
+
+    recon_loss_fct_type = recon_loss_fct_dict.pop("type")
+    if recon_loss_fct_type == "mae":
+        recon_loss_function = L1Loss()
+    elif recon_loss_fct_type == "mse":
+        recon_loss_function = MSELoss()
+    elif recon_loss_fct_type == "bce":
+        recon_loss_function = BCELoss()
+    else:
+        raise NotImplementedError(
+            'Unknown loss function type "{}"'.format(recon_loss_fct_type)
+        )
+
+    domain_config = DomainConfig(
+        name=name,
+        model=model,
+        optimizer=optimizer,
+        recon_loss_function=recon_loss_function,
+        data_loader_dict=data_loader_dict,
+        data_key=data_key,
+        label_key=label_key,
+    )
+
+    return domain_config
+
+
+def get_latent_model_configuration(
+    model_dict: dict, optimizer_dict: dict, loss_dict: dict, device: None
+) -> dict:
+
+    if device is None:
+        device = get_device()
+
+    model_type = model_dict.pop("type")
+    if model_type == "LatentDiscriminator":
+        model = LatentDiscriminator(**model_dict)
+    elif model_type == "LinearClassifier":
+        model = LinearClassifier(**model_dict)
+    else:
+        raise NotImplementedError('Unknown model type "{}"'.format(model_type))
+
+    optimizer = get_optimizer_for_model(optimizer_dict=optimizer_dict, model=model)
+
+    try:
+        weights = torch.FloatTensor(loss_dict.pop("weights")).to(device)
+    except KeyError:
+        weights = torch.FloatTensor(model_dict["n_classes"]).to(device)
+
+    loss_type = loss_dict.pop("type")
+    if loss_type == "ce":
+        latent_loss = CrossEntropyLoss(weight=weights)
+    else:
+        raise NotImplementedError('Unknown loss type "{}"'.format(loss_type))
+
+    latent_model_config = {"model": model, "optimizer": optimizer, "loss": latent_loss}
+    return latent_model_config

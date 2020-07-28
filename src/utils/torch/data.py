@@ -9,7 +9,8 @@ from torchvision.transforms import Compose
 from src.data.datasets import (
     TorchTransformableSubset,
     TorchNucleiImageDataset,
-    TorchSeqDataset, LabeledDataset,
+    TorchSeqDataset,
+    LabeledDataset,
 )
 
 
@@ -39,6 +40,7 @@ def init_seq_dataset(
         transform_pipeline=transform_pipeline,
     )
     logging.debug("Samples loaded: {}".format(len(seq_dataset)))
+    return seq_dataset
 
 
 class DataHandler(object):

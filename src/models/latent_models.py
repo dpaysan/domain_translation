@@ -27,3 +27,14 @@ class LatentDiscriminator(nn.Module):
     def forward(self, input: Tensor) -> Tensor:
         output = self.model(input)
         return output
+
+
+class LinearClassifier(nn.Module):
+    def __init__(self, latent_dim: int = 128, n_classes: int = 2):
+        super().__init__()
+        self.latent_dim = latent_dim
+        self.n_classes = n_classes
+        self.model = nn.Linear(self.latent_dim, self.n_classes)
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        return self.model(inputs)
