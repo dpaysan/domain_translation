@@ -92,7 +92,7 @@ class DataHandler(object):
             "test": test_dataset,
         }
 
-    def get_data_loader_dict(self, shuffle: bool = False,) -> None:
+    def get_data_loader_dict(self, shuffle: bool = True,) -> None:
         if self.transformation_dict is not None:
             for k, transform_pipeline in self.transformation_dict.items():
                 self.train_val_test_datasets_dict[k].set_transform_pipeline(
@@ -105,6 +105,7 @@ class DataHandler(object):
                 batch_size=self.batch_size,
                 shuffle=shuffle,
                 num_workers=self.num_workers,
+                drop_last=True,
             )
 
         self.data_loader_dict = data_loader_dict

@@ -55,7 +55,7 @@ class TorchNucleiImageDataset(LabeledDataset):
     def process_image(self, image_loc: str) -> Tensor:
         image = io.imread(image_loc)
         image = np.float32(image)
-        image = torch.from_numpy(image)
+        image = torch.from_numpy(image).unsqueeze(0)
         return image
 
 
@@ -65,7 +65,7 @@ class TorchSeqDataset(LabeledDataset):
         self.seq_data_and_labels_fname = seq_data_and_labels_fname
         seq_data_and_labels = pd.read_csv(self.seq_data_and_labels_fname, index_col=0)
 
-        self.seq_data = np.array(seq_data_and_labels.iloc[:, :-1])
+        self.seq_data = np.array(seq_data_and_labels.iloc[:, :-1]).astype(np.float32)
         self.labels = np.array(seq_data_and_labels.iloc[:, -1]).astype(int)
         self.transform_pipeline = transform_pipeline
 
@@ -74,7 +74,7 @@ class TorchSeqDataset(LabeledDataset):
 
     def __getitem__(self, index: int) -> dict:
         seq_data = torch.from_numpy(self.seq_data[index])
-        label = torch.from_numpy(self.labels[index])
+        label = torch.from_numpy(np.array(self.labels[index]))
         sample = {'seq_data': seq_data, 'label': label}
         return sample
 

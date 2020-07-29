@@ -14,7 +14,7 @@ class LatentDiscriminator(nn.Module):
         self.hidden_dims = hidden_dims
         self.n_classes = n_classes
 
-        model_modules = [nn.Linear(self.latent_dim, hidden_dims[0])]
+        model_modules = [nn.Linear(self.latent_dim + 1, hidden_dims[0])]
         for i in range(0, len(self.hidden_dims) - 1):
             model_modules.append(
                 nn.Sequential(

@@ -19,6 +19,11 @@ def kl_divergence(mu: Tensor, logsigma: Tensor) -> Tensor:
     return kld
 
 
+def compute_KL_loss(mu, logvar):
+    KLloss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    return KLloss
+
+
 class KLDLoss(nn.Module):
     def __init__(self):
         super(KLDLoss, self).__init__()

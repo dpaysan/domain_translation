@@ -27,4 +27,3 @@ class BaseExperiment:
 
         # Other attributes
         self.random_state = random_state
-

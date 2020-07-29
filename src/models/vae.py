@@ -39,22 +39,23 @@ class VanillaConvVAE(BaseVAE, ABC):
         self,
         in_channels: int = 1,
         latent_dim: int = 128,
-        hidden_dims: List = None,
+        hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
+        lrelu_slope: int = 0.2,
         **kwargs
     ) -> None:
         super(BaseVAE, self).__init__()
         self.in_channels = in_channels
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
-        if not self.hidden_dims:
-            self.hidden_dims = [128, 256, 512, 1024, 1024]
+        self.lrelu_slope = lrelu_slope
+        self.updated = False
 
         # encoder
         encoder_modules = [
             nn.Sequential(
                 nn.Conv2d(
                     in_channels=self.in_channels,
-                    out_channels=128,
+                    out_channels=self.hidden_dims[0],
                     kernel_size=4,
                     stride=2,
                     padding=1,
@@ -63,11 +64,11 @@ class VanillaConvVAE(BaseVAE, ABC):
             )
         ]
 
-        for i in range(1, len(hidden_dims)):
+        for i in range(1, len(self.hidden_dims)):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Conv2d(
-                        in_channels=self.in_channels,
+                        in_channels=self.hidden_dims[i - 1],
                         out_channels=self.hidden_dims[i],
                         kernel_size=4,
                         stride=2,
@@ -120,7 +121,7 @@ class VanillaConvVAE(BaseVAE, ABC):
 
     def encode(self, input: Tensor) -> Tuple[Tensor, Tensor]:
         h = self.encoder(input)
-        h = h.view(-1, self.latent_dim)
+        h = h.view(-1, self.hidden_dims[-1] * 2 * 2)
         mu = self.fc1(h)
         logsigma = self.fc2(h)
 
@@ -163,7 +164,7 @@ class VanillaConvVAE(BaseVAE, ABC):
 class VanillaVAE(BaseVAE, ABC):
     def __init__(
         self,
-        in_dims: int = 1,
+        in_dims: int = 7633,
         latent_dim: int = 128,
         hidden_dims: List = None,
         **kwargs
@@ -175,6 +176,7 @@ class VanillaVAE(BaseVAE, ABC):
             self.hidden_dims = [1024, 1024, 1024, 1024, 1024, 1024]
         else:
             self.hidden_dims = hidden_dims
+        self.updated = False
 
         # encoder
         encoder_modules = [
@@ -226,7 +228,7 @@ class VanillaVAE(BaseVAE, ABC):
 
     def reparameterize(self, mu: Tensor, logsigma: Tensor) -> Tensor:
         std = logsigma.mul(0.5).exp()
-        eps = Variable(torch.FloatTensor(std.size()).normal_().to(self.device))
+        eps = Variable(torch.FloatTensor(std.size()).normal_().to(mu.device))
         z = eps * std + mu
         return z
 
