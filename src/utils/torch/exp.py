@@ -135,6 +135,8 @@ def train_autoencoders_two_domains(
     # Calculate adversarial loss - by mixing labels indicating domain with output predictions to "confuse" the
     # discriminator and encourage learning autoencoder that make the distinction between the modalities in the latent
     # space as difficult as possible for the discriminator
+
+    # Todo remove .item() from first term
     dcm_loss = 0.5 * latent_dcm_loss(
         dcm_output_i, domain_labels_j
     ).item() + 0.5 * latent_dcm_loss(dcm_output_j, domain_labels_i)
@@ -175,7 +177,7 @@ def train_autoencoders_two_domains(
         "total_loss": total_loss.item(),
     }
     if use_clf:
-        summary_stats["clf_loss"] = clf_loss
+        summary_stats["clf_loss"] = clf_loss.item()
 
     del recon_loss_i
     del recon_loss_j
@@ -795,11 +797,161 @@ def train_val_test_loop_two_domains(
     return trained_models, total_loss_dict
 
 
+def train_autoencoder(domain_model_config:DomainModelConfig, latent_clf:Module, latent_clf_optimizer:Optimizer,
+                      latent_clf_loss:Module, beta:float=1.0, lamb:float=1e-8, phase:str='train', use_clf:bool=True,
+                      device:str='cuda:0')->dict:
+    # Get all parameters of the configuration for domain i
+    vae = domain_model_config.model
+    optimizer = domain_model_config.optimizer
+    inputs = domain_model_config.inputs
+    labels = domain_model_config.labels
+    recon_loss_fct = domain_model_config.recon_loss_function
+    train = domain_model_config.train
+
+    # Set VAE model to train if defined in respective configuration
+    if phase == "train" and train:
+        vae.train()
+    else:
+        vae.eval()
+
+    vae.to(device)
+    vae.zero_grad()
+
+    if use_clf:
+        assert latent_clf is not None
+        if phase == "train":
+            latent_clf.train()
+        else:
+            latent_clf.eval()
+        latent_clf.to(device)
+        latent_clf.zero_grad()
+
+    # Forward pass of the VAE
+    inputs= inputs.to(device)
+    recons, latents, mu, logvar = vae(inputs)
+
+    # Forward pass latent classifier if it is supposed to be trained and used to assess the integration of the learned
+    # latent spaces
+    if use_clf:
+        clf_output = latent_clf(latents)
+
+    # Compute losses
+
+    recon_loss = recon_loss_fct(recons, inputs)
+    kl_loss = compute_KL_loss(mu, logvar)
+    kl_loss *= lamb
+
+    total_loss = recon_loss + kl_loss
+
+    # Add loss of latent classifier if this is trained
+    if use_clf:
+        clf_loss = 0.5 * (
+                latent_clf_loss(clf_output, labels)
+        )
+        clf_loss *= beta
+        total_loss += clf_loss
+
+    # Backpropagate loss and update parameters if we are in the training phase
+    if phase == "train":
+        total_loss.backward()
+        if train:
+            optimizer.step()
+            vae.updated = True
+        if use_clf:
+            latent_clf_optimizer.step()
+
+    # Get summary statistics
+    batch_size = inputs.size(0)
+    latent_size = mu.size(0)
+    batch_statistics = {
+        "recon_loss_i": recon_loss.item() * batch_size,
+        "kl_loss": kl_loss.item() * latent_size,
+        "total_loss": total_loss.item(),
+    }
+    if use_clf:
+        batch_statistics["clf_loss"] = clf_loss.item()
+
+    del recon_loss
+    del total_loss
+    del kl_loss
+    del latents
+    del inputs
+    del labels
+    del recons
+    del mu
+    del logvar
+
+    return batch_statistics
+
+
+def process_epoch_single_domain(domain_config:DomainConfig, latent_clf:Module=None,
+                                latent_clf_optimizer:Optimizer=None,
+                                latent_clf_loss:Module=None,
+                                beta:float=1.0,
+                                lamb:float=1e-8,
+                                use_clf:bool=True,
+                                phase:str='train',
+                                device:str='cuda:0')->dict:
+
+    # Get domain configurations for the two domains
+    domain_model_config = domain_config.domain_model_config
+    data_loader_dict = domain_config.data_loader_dict
+    train_loader = data_loader_dict[phase]
+    data_key = domain_config.data_key
+    label_key = domain_config.label_key
+
+    # Initialize epoch statistics
+    recon_loss = 0
+    clf_loss = 0
+    kl_loss = 0
+    total_loss = 0
+
+    correct_preds = 0
+    n_preds = 0
+
+    # Iterate over batches
+    for index, samples in enumerate(train_loader):
+        # Set model_configs
+        domain_model_config.inputs = samples[data_key]
+        domain_model_config.labels = samples[label_key]
+
+        batch_statistics = train_autoencoder(domain_model_config=domain_model_config, latent_clf=latent_clf,
+                                             latent_clf_optimizer=latent_clf_optimizer, latent_clf_loss=latent_clf_loss,
+                                             beta=beta, lamb=lamb, phase=phase, device=device)
+
+        recon_loss += batch_statistics['recon_loss']
+        if use_clf:
+            clf_loss += batch_statistics['clf_loss']
+        kl_loss += batch_statistics['kl_loss']
+        total_loss += batch_statistics['total_loss']
+
+        correct_preds += batch_statistics['accuracy'][0]
+        n_preds += batch_statistics['accuracy'][1]
+
+    # Get average over batches for statistics
+    recon_loss /= n_preds
+    kl_loss /= n_preds
+    total_loss /= n_preds
+    accuracy= correct_preds / n_preds
+
+    epoch_statistics = {
+        "recon_loss": recon_loss,
+        "kl_loss": kl_loss,
+        "accuracy": accuracy,
+        "total_loss": total_loss,
+    }
+
+    if use_clf:
+        clf_loss /= n_preds
+        epoch_statistics["clf_loss"] = clf_loss
+
+    return epoch_statistics
+
+
 def train_val_test_loop_vae(
     output_dir: str,
-    domain_config: dict,
+    domain_config: DomainConfig,
     latent_clf_config: dict = None,
-    alpha: float = 0.1,
     beta: float = 1.0,
     lamb: float = 0.00000001,
     use_clf: bool = False,
@@ -808,7 +960,137 @@ def train_val_test_loop_vae(
     early_stopping: int = 20,
     device: str = None,
 ):
-    pass
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Get available device, if cuda is available the GPU will be used
+    if not device:
+        device = get_device()
+
+    # Store start time of the training
+    start_time = time.time()
+
+    # Initialize early stopping counter
+    es_counter = 0
+    if early_stopping < 0:
+        early_stopping = num_epochs
+
+    total_loss_dict = {"train": [], "val": []}
+
+    # Reserve space for best model weights
+    best_vae_weights = domain_config.domain_model_config.model.cpu().state_dict()
+
+    if use_clf:
+        latent_clf = latent_clf_config['model']
+        latent_clf_optimizer = latent_clf_config['optimizer']
+        latent_clf_loss = latent_clf_config['loss']
+    else:
+        latent_clf = None
+        latent_clf_optimizer = None
+        latent_clf_loss = None
+
+    # Reserve space for best latent clf weights
+    if latent_clf is not None:
+        best_clf_weights = latent_clf.cpu().state_dict()
+
+    best_model_configs={'best_vae':best_vae_weights, 'best_clf_weights':best_clf_weights}
+
+    best_total_loss = np.infty
+
+    # Iterate over the epochs
+    for i in range(num_epochs):
+        logging.debug("---" * 20)
+        logging.debug("---" * 20)
+        logging.debug("Started epoch {}/{}".format(i + 1, num_epochs))
+        logging.debug("---" * 20)
+
+        # Check if early stopping is triggered
+        if es_counter > early_stopping:
+            logging.debug(
+                "Training was stopped early due to no improvement of the validation"
+                " loss for {} epochs.".format(early_stopping)
+            )
+            break
+
+        # Iterate over training and validation phase
+        for phase in ["train", "val"]:
+            epoch_statistics = process_epoch_single_domain(
+                domain_config=domain_config,
+                latent_clf=latent_clf,
+                latent_clf_optimizer=latent_clf_optimizer,
+                latent_clf_loss=latent_clf_loss,
+                beta=beta,
+                lamb=lamb,
+                use_clf=use_clf,
+                phase=phase,
+                device=device,
+            )
+
+            logging.debug(
+                "{} LOSS STATISTICS FOR EPOCH {}: ".format(phase.upper(), i + 1)
+            )
+
+            logging.debug(
+                "Reconstruction Loss for {} domain: {:.8f}".format(
+                    domain_config.name, epoch_statistics["recon_loss"]
+                )
+            )
+
+            if use_clf:
+                logging.debug("Latent classifier loss for {} domain: {:.8f}".format(domain_config.name,
+                                                                                    epoch_statistics['clf_loss']))
+
+            epoch_total_loss = epoch_statistics['total_loss']
+            total_loss_dict[phase].append(epoch_total_loss)
+
+            if phase == "val":
+                # Save model states if current parameters give the best validation loss
+                if epoch_total_loss < best_total_loss:
+                    es_counter = 0
+                    best_total_loss = epoch_total_loss
+
+                    best_vae_weights = copy.deepcopy(
+                        domain_config.domain_model_config.model.cpu().state_dict()
+                    )
+                    best_model_configs["best_vae_weights"] = best_vae_weights
+
+                    torch.save(
+                        best_vae_weights,
+                        "{}/best_vae.pth".format(output_dir),
+                    )
+
+                    if latent_clf is not None:
+                        best_latent_clf_weights = copy.deepcopy(
+                            latent_clf.cpu().state_dict()
+                        )
+                        best_model_configs["clf_weights"] = best_latent_clf_weights
+                        torch.save(
+                            best_latent_clf_weights,
+                            "{}/best_clf.pth".format(output_dir),
+                        )
+                else:
+                    es_counter += 1
+
+                if i % save_freq == 0:
+
+                    # Save model states regularly
+                    checkpoint_dir = " {}/checkpoint_{}".format(output_dir, i + 1)
+                    os.makedirs(checkpoint_dir, exist_ok=True)
+
+
+    # Training complete
+    time_elapsed = time.time() - start_time
+
+    logging.debug("###" * 20)
+    logging.debug(
+        "Training completed in {:.0f}m {:0f}s".format(
+            time_elapsed // 60, time_elapsed % 60
+        )
+    )
+
+    #Todo implement test processing
+
+
 
 
 def generate_images(
