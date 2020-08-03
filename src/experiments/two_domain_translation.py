@@ -1,3 +1,4 @@
+import logging
 from typing import List
 
 import torch
@@ -8,12 +9,12 @@ from src.utils.torch.data import (
     init_seq_dataset,
     DataHandler,
 )
-from src.utils.torch.exp import (
+from src.utils.torch.exp import train_val_test_loop_two_domains
+from src.utils.torch.general import get_device
+from src.utils.torch.model import (
     get_domain_configuration,
     get_latent_model_configuration,
-    train_val_test_loop_two_domains,
 )
-from src.utils.torch.general import get_device
 
 
 class TwoDomainTranslationExperiment(BaseExperiment):
@@ -108,7 +109,7 @@ class TwoDomainTranslationExperiment(BaseExperiment):
         dh.get_data_loader_dict()
         self.seq_data_loader_dict = dh.data_loader_dict
 
-    def initialize_image_domain_config(self):
+    def initialize_image_domain_config(self, train_model: bool = True):
         if self.domain_configs is None:
             self.domain_configs = []
 
@@ -124,6 +125,7 @@ class TwoDomainTranslationExperiment(BaseExperiment):
             label_key=self.image_label_key,
             optimizer_dict=optimizer_config,
             recon_loss_fct_dict=recon_loss_config,
+            train_model=train_model,
         )
         self.domain_configs.append(image_domain_config)
 
@@ -172,6 +174,11 @@ class TwoDomainTranslationExperiment(BaseExperiment):
         model_state_dict = torch.load(weights_fname)
         self.domain_configs[id].domain_model_config.model.load_state_dict(
             model_state_dict
+        )
+        logging.debug(
+            "Model loaded from {} and set for domain {}.".format(
+                weights_fname, self.domain_configs[id].name
+            )
         )
 
     def train_models(

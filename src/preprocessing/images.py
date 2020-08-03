@@ -16,6 +16,7 @@ def min_max_scale_images(images: List[ndarray]) -> List[ndarray]:
         min_x = image.min()
         max_x = image.max()
         image = (image - min_x) / (max_x - min_x)
+        image = np.clip(image, 0, 1)
         scaled_images.append(image)
     return scaled_images
 
@@ -32,6 +33,7 @@ def resize_images(images: List[ndarray], size: Tuple[int, int] = (64, 64)):
     scaled_images = []
     for image in images:
         image = cv2.resize(src=image, dsize=size, interpolation=cv2.INTER_CUBIC)
+        image = np.clip(image, 0, 1)
         scaled_images.append(image)
     return scaled_images
 

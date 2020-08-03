@@ -48,9 +48,10 @@ class DataHandler(object):
         self,
         dataset: LabeledDataset,
         batch_size: int = 64,
-        num_workers: int = 0,
+        num_workers: int = 10,
         transformation_dict: dict = None,
         random_state: int = 42,
+        drop_last_batch: bool = True,
     ):
         super().__init__()
         self.dataset = dataset
@@ -58,6 +59,7 @@ class DataHandler(object):
         self.num_workers = num_workers
         self.transformation_dict = transformation_dict
         self.random_state = random_state
+        self.drop_last_batch = drop_last_batch
         self.train_val_test_datasets_dict = None
         self.data_loader_dict = None
 
@@ -105,7 +107,7 @@ class DataHandler(object):
                 batch_size=self.batch_size,
                 shuffle=shuffle,
                 num_workers=self.num_workers,
-                drop_last=True,
+                drop_last=self.drop_last_batch,
             )
 
         self.data_loader_dict = data_loader_dict

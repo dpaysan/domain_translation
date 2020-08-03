@@ -11,6 +11,7 @@ from torchvision.transforms import (
 def get_device():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     return device
+    # return torch.device("cpu")
 
 
 def get_transformation_dict_for_train_val_test():

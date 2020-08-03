@@ -1,9 +1,7 @@
 from typing import List
 
-from torch.optim import Adam
-from torch.optim.rmsprop import RMSprop
-from torch.optim.sgd import SGD
-from src.utils.torch.general import get_transformation_dict_for_train_val_test
+import numpy as np
+import torch
 
 
 class BaseExperiment:
@@ -27,3 +25,13 @@ class BaseExperiment:
 
         # Other attributes
         self.random_state = random_state
+        self.loss_dict = None
+
+        # Fix random seeds for reproducibility and limit applicable algorithms to those believed to be deterministic
+        torch.manual_seed(self.random_state)
+        np.random.seed(self.random_state)
+        # torch.backends.cudnn.deterministic = True
+        # torch.backends.cudnn.benchmark = False
+
+    def visualize_loss_evolution(self):
+        assert self.loss_dict is None

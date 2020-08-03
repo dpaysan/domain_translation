@@ -1,94 +1,131 @@
-import os
 from typing import List
 
 from src.experiments.base import BaseExperiment
-from src.models.vae import AugmentedVAE
-from src.utils.basic.visualization import visualize_vae_performance
-from src.utils.torch.exp import train_combined_architecture
+from src.utils.torch.data import (
+    init_nuclei_image_dataset,
+    DataHandler,
+    init_seq_dataset,
+)
+from src.utils.torch.exp import train_val_test_loop_vae
+from src.utils.torch.general import get_device
+from src.utils.torch.model import (
+    get_domain_configuration,
+    get_latent_model_configuration,
+)
 
 
 class VaeExperiment(BaseExperiment):
     def __init__(
         self,
-        data_dir: str,
         output_dir: str,
+        data_config: dict,
         model_config: dict,
-        optimizer_config: dict,
-        loss_config: dict,
-        train_val_test_split: List = [0.7, 0.2, 0.1],
+        domain_name: str,
+        latent_clf_config: dict = None,
+        train_val_test_split: List[float] = [0.7, 0.2, 0.1],
         batch_size: int = 64,
-        n_epochs: int = 2000,
-        early_stopping: int = 20,
-        data_key: str = "image",
-        label_key: str = "label",
+        num_epochs: int = 64,
+        early_stopping: int = -1,
         random_state: int = 42,
     ):
         super().__init__(
-            data_dir=data_dir,
             output_dir=output_dir,
-            model_config=model_config,
-            optimizer_config=optimizer_config,
-            loss_config=loss_config,
             train_val_test_split=train_val_test_split,
             batch_size=batch_size,
-            n_epochs=n_epochs,
+            num_epochs=num_epochs,
             early_stopping=early_stopping,
-            data_key=data_key,
-            label_key=label_key,
             random_state=random_state,
         )
-        self.fitted_model = None
-        self.loss_history = None
 
-    def init_vae_model(self):
-        model_type = self.model_config.pop("type")
-        if model_type == "augmented_vae":
-            self.model = AugmentedVAE(**self.model_config)
-            self.model_name = "AugmentedVAE"
-        else:
-            raise NotImplementedError
+        self.data_config = data_config
+        self.model_config = model_config
+        self.domain_name = domain_name
+        self.latent_clf_config = latent_clf_config
 
-    def init_optimizer(self):
-        super().init_optimizer()
+        self.data_set = None
+        self.data_transform_pipeline_dict = None
+        self.data_loader_dict = None
+        self.data_key = None
+        self.label_key = None
+        self.domain_config = None
 
-    def init_loss(self):
-        super().init_loss()
+        self.trained_models = None
+        self.loss_dict = None
 
-    def init_data_loader_dict(self, label_weights: dict = None):
-        super().init_data_loader_dict(label_weights=label_weights)
+        self.device = get_device()
 
-    def train_vae_model(self):
-        self.model, self.loss_history = train_combined_architecture(
-            model=self.model,
-            data_loaders_dict=self.data_loader_dict,
-            optimizer=self.optimizer,
-            loss_dict=self.loss_dict,
-            data_key=self.data_key,
-            label_key=self.label_key,
-            n_epochs=self.n_epochs,
-            early_stopping=self.early_stopping,
-            output_dir=self.output_dir,
+    def initialize_image_data_set(self):
+        image_dir = self.data_config["image_dir"]
+        label_fname = self.data_config["label_fname"]
+        self.data_set = init_nuclei_image_dataset(
+            image_dir=image_dir, label_fname=label_fname
+        )
+        self.data_key = self.data_config["data_key"]
+        self.label_key = self.data_config["label_key"]
+
+    def initialize_seq_data_set(self):
+        seq_data_and_labels_fname = self.data_config["data_fname"]
+        self.data_key = self.data_config["data_key"]
+        self.label_key = self.data_config["label_key"]
+        self.data_set = init_seq_dataset(
+            seq_data_and_labels_fname=seq_data_and_labels_fname
         )
 
-    def visualize_model_performance(
-        self, label_dict: dict = None, postfix: str = "unfitted"
+    def initialize_data_loader_dict(self, drop_last_batch: bool = False):
+        dh = DataHandler(
+            dataset=self.data_set,
+            batch_size=self.batch_size,
+            num_workers=0,
+            random_state=self.random_state,
+            transformation_dict=self.data_transform_pipeline_dict,
+            drop_last_batch=drop_last_batch,
+        )
+        dh.stratified_train_val_test_split(splits=self.train_val_test_split)
+        dh.get_data_loader_dict()
+        self.data_loader_dict = dh.data_loader_dict
+
+    def initialize_domain_config(self):
+        model_config = self.model_config["model_config"]
+        optimizer_config = self.model_config["optimizer_config"]
+        recon_loss_config = self.model_config["loss_config"]
+
+        self.domain_config = get_domain_configuration(
+            name=self.domain_name,
+            model_dict=model_config,
+            data_loader_dict=self.data_loader_dict,
+            data_key=self.data_key,
+            label_key=self.label_key,
+            optimizer_dict=optimizer_config,
+            recon_loss_fct_dict=recon_loss_config,
+        )
+
+    def initialize_clf_model(self):
+        model_config = self.latent_clf_config["model_config"]
+        optimizer_config = self.latent_clf_config["optimizer_config"]
+        loss_config = self.latent_clf_config["loss_config"]
+        self.latent_clf_config = get_latent_model_configuration(
+            model_dict=model_config,
+            optimizer_dict=optimizer_config,
+            loss_dict=loss_config,
+            device=self.device,
+        )
+
+    def train_models(
+        self,
+        beta: float = 1.0,
+        lamb: float = 0.00000001,
+        use_clf: bool = False,
+        save_freq: int = 50,
     ):
-        input_fig, output_fig, samples_fig = visualize_vae_performance(
-            vae_model=self.model,
-            data_loader=self.data_loader_dict["test"],
-            data_key=self.data_key,
-            label_key=self.label_key,
-            label_dict=label_dict,
+        self.trained_models, self.loss_dict = train_val_test_loop_vae(
+            output_dir=self.output_dir,
+            domain_config=self.domain_config,
+            latent_clf_config=self.latent_clf_config,
+            num_epochs=self.num_epochs,
+            early_stopping=self.early_stopping,
+            device=self.device,
+            beta=beta,
+            lamb=lamb,
+            use_clf=use_clf,
+            save_freq=save_freq,
         )
-
-        os.makedirs(self.output_dir + "/visualization/", exist_ok=True)
-        input_fig.savefig(
-            self.output_dir + "/visualization/inputs_{}.png".format(postfix)
-        )
-        output_fig.savefig(
-            self.output_dir + "/visualization/recons_{}.png".format(postfix)
-        )
-        if samples_fig is not None:
-            samples_fig.savefig(
-                self.output_dir + "/visualization/samples_{}.png".format(postfix)
-            )

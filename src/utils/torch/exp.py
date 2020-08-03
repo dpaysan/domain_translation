@@ -2,24 +2,24 @@ import copy
 import logging
 import os
 import time
-from typing import List
+from typing import List, Tuple
 
-import imageio
 import numpy as np
 import torch
 from torch import nn
 from torch.autograd import Variable
-from torch.optim.adam import Adam
-from torch.optim.rmsprop import RMSprop
+from torch.nn import Module
+from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 
 from src.functions.loss_functions import compute_KL_loss
 from src.functions.metrics import accuracy
 from src.helper.models import DomainModelConfig, DomainConfig
-from src.models.latent_models import LatentDiscriminator, LinearClassifier
-from src.models.vae import VanillaConvVAE, VanillaVAE
 from src.utils.torch.general import get_device
-from torch.nn import Module, L1Loss, MSELoss, BCELoss, CrossEntropyLoss
+from src.utils.torch.visualization import (
+    visualize_image_translation_performance,
+    visualize_image_vae_performance,
+)
 
 
 def train_autoencoders_two_domains(
@@ -139,7 +139,7 @@ def train_autoencoders_two_domains(
     # Todo remove .item() from first term
     dcm_loss = 0.5 * latent_dcm_loss(
         dcm_output_i, domain_labels_j
-    ).item() + 0.5 * latent_dcm_loss(dcm_output_j, domain_labels_i)
+    ) + 0.5 * latent_dcm_loss(dcm_output_j, domain_labels_i)
 
     total_loss = alpha * (recon_loss_i + recon_loss_j) + kl_loss + dcm_loss
 
@@ -215,7 +215,7 @@ def train_latent_dcm_two_domains(
     use_dcm: bool,
     device: str = "cuda:0",
     phase: str = "train",
-):
+) -> dict:
     # Get the model configurations for the two domains
     model_configuration_i = domain_model_configurations[0]
     model_configuration_j = domain_model_configurations[1]
@@ -331,7 +331,7 @@ def process_epoch_two_domains(
     use_clf: bool = False,
     phase: str = "train",
     device: str = "cuda:0",
-):
+) -> dict:
     # Get domain configurations for the two domains
     domain_config_i = domain_configs[0]
     domain_model_config_i = domain_config_i.domain_model_config
@@ -461,7 +461,7 @@ def train_val_test_loop_two_domains(
     save_freq: int = 10,
     early_stopping: int = 20,
     device: str = None,
-):
+) -> Tuple[dict, dict]:
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -612,7 +612,7 @@ def train_val_test_loop_two_domains(
             logging.debug("***" * 20)
 
             epoch_total_loss = epoch_statistics["total_loss"]
-            logging.debug("Total {} loss: {:.6f}".format(phase, epoch_total_loss))
+            logging.debug("Total {} loss: {:.8f}".format(phase, epoch_total_loss))
             logging.debug("***" * 20)
 
             total_loss_dict[phase].append(epoch_total_loss)
@@ -669,7 +669,7 @@ def train_val_test_loop_two_domains(
                         domain_configs[0].domain_model_config,
                         domain_configs[1].domain_model_config,
                     ]
-                    generate_images(
+                    visualize_image_translation_performance(
                         domain_model_configs=domain_model_configs,
                         epoch=i,
                         output_dir=output_dir,
@@ -677,7 +677,7 @@ def train_val_test_loop_two_domains(
                     )
 
                     # Save model states regularly
-                    checkpoint_dir = " {}/checkpoint_{}".format(output_dir, i + 1)
+                    checkpoint_dir = "{}/epoch_{}".format(output_dir, i + 1)
                     os.makedirs(checkpoint_dir, exist_ok=True)
 
                     vae_i_weights = (
@@ -782,7 +782,9 @@ def train_val_test_loop_two_domains(
         logging.debug("***" * 20)
 
         epoch_total_loss = epoch_statistics["total_loss"]
-        logging.debug("Total loss: {:.6f}".format(epoch_total_loss))
+        logging.debug("Total test loss: {:.8f}".format(epoch_total_loss))
+
+        logging.debug("***" * 20)
 
     # Summarize return parameters
     trained_models = {
@@ -797,9 +799,17 @@ def train_val_test_loop_two_domains(
     return trained_models, total_loss_dict
 
 
-def train_autoencoder(domain_model_config:DomainModelConfig, latent_clf:Module, latent_clf_optimizer:Optimizer,
-                      latent_clf_loss:Module, beta:float=1.0, lamb:float=1e-8, phase:str='train', use_clf:bool=True,
-                      device:str='cuda:0')->dict:
+def train_autoencoder(
+    domain_model_config: DomainModelConfig,
+    latent_clf: Module,
+    latent_clf_optimizer: Optimizer,
+    latent_clf_loss: Module,
+    beta: float = 0.001,
+    lamb: float = 1e-8,
+    phase: str = "train",
+    use_clf: bool = True,
+    device: str = "cuda:0",
+) -> dict:
     # Get all parameters of the configuration for domain i
     vae = domain_model_config.model
     optimizer = domain_model_config.optimizer
@@ -827,7 +837,8 @@ def train_autoencoder(domain_model_config:DomainModelConfig, latent_clf:Module, 
         latent_clf.zero_grad()
 
     # Forward pass of the VAE
-    inputs= inputs.to(device)
+    inputs = inputs.to(device)
+    labels = labels.to(device)
     recons, latents, mu, logvar = vae(inputs)
 
     # Forward pass latent classifier if it is supposed to be trained and used to assess the integration of the learned
@@ -845,9 +856,7 @@ def train_autoencoder(domain_model_config:DomainModelConfig, latent_clf:Module, 
 
     # Add loss of latent classifier if this is trained
     if use_clf:
-        clf_loss = 0.5 * (
-                latent_clf_loss(clf_output, labels)
-        )
+        clf_loss = latent_clf_loss(clf_output, labels.view(-1).long())
         clf_loss *= beta
         total_loss += clf_loss
 
@@ -857,19 +866,24 @@ def train_autoencoder(domain_model_config:DomainModelConfig, latent_clf:Module, 
         if train:
             optimizer.step()
             vae.updated = True
+
         if use_clf:
             latent_clf_optimizer.step()
 
     # Get summary statistics
     batch_size = inputs.size(0)
     latent_size = mu.size(0)
+
     batch_statistics = {
-        "recon_loss_i": recon_loss.item() * batch_size,
+        "recon_loss": recon_loss.item() * batch_size,
         "kl_loss": kl_loss.item() * latent_size,
-        "total_loss": total_loss.item(),
     }
+    total_loss_item = recon_loss.item() * batch_size + kl_loss.item() * latent_size
     if use_clf:
-        batch_statistics["clf_loss"] = clf_loss.item()
+        batch_statistics["clf_loss"] = clf_loss.item() * batch_size
+        batch_statistics["accuracy"] = accuracy(clf_output, labels)
+        total_loss_item += clf_loss.item() * batch_size
+    batch_statistics["total_loss"] = total_loss_item
 
     del recon_loss
     del total_loss
@@ -884,19 +898,22 @@ def train_autoencoder(domain_model_config:DomainModelConfig, latent_clf:Module, 
     return batch_statistics
 
 
-def process_epoch_single_domain(domain_config:DomainConfig, latent_clf:Module=None,
-                                latent_clf_optimizer:Optimizer=None,
-                                latent_clf_loss:Module=None,
-                                beta:float=1.0,
-                                lamb:float=1e-8,
-                                use_clf:bool=True,
-                                phase:str='train',
-                                device:str='cuda:0')->dict:
+def process_epoch_single_domain(
+    domain_config: DomainConfig,
+    latent_clf: Module = None,
+    latent_clf_optimizer: Optimizer = None,
+    latent_clf_loss: Module = None,
+    beta: float = 0.001,
+    lamb: float = 1e-8,
+    use_clf: bool = True,
+    phase: str = "train",
+    device: str = "cuda:0",
+) -> dict:
 
-    # Get domain configurations for the two domains
+    # Get domain configurations for the domain
     domain_model_config = domain_config.domain_model_config
     data_loader_dict = domain_config.data_loader_dict
-    train_loader = data_loader_dict[phase]
+    data_loader = data_loader_dict[phase]
     data_key = domain_config.data_key
     label_key = domain_config.label_key
 
@@ -910,29 +927,41 @@ def process_epoch_single_domain(domain_config:DomainConfig, latent_clf:Module=No
     n_preds = 0
 
     # Iterate over batches
-    for index, samples in enumerate(train_loader):
+    for index, samples in enumerate(data_loader):
         # Set model_configs
         domain_model_config.inputs = samples[data_key]
         domain_model_config.labels = samples[label_key]
 
-        batch_statistics = train_autoencoder(domain_model_config=domain_model_config, latent_clf=latent_clf,
-                                             latent_clf_optimizer=latent_clf_optimizer, latent_clf_loss=latent_clf_loss,
-                                             beta=beta, lamb=lamb, phase=phase, device=device)
+        batch_statistics = train_autoencoder(
+            domain_model_config=domain_model_config,
+            latent_clf=latent_clf,
+            latent_clf_optimizer=latent_clf_optimizer,
+            latent_clf_loss=latent_clf_loss,
+            beta=beta,
+            lamb=lamb,
+            phase=phase,
+            device=device,
+            use_clf=use_clf
+        )
 
-        recon_loss += batch_statistics['recon_loss']
+        recon_loss += batch_statistics["recon_loss"]
         if use_clf:
-            clf_loss += batch_statistics['clf_loss']
-        kl_loss += batch_statistics['kl_loss']
-        total_loss += batch_statistics['total_loss']
+            clf_loss += batch_statistics["clf_loss"]
+            correct_preds += batch_statistics["accuracy"][0]
+            n_preds += batch_statistics["accuracy"][1]
+        kl_loss += batch_statistics["kl_loss"]
+        total_loss += batch_statistics["total_loss"]
 
-        correct_preds += batch_statistics['accuracy'][0]
-        n_preds += batch_statistics['accuracy'][1]
+
 
     # Get average over batches for statistics
-    recon_loss /= n_preds
-    kl_loss /= n_preds
-    total_loss /= n_preds
-    accuracy= correct_preds / n_preds
+    recon_loss /= len(data_loader.dataset)
+    kl_loss /= len(data_loader.dataset)
+    total_loss /= len(data_loader.dataset)
+    if use_clf:
+        accuracy = correct_preds / len(data_loader.dataset)
+    else:
+        accuracy = 0
 
     epoch_statistics = {
         "recon_loss": recon_loss,
@@ -952,14 +981,14 @@ def train_val_test_loop_vae(
     output_dir: str,
     domain_config: DomainConfig,
     latent_clf_config: dict = None,
-    beta: float = 1.0,
+    beta: float = 0.001,
     lamb: float = 0.00000001,
     use_clf: bool = False,
     num_epochs: int = 500,
     save_freq: int = 10,
     early_stopping: int = 20,
     device: str = None,
-):
+) -> Tuple[dict, dict]:
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -981,9 +1010,9 @@ def train_val_test_loop_vae(
     best_vae_weights = domain_config.domain_model_config.model.cpu().state_dict()
 
     if use_clf:
-        latent_clf = latent_clf_config['model']
-        latent_clf_optimizer = latent_clf_config['optimizer']
-        latent_clf_loss = latent_clf_config['loss']
+        latent_clf = latent_clf_config["model"]
+        latent_clf_optimizer = latent_clf_config["optimizer"]
+        latent_clf_loss = latent_clf_config["loss"]
     else:
         latent_clf = None
         latent_clf_optimizer = None
@@ -992,8 +1021,13 @@ def train_val_test_loop_vae(
     # Reserve space for best latent clf weights
     if latent_clf is not None:
         best_clf_weights = latent_clf.cpu().state_dict()
+    else:
+        best_clf_weights = None
 
-    best_model_configs={'best_vae':best_vae_weights, 'best_clf_weights':best_clf_weights}
+    best_model_configs = {
+        "best_vae": best_vae_weights,
+        "best_clf_weights": best_clf_weights,
+    }
 
     best_total_loss = np.infty
 
@@ -1031,17 +1065,38 @@ def train_val_test_loop_vae(
             )
 
             logging.debug(
-                "Reconstruction Loss for {} domain: {:.8f}".format(
+                "Reconstruction loss for {} domain: {:.8f}".format(
                     domain_config.name, epoch_statistics["recon_loss"]
+                )
+            )
+            logging.debug(
+                "KL loss for {} domain: {:.8f}".format(
+                    domain_config.name, epoch_statistics["kl_loss"]
                 )
             )
 
             if use_clf:
-                logging.debug("Latent classifier loss for {} domain: {:.8f}".format(domain_config.name,
-                                                                                    epoch_statistics['clf_loss']))
+                logging.debug(
+                    "Latent classifier loss for {} domain: {:.8f}".format(
+                        domain_config.name, epoch_statistics["clf_loss"]
+                    )
+                )
 
-            epoch_total_loss = epoch_statistics['total_loss']
+                logging.debug(
+                    "Latent classifier accuracy for {} domain: {:.8f}".format(
+                        domain_config.name, epoch_statistics["accuracy"]
+                    )
+                )
+
+            epoch_total_loss = epoch_statistics["total_loss"]
             total_loss_dict[phase].append(epoch_total_loss)
+            logging.debug("***" * 20)
+            logging.debug(
+                "Total {} loss for {} domain: {:.8f}".format(
+                    phase, domain_config.name, epoch_total_loss
+                )
+            )
+            logging.debug("***" * 20)
 
             if phase == "val":
                 # Save model states if current parameters give the best validation loss
@@ -1055,8 +1110,7 @@ def train_val_test_loop_vae(
                     best_model_configs["best_vae_weights"] = best_vae_weights
 
                     torch.save(
-                        best_vae_weights,
-                        "{}/best_vae.pth".format(output_dir),
+                        best_vae_weights, "{}/best_vae.pth".format(output_dir),
                     )
 
                     if latent_clf is not None:
@@ -1073,10 +1127,25 @@ def train_val_test_loop_vae(
 
                 if i % save_freq == 0:
 
-                    # Save model states regularly
-                    checkpoint_dir = " {}/checkpoint_{}".format(output_dir, i + 1)
-                    os.makedirs(checkpoint_dir, exist_ok=True)
+                    visualize_image_vae_performance(
+                        domain_model_config=domain_config.domain_model_config,
+                        epoch=i + 1,
+                        output_dir=output_dir,
+                        device=device,
+                    )
 
+                    # Save model states regularly
+                    checkpoint_dir = "{}/epoch_{}".format(output_dir, i + 1)
+                    os.makedirs(checkpoint_dir, exist_ok=True)
+                    torch.save(
+                        domain_config.domain_model_config.model.state_dict(),
+                        "{}/vae.pth".format(checkpoint_dir),
+                    )
+                    if use_clf:
+                        torch.save(
+                        latent_clf.state_dict(),
+                        "{}/latent_clf.pth".format(checkpoint_dir),
+                    )
 
     # Training complete
     time_elapsed = time.time() - start_time
@@ -1088,131 +1157,49 @@ def train_val_test_loop_vae(
         )
     )
 
-    #Todo implement test processing
+    # Load best model
+    domain_config.domain_model_config.model.load_state_dict(best_vae_weights)
+    if latent_clf is not None:
+        latent_clf.load_state_dict(best_clf_weights)
 
-
-
-
-def generate_images(
-    domain_model_configs: List[DomainModelConfig],
-    epoch: int,
-    output_dir: str,
-    device: str = "cuda:0",
-):
-    # Todo make more generic
-    image_dir = os.path.join(output_dir, "epoch_{}/images".format(epoch))
-    os.makedirs(image_dir, exist_ok=True)
-
-    image_vae = domain_model_configs[0].model.to(device)
-    rna_vae = domain_model_configs[1].model.to(device)
-
-    rna_inputs = domain_model_configs[1].inputs
-    rna_inputs = Variable(rna_inputs).to(device)
-
-    image_inputs = domain_model_configs[0].inputs
-    image_inputs = Variable(image_inputs).to(device)
-
-    _, rna_latents, _, _ = rna_vae(rna_inputs)
-    recon_inputs = image_vae.decode(rna_latents)
-    for i in range(5):
-        imageio.imwrite(
-            os.path.join(image_dir, "epoch_%s_inputs_%s.jpg" % (epoch, i)),
-            np.uint8(image_inputs[i].cpu().data.view(64, 64).numpy() * 255),
-        )
-        imageio.imwrite(
-            os.path.join(image_dir, "epoch_%s_trans_%s.jpg" % (epoch, i)),
-            np.uint8(recon_inputs[i].cpu().data.view(64, 64).numpy() * 255),
-        )
-        recon_images, _, _, _ = image_vae(image_inputs)
-        imageio.imwrite(
-            os.path.join(image_dir, "epoch_%s_recon_%s.jpg" % (epoch, i)),
-            np.uint8(recon_images[i].cpu().data.view(64, 64).numpy() * 255),
+    if "test" in domain_config.data_loader_dict:
+        epoch_statistics = process_epoch_single_domain(
+            domain_config=domain_config,
+            latent_clf=latent_clf,
+            latent_clf_optimizer=latent_clf_optimizer,
+            latent_clf_loss=latent_clf_loss,
+            beta=beta,
+            lamb=lamb,
+            use_clf=use_clf,
+            phase="test",
+            device=device,
         )
 
+        logging.debug("TEST LOSS STATISTICS")
 
-def get_optimizer_for_model(optimizer_dict: dict, model: Module) -> Optimizer:
-    optimizer_type = optimizer_dict.pop("type")
-    if optimizer_type == "adam":
-        optimizer = Adam(model.parameters(), **optimizer_dict)
-    elif optimizer_type == "rmsprop":
-        optimizer = RMSprop(model.parameters(), **optimizer_dict)
-    else:
-        raise NotImplementedError('Unknown optimizer type "{}"'.format(optimizer_type))
-    return optimizer
-
-
-def get_domain_configuration(
-    name: str,
-    model_dict: dict,
-    optimizer_dict: dict,
-    recon_loss_fct_dict: dict,
-    data_loader_dict: dict,
-    data_key: str,
-    label_key: str,
-) -> DomainConfig:
-
-    model_type = model_dict.pop("type")
-    if model_type == "VanillaConvVAE":
-        model = VanillaConvVAE(**model_dict)
-    elif model_type == "VanillaVAE":
-        model = VanillaVAE(**model_dict)
-    else:
-        raise NotImplementedError('Unknown model type "{}"'.format(model_type))
-
-    optimizer = get_optimizer_for_model(optimizer_dict=optimizer_dict, model=model)
-
-    recon_loss_fct_type = recon_loss_fct_dict.pop("type")
-    if recon_loss_fct_type == "mae":
-        recon_loss_function = L1Loss()
-    elif recon_loss_fct_type == "mse":
-        recon_loss_function = MSELoss()
-    elif recon_loss_fct_type == "bce":
-        recon_loss_function = BCELoss()
-    else:
-        raise NotImplementedError(
-            'Unknown loss function type "{}"'.format(recon_loss_fct_type)
+        logging.debug(
+            "Reconstruction Loss for {} domain: {:.8f}".format(
+                domain_config.name, epoch_statistics["recon_loss"]
+            )
         )
 
-    domain_config = DomainConfig(
-        name=name,
-        model=model,
-        optimizer=optimizer,
-        recon_loss_function=recon_loss_function,
-        data_loader_dict=data_loader_dict,
-        data_key=data_key,
-        label_key=label_key,
-    )
+        if use_clf:
+            logging.debug(
+                "Latent classifier loss for {} domain: {:.8f}".format(
+                    domain_config.name, epoch_statistics["clf_loss"]
+                )
+            )
+        logging.debug("***" * 20)
+        logging.debug(
+            "Total test loss for {} domain: {:.8f}".format(
+                domain_config.name, epoch_statistics["total_loss"]
+            )
+        )
+        logging.debug("***" * 20)
 
-    return domain_config
+    # Summarize return parameters
+    fitted_models = {"vae": domain_config.domain_model_config.model}
+    if latent_clf is not None:
+        fitted_models["latent_clf"] = latent_clf
 
-
-def get_latent_model_configuration(
-    model_dict: dict, optimizer_dict: dict, loss_dict: dict, device: None
-) -> dict:
-
-    if device is None:
-        device = get_device()
-
-    model_type = model_dict.pop("type")
-    if model_type == "LatentDiscriminator":
-        model = LatentDiscriminator(**model_dict)
-    elif model_type == "LinearClassifier":
-        model = LinearClassifier(**model_dict)
-    else:
-        raise NotImplementedError('Unknown model type "{}"'.format(model_type))
-
-    optimizer = get_optimizer_for_model(optimizer_dict=optimizer_dict, model=model)
-
-    try:
-        weights = torch.FloatTensor(loss_dict.pop("weights")).to(device)
-    except KeyError:
-        weights = torch.ones(model_dict["n_classes"]).float().to(device)
-
-    loss_type = loss_dict.pop("type")
-    if loss_type == "ce":
-        latent_loss = CrossEntropyLoss(weight=weights)
-    else:
-        raise NotImplementedError('Unknown loss type "{}"'.format(loss_type))
-
-    latent_model_config = {"model": model, "optimizer": optimizer, "loss": latent_loss}
-    return latent_model_config
+    return fitted_models, total_loss_dict
