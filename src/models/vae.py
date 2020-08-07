@@ -41,6 +41,7 @@ class VanillaConvVAE(BaseVAE, ABC):
         latent_dim: int = 128,
         hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
         lrelu_slope: int = 0.2,
+        batchnorm: bool = True,
         **kwargs
     ) -> None:
         super(BaseVAE, self).__init__()
@@ -48,6 +49,7 @@ class VanillaConvVAE(BaseVAE, ABC):
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
         self.lrelu_slope = lrelu_slope
+        self.batchnorm = batchnorm
         self.updated = False
 
         # encoder
@@ -59,6 +61,7 @@ class VanillaConvVAE(BaseVAE, ABC):
                     kernel_size=4,
                     stride=2,
                     padding=1,
+                    bias=False,
                 ),
                 nn.LeakyReLU(self.lrelu_slope, inplace=True),
             )
@@ -73,6 +76,7 @@ class VanillaConvVAE(BaseVAE, ABC):
                         kernel_size=4,
                         stride=2,
                         padding=1,
+                        bias=False,
                     ),
                     nn.BatchNorm2d(self.hidden_dims[i]),
                     nn.LeakyReLU(self.lrelu_slope, inplace=True),
@@ -83,10 +87,18 @@ class VanillaConvVAE(BaseVAE, ABC):
         self.encoder = nn.Sequential(*encoder_modules)
         self.device = get_device()
 
-        self.fc1 = nn.Linear(hidden_dims[-1] * 2 * 2, self.latent_dim)
-        self.fc2 = nn.Linear(hidden_dims[-1] * 2 * 2, self.latent_dim)
+        if self.batchnorm:
+            self.mu_fc = nn.Sequential(
+                nn.Linear(hidden_dims[-1] * 2 * 2, self.latent_dim),
+                nn.BatchNorm1d(self.latent_dim),
+            )
+        else:
+            self.mu_fc = nn.Linear(hidden_dims[-1] * 2 * 2, self.latent_dim)
+        self.logvar_fc = nn.Linear(hidden_dims[-1] * 2 * 2, self.latent_dim)
 
-        self.d1 = nn.Linear(self.latent_dim, hidden_dims[-1] * 2 * 2)
+        self.d1 = nn.Sequential(
+            nn.Linear(self.latent_dim, hidden_dims[-1] * 2 * 2), nn.ReLU(inplace=True)
+        )
 
         # decoder
         decoder_modules = []
@@ -99,9 +111,10 @@ class VanillaConvVAE(BaseVAE, ABC):
                         kernel_size=4,
                         stride=2,
                         padding=1,
+                        bias=False,
                     ),
                     nn.BatchNorm2d(hidden_dims[-2 - i]),
-                    nn.ReLU(inplace=True),
+                    nn.LeakyReLU(self.lrelu_slope, inplace=True),
                 )
             )
         decoder_modules.append(
@@ -112,6 +125,7 @@ class VanillaConvVAE(BaseVAE, ABC):
                     kernel_size=4,
                     stride=2,
                     padding=1,
+                    bias=False,
                 ),
                 nn.Sigmoid(),
             )
@@ -122,10 +136,10 @@ class VanillaConvVAE(BaseVAE, ABC):
     def encode(self, input: Tensor) -> Tuple[Tensor, Tensor]:
         h = self.encoder(input)
         h = h.view(-1, self.hidden_dims[-1] * 2 * 2)
-        mu = self.fc1(h)
-        logsigma = self.fc2(h)
+        mu = self.mu_fc(h)
+        logvar = self.logvar_fc(h)
 
-        return mu, logsigma
+        return mu, logvar
 
     def decode(self, input: Tensor) -> Tensor:
         h = self.d1(input)
@@ -133,10 +147,10 @@ class VanillaConvVAE(BaseVAE, ABC):
         output = self.decoder(h)
         return output
 
-    def reparameterize(self, mu: Tensor, logsigma: Tensor) -> Tensor:
-        std = logsigma.mul(0.5).exp()
+    def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
+        std = logvar.mul(0.5).exp()
         eps = Variable(torch.FloatTensor(std.size()).normal_().to(self.device))
-        z = eps * std + mu
+        z = eps.mul(std).add_(mu)
         return z
 
     def forward(self, input: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
@@ -146,8 +160,8 @@ class VanillaConvVAE(BaseVAE, ABC):
         return output, z, mu, logsigma
 
     def get_latent_representation(self, input: Tensor) -> Tensor:
-        mu, logsigma = self.encode(input)
-        z = self.reparameterize(mu, logsigma)
+        mu, logvar = self.encode(input)
+        z = self.reparameterize(mu, logvar)
         return z
 
     def generate(self, z: Tensor, **kwargs) -> Tensor:
@@ -167,6 +181,7 @@ class VanillaVAE(BaseVAE, ABC):
         in_dims: int = 7633,
         latent_dim: int = 128,
         hidden_dims: List = None,
+        batchnorm: bool = False,
         **kwargs
     ) -> None:
         super(BaseVAE, self).__init__()
@@ -176,6 +191,7 @@ class VanillaVAE(BaseVAE, ABC):
             self.hidden_dims = [1024, 1024, 1024, 1024, 1024, 1024]
         else:
             self.hidden_dims = hidden_dims
+        self.batchnorm = batchnorm
         self.updated = False
 
         # encoder
@@ -196,8 +212,14 @@ class VanillaVAE(BaseVAE, ABC):
             )
 
         self.encoder = nn.Sequential(*encoder_modules)
-        self.mu_fc = nn.Linear(self.hidden_dims[-1], self.latent_dim)
-        self.logsgima_fc = nn.Linear(self.hidden_dims[-1], self.latent_dim)
+        if self.batchnorm:
+            self.mu_fc = nn.Sequential(
+                nn.Linear(self.hidden_dims[-1], self.latent_dim),
+                nn.BatchNorm1d(self.latent_dim),
+            )
+        else:
+            self.mu_fc = nn.Linear(self.hidden_dims[-1], self.latent_dim)
+        self.logvar_fc = nn.Linear(self.hidden_dims[-1], self.latent_dim)
 
         # decoder
         decoder_modules = [
@@ -218,7 +240,7 @@ class VanillaVAE(BaseVAE, ABC):
     def encode(self, input: Tensor) -> Tuple[Tensor, Tensor]:
         h = self.encoder(input)
         mu = self.mu_fc(h)
-        logsigma = self.logsgima_fc(h)
+        logsigma = self.logvar_fc(h)
 
         return mu, logsigma
 

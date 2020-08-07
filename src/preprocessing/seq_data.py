@@ -15,10 +15,18 @@ def merge_seq_data_and_labels(seq_data: DataFrame, seq_labels: DataFrame) -> Dat
 
 
 def read_seq_data_and_labels(
-    data_fname: str, label_fname: str
+    data_fname: str,
+    label_fname: str,
+    label_codes=None,
+    label_column_name: str = "label",
 ) -> Tuple[DataFrame, DataFrame]:
+    if label_codes is None:
+        label_codes = {1: 0, 0: 1}
     seq_data = pd.read_csv(data_fname, index_col=0)
     seq_labels = pd.read_csv(label_fname, index_col=0)
+    seq_labels.loc[:, label_column_name] = seq_labels[label_column_name].map(
+        label_codes
+    )
     return seq_data, seq_labels
 
 

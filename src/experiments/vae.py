@@ -1,5 +1,7 @@
 from typing import List
 
+import torch
+
 from src.experiments.base import BaseExperiment
 from src.utils.torch.data import (
     init_nuclei_image_dataset,
@@ -129,3 +131,7 @@ class VaeExperiment(BaseExperiment):
             use_clf=use_clf,
             save_freq=save_freq,
         )
+
+    def load_model(self, weights_fname):
+        weights = torch.load(weights_fname)
+        self.domain_config.domain_model_config.model.load_state_dict(weights)

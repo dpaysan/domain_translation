@@ -88,14 +88,19 @@ def train_autoencoders_two_domains(
         latent_clf.zero_grad()
 
     # Forward pass of the VAE
-    inputs_i, inputs_j = inputs_i.to(device), inputs_j.to(device)
+    inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
     recons_i, latents_i, mu_i, logvar_i = vae_i(inputs_i)
     recons_j, latents_j, mu_j, logvar_j = vae_j(inputs_j)
 
     if use_dcm:
+        if use_clf:
+            raise RuntimeError(
+                "Latent discriminator cannot be used jointly with the latent"
+                " classifier."
+            )
         labels_i, labels_j = (
-            labels_i.to(device),
-            labels_j.to(device),
+            Variable(labels_i).to(device),
+            Variable(labels_j).to(device),
         )
 
         # Add class label to latent representations to ensure that latent representations encode generic information
@@ -173,7 +178,7 @@ def train_autoencoders_two_domains(
         "recon_loss_i": recon_loss_i.item() * batch_size_i,
         "recon_loss_j": recon_loss_j.item() * batch_size_j,
         "dcm_loss": dcm_loss.item() * (batch_size_i + batch_size_j),
-        "kl_loss": kl_loss.item() * (latent_size_i + latent_size_j),
+        "kl_loss": kl_loss.item(),
         "total_loss": total_loss.item(),
     }
     if use_clf:
@@ -235,7 +240,7 @@ def train_latent_dcm_two_domains(
     vae_j.eval()
 
     # Send models and data to device
-    inputs_i, inputs_j = inputs_i.to(device), inputs_j.to(device)
+    inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
 
     vae_i.to(device)
     vae_j.to(device)
@@ -677,7 +682,7 @@ def train_val_test_loop_two_domains(
                     )
 
                     # Save model states regularly
-                    checkpoint_dir = "{}/epoch_{}".format(output_dir, i + 1)
+                    checkpoint_dir = "{}/epoch_{}".format(output_dir, i)
                     os.makedirs(checkpoint_dir, exist_ok=True)
 
                     vae_i_weights = (
@@ -819,13 +824,13 @@ def train_autoencoder(
     train = domain_model_config.train
 
     # Set VAE model to train if defined in respective configuration
-    if phase == "train" and train:
+    vae.to(device)
+
+    if phase == "train":
         vae.train()
+        optimizer.zero_grad()
     else:
         vae.eval()
-
-    vae.to(device)
-    vae.zero_grad()
 
     if use_clf:
         assert latent_clf is not None
@@ -834,11 +839,11 @@ def train_autoencoder(
         else:
             latent_clf.eval()
         latent_clf.to(device)
-        latent_clf.zero_grad()
+        latent_clf_optimizer.zero_grad()
 
     # Forward pass of the VAE
-    inputs = inputs.to(device)
-    labels = labels.to(device)
+    inputs = Variable(inputs).to(device)
+    labels = Variable(labels).to(device)
     recons, latents, mu, logvar = vae(inputs)
 
     # Forward pass latent classifier if it is supposed to be trained and used to assess the integration of the learned
@@ -866,34 +871,32 @@ def train_autoencoder(
         if train:
             optimizer.step()
             vae.updated = True
-
         if use_clf:
             latent_clf_optimizer.step()
 
     # Get summary statistics
     batch_size = inputs.size(0)
-    latent_size = mu.size(0)
 
     batch_statistics = {
         "recon_loss": recon_loss.item() * batch_size,
-        "kl_loss": kl_loss.item() * latent_size,
+        "kl_loss": kl_loss.item(),
     }
-    total_loss_item = recon_loss.item() * batch_size + kl_loss.item() * latent_size
+    total_loss_item = recon_loss.item() * batch_size + kl_loss.item()
     if use_clf:
         batch_statistics["clf_loss"] = clf_loss.item() * batch_size
         batch_statistics["accuracy"] = accuracy(clf_output, labels)
         total_loss_item += clf_loss.item() * batch_size
     batch_statistics["total_loss"] = total_loss_item
 
-    del recon_loss
-    del total_loss
-    del kl_loss
-    del latents
-    del inputs
-    del labels
-    del recons
-    del mu
-    del logvar
+    # del recon_loss
+    # del total_loss
+    # del kl_loss
+    # del latents
+    # del inputs
+    # del labels
+    # del recons
+    # del mu
+    # del logvar
 
     return batch_statistics
 
@@ -941,7 +944,7 @@ def process_epoch_single_domain(
             lamb=lamb,
             phase=phase,
             device=device,
-            use_clf=use_clf
+            use_clf=use_clf,
         )
 
         recon_loss += batch_statistics["recon_loss"]
@@ -951,8 +954,6 @@ def process_epoch_single_domain(
             n_preds += batch_statistics["accuracy"][1]
         kl_loss += batch_statistics["kl_loss"]
         total_loss += batch_statistics["total_loss"]
-
-
 
     # Get average over batches for statistics
     recon_loss /= len(data_loader.dataset)
@@ -982,7 +983,7 @@ def train_val_test_loop_vae(
     domain_config: DomainConfig,
     latent_clf_config: dict = None,
     beta: float = 0.001,
-    lamb: float = 0.00000001,
+    lamb: float = 0.0000001,
     use_clf: bool = False,
     num_epochs: int = 500,
     save_freq: int = 10,
@@ -1143,9 +1144,9 @@ def train_val_test_loop_vae(
                     )
                     if use_clf:
                         torch.save(
-                        latent_clf.state_dict(),
-                        "{}/latent_clf.pth".format(checkpoint_dir),
-                    )
+                            latent_clf.state_dict(),
+                            "{}/latent_clf.pth".format(checkpoint_dir),
+                        )
 
     # Training complete
     time_elapsed = time.time() - start_time

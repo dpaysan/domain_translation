@@ -4,17 +4,16 @@ from torch import nn
 
 class LatentDiscriminator(nn.Module):
     def __init__(
-        self,
-        latent_dim: int = 128,
-        hidden_dims=[1024, 1024, 1024, 1024],
-        n_classes: int = 2,
+        self, latent_dim: int = 128, hidden_dims=[1024, 1024, 1024], n_classes: int = 2,
     ):
         super().__init__()
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
         self.n_classes = n_classes
 
-        model_modules = [nn.Linear(self.latent_dim + 1, hidden_dims[0])]
+        model_modules = [
+            nn.Sequential(nn.Linear(self.latent_dim + 1, hidden_dims[0]), nn.ReLU())
+        ]
         for i in range(0, len(self.hidden_dims) - 1):
             model_modules.append(
                 nn.Sequential(

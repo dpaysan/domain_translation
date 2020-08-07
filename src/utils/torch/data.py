@@ -3,7 +3,7 @@ from typing import Iterable
 
 import numpy as np
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torchvision.transforms import Compose
 
 from src.data.datasets import (
@@ -12,10 +12,12 @@ from src.data.datasets import (
     TorchSeqDataset,
     LabeledDataset,
 )
+from src.data.datasets_kdy import NucleiDataset
+from src.helper.custom_transforms import NucleiImageTransform
 
 
 def init_nuclei_image_dataset(
-    image_dir: str, label_fname: str, transform_pipeline: Compose = None,
+    image_dir: str, label_fname: str, transform_pipeline: Compose = NucleiImageTransform(),
 ) -> TorchNucleiImageDataset:
     logging.debug(
         "Load images set from {} and label information from {}.".format(
@@ -48,7 +50,7 @@ class DataHandler(object):
         self,
         dataset: LabeledDataset,
         batch_size: int = 64,
-        num_workers: int = 10,
+        num_workers: int = 0,
         transformation_dict: dict = None,
         random_state: int = 42,
         drop_last_batch: bool = True,
@@ -105,9 +107,18 @@ class DataHandler(object):
             data_loader_dict[k] = DataLoader(
                 dataset=dataset,
                 batch_size=self.batch_size,
-                shuffle=shuffle,
+                shuffle=shuffle and k == 'train',
                 num_workers=self.num_workers,
                 drop_last=self.drop_last_batch,
             )
 
+        # train_dataset = NucleiDataset('../../data/nuclear_crops_all_experiments/', mode='train')
+        # val_dataset = test_dataset = NucleiDataset('../../data/nuclear_crops_all_experiments/', mode='test')
+        # data_loader_dict['train'] = DataLoader(train_dataset, batch_size=128,
+        #                                        shuffle=True)
+        # data_loader_dict['val'] = DataLoader(val_dataset,
+        #                                      batch_size=128, shuffle=False)
+        # data_loader_dict['test'] = DataLoader(test_dataset, batch_size=128, shuffle=False)
+
         self.data_loader_dict = data_loader_dict
+

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from numpy import ndarray
 from skimage import io
+from shutil import copyfile
 
 from src.utils.basic.io import get_data_list
 
@@ -16,7 +17,6 @@ def min_max_scale_images(images: List[ndarray]) -> List[ndarray]:
         min_x = image.min()
         max_x = image.max()
         image = (image - min_x) / (max_x - min_x)
-        image = np.clip(image, 0, 1)
         scaled_images.append(image)
     return scaled_images
 
@@ -32,7 +32,7 @@ def get_max_intensity_images(images: List[ndarray]) -> List[ndarray]:
 def resize_images(images: List[ndarray], size: Tuple[int, int] = (64, 64)):
     scaled_images = []
     for image in images:
-        image = cv2.resize(src=image, dsize=size, interpolation=cv2.INTER_CUBIC)
+        image = cv2.resize(image, dsize=size, interpolation=cv2.INTER_CUBIC)
         image = np.clip(image, 0, 1)
         scaled_images.append(image)
     return scaled_images
@@ -118,9 +118,30 @@ def run_and_visualize_preprocessing_pipeline(
         save_dir="../../data/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images/",
     )
 
+def copy_labeled_images(image_dir : str = "../../data/nuclear_crops_all_experiments/images/",
+                           label_fname: str="../../data/nuclear_crops_all_experiments/simple_image_labels.csv",
+                           id_column: str = "nucleus_id",
+                           output_dir:str="../../data/nuclear_crops_all_experiments/labeled_images/"):
+    image_ids = get_data_list(
+        root_dir=image_dir, absolute_path=False, file_ending=False
+    )
+    image_locs = get_data_list(root_dir=image_dir)
+    image_df = pd.DataFrame.from_dict({id_column: image_ids, "image_loc": image_locs})
+    label_ids = pd.read_csv(label_fname, index_col=0)
+    image_df = image_df.merge(label_ids, on=id_column)
+    image_names = [
+        image_name + ".tif" for image_name in list(image_df.loc[:, id_column])
+    ]
+    os.makedirs(output_dir, exist_ok=True)
+    for image_name in image_names:
+        copyfile(image_dir+image_name, output_dir+image_name)
+
+
     # stats = get_mean_and_std_of_images(resized_images)
     # io.imsave(fname='mean_image.tif', arr=stats['mean'])
 
 
 if __name__ == "__main__":
+    #copy_labeled_images()
     run_and_visualize_preprocessing_pipeline()
+

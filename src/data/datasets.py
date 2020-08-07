@@ -1,4 +1,5 @@
 import logging
+import os
 
 import numpy as np
 import pandas as pd
@@ -9,8 +10,8 @@ from torch.utils.data import Dataset, Subset
 from torchvision import transforms
 from torchvision.transforms import Compose
 
+from src.helper.custom_transforms import NucleiImageTransform
 from src.utils.basic.io import get_data_list
-
 
 class LabeledDataset(Dataset):
     def __init__(self):
@@ -21,7 +22,7 @@ class LabeledDataset(Dataset):
 
 class TorchNucleiImageDataset(LabeledDataset):
     def __init__(
-            self, image_dir: str, label_fname: str, transform_pipeline: Compose = None,
+            self, image_dir: str, label_fname: str, transform_pipeline: Compose = NucleiImageTransform(),
     ):
         super(TorchNucleiImageDataset, self).__init__()
 
@@ -38,6 +39,7 @@ class TorchNucleiImageDataset(LabeledDataset):
     def __getitem__(self, index: int) -> dict:
         img_loc = self.image_locs[index]
         image = self.process_image(image_loc=img_loc)
+        #image = self.load_image(image_loc=img_loc)
         if self.transform_pipeline is not None:
             image = self.transform_pipeline(image)
 
@@ -54,7 +56,7 @@ class TorchNucleiImageDataset(LabeledDataset):
 
     def process_image(self, image_loc: str) -> Tensor:
         image = io.imread(image_loc)
-        image = np.float32(image)
+        image = np.array(image, dtype=np.float32)
         image = torch.from_numpy(image).unsqueeze(0)
         return image
 
