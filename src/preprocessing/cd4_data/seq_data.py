@@ -35,15 +35,15 @@ def save_seq_data_and_labels(seq_data: DataFrame, seq_data_save_fname: str) -> N
 
 
 def get_seq_label_class_weights(
-    simple_labels_fname: str = "../../data/cda_rna_seq/rna_seq_data_and_labels.csv",
+    simple_labels_fname: str = "../../../data/cd4/cda_rna_seq/rna_seq_data_and_labels.csv",
 ) -> dict:
     return get_class_weights(simple_labels_fname=simple_labels_fname)
 
 
 def run_seq_data_pipeline(
-    data_fname: str = "../../data/cda_rna_seq/filtered_lognuminorm_pc_rp_7633genes_1396cellsnCD4.csv",
-    label_fname: str = "../../data/cda_rna_seq/labels_nCD4_corrected.csv",
-    seq_data_save_fname: str = "../../data/cda_rna_seq/rna_seq_data_and_labels.csv",
+    data_fname: str = "../../../data/cd4/cda_rna_seq/filtered_lognuminorm_pc_rp_7633genes_1396cellsnCD4.csv",
+    label_fname: str = "../../../data/cd4/cda_rna_seq/labels_nCD4_corrected.csv",
+    seq_data_save_fname: str = "../../../data/cd4/cda_rna_seq/rna_seq_data_and_labels.csv",
 ) -> None:
     seq_data, seq_labels = read_seq_data_and_labels(
         data_fname=data_fname, label_fname=label_fname

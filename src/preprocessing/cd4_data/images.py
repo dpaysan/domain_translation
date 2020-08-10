@@ -83,45 +83,50 @@ def get_only_images_with_labels(
 
 
 def run_and_visualize_preprocessing_pipeline(
-    image_dir: str = "../../data/nuclear_crops_all_experiments/images/",
+    image_dir: str = "../../../data/cd4/nuclear_crops_all_experiments/images/",
 ):
     image_names, images = read_images_from_disk(image_dir=image_dir)
     scaled_images = min_max_scale_images(images)
     save_images_to_disk(
         images=scaled_images,
         image_names=image_names,
-        save_dir="../../data/nuclear_crops_all_experiments/scaled_images/",
+        save_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_images/",
     )
     max_intensity_images = get_max_intensity_images(images=scaled_images)
     save_images_to_disk(
         images=max_intensity_images,
         image_names=image_names,
         save_dir=(
-            "../../data/nuclear_crops_all_experiments/scaled_max_intensity_images/"
+            "../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_images/"
         ),
     )
     resized_images = resize_images(max_intensity_images)
     save_images_to_disk(
         images=resized_images,
         image_names=image_names,
-        save_dir="../../data/nuclear_crops_all_experiments/scaled_max_intensity_resized_images/",
+        save_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_resized_images/",
     )
 
     image_names, labeled_images = get_only_images_with_labels(
-        image_dir="../../data/nuclear_crops_all_experiments/scaled_max_intensity_resized_images/",
-        label_fname="../../data/nuclear_crops_all_experiments/simple_image_labels.csv",
+        image_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_resized_images/",
+        label_fname=(
+            "../../data/cd4/nuclear_crops_all_experiments/simple_image_labels.csv"
+        ),
         id_column="nucleus_id",
     )
     save_images_to_disk(
         images=labeled_images,
         image_names=image_names,
-        save_dir="../../data/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images/",
+        save_dir="../../../data/cd4/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images/",
     )
 
-def copy_labeled_images(image_dir : str = "../../data/nuclear_crops_all_experiments/images/",
-                           label_fname: str="../../data/nuclear_crops_all_experiments/simple_image_labels.csv",
-                           id_column: str = "nucleus_id",
-                           output_dir:str="../../data/nuclear_crops_all_experiments/labeled_images/"):
+
+def copy_labeled_images(
+    image_dir: str = "../../../data/cd4/nuclear_crops_all_experiments/images/",
+    label_fname: str = "../../../data/cd4/nuclear_crops_all_experiments/simple_image_labels.csv",
+    id_column: str = "nucleus_id",
+    output_dir: str = "../../../data/cd4/nuclear_crops_all_experiments/labeled_images/",
+):
     image_ids = get_data_list(
         root_dir=image_dir, absolute_path=False, file_ending=False
     )
@@ -134,14 +139,12 @@ def copy_labeled_images(image_dir : str = "../../data/nuclear_crops_all_experime
     ]
     os.makedirs(output_dir, exist_ok=True)
     for image_name in image_names:
-        copyfile(image_dir+image_name, output_dir+image_name)
-
+        copyfile(image_dir + image_name, output_dir + image_name)
 
     # stats = get_mean_and_std_of_images(resized_images)
     # io.imsave(fname='mean_image.tif', arr=stats['mean'])
 
 
 if __name__ == "__main__":
-    #copy_labeled_images()
+    # copy_labeled_images()
     run_and_visualize_preprocessing_pipeline()
-

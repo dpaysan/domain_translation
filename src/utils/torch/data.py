@@ -17,7 +17,9 @@ from src.helper.custom_transforms import NucleiImageTransform
 
 
 def init_nuclei_image_dataset(
-    image_dir: str, label_fname: str, transform_pipeline: Compose = NucleiImageTransform(),
+    image_dir: str,
+    label_fname: str,
+    transform_pipeline: Compose = NucleiImageTransform(),
 ) -> TorchNucleiImageDataset:
     logging.debug(
         "Load images set from {} and label information from {}.".format(
@@ -107,7 +109,7 @@ class DataHandler(object):
             data_loader_dict[k] = DataLoader(
                 dataset=dataset,
                 batch_size=self.batch_size,
-                shuffle=shuffle and k == 'train',
+                shuffle=shuffle and k == "train",
                 num_workers=self.num_workers,
                 drop_last=self.drop_last_batch,
             )
@@ -121,4 +123,3 @@ class DataHandler(object):
         # data_loader_dict['test'] = DataLoader(test_dataset, batch_size=128, shuffle=False)
 
         self.data_loader_dict = data_loader_dict
-

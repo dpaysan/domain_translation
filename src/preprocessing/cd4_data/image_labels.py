@@ -4,8 +4,8 @@ from src.utils.basic.general import get_class_weights
 
 
 def get_compressed_image_labels(
-    input_labels_fname: str = "../../data/nuclear_crops_all_experiments/protein_ratios_full.csv",
-    output_labels_fname: str = "../../data/nuclear_crops_all_experiments/simple_image_labels.csv",
+    input_labels_fname: str = "../../../data/nuclear_crops_all_experiments/protein_ratios_full.csv",
+    output_labels_fname: str = "../../../data/nuclear_crops_all_experiments/simple_image_labels.csv",
     data_name_column: str = "Label",
     cluster_column_name="mycl",
     label_codes=None,
@@ -29,7 +29,7 @@ def get_compressed_image_labels(
 
 
 def get_image_label_class_weights(
-    simple_labels_fname: str = "../../data/nuclear_crops_all_experiments/simple_image_labels.csv",
+    simple_labels_fname: str = "../../../data/nuclear_crops_all_experiments/simple_image_labels.csv",
 ) -> dict:
     return get_class_weights(simple_labels_fname=simple_labels_fname)
 
