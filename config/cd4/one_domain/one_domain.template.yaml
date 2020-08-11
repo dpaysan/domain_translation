@@ -1,0 +1,39 @@
+output_dir: '../../data/cd4/experiments'
+module: src.experiments.vae
+class: VaeExperiment
+run_params:
+  data_config: {'image_dir':'../../data/nuclear_crops_all_experiments/labeled_images',
+                      'label_fname':'../../data/nuclear_crops_all_experiments/simple_image_labels.csv',
+                      'data_key':'image', 'label_key':'label'}
+
+  model_config: {'model_config':{'type':'VanillaConvVAE', 'latent_dim':128},
+                       'optimizer_config':{'type':'adam','lr':0.001},
+                       'loss_config':{'type':'mse'}}
+
+  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':128, 'n_classes':2},
+                      'optimizer_config':{'type':'adam', 'lr':0.001},
+                      'loss_config':{'type':'ce', 'weights':[4.5,0.5]}}
+
+  domain_name: 'image'
+  num_epochs: 500
+  early_stopping: -1
+  train_val_test_split: [0.7, 0.2, 0.1]
+  batch_size: 128
+  random_state: 1
+
+
+pipeline:
+  - method: initialize_image_data_set
+  - method: initialize_data_loader_dict
+  - method: initialize_domain_config
+  - method: initialize_clf_model
+  #- method: load_model
+  #  params:
+  #    weights_fname: '../../data/experiments/20200805_134219/best_vae.pth'
+  - method: train_models
+    params:
+      beta: 0.00
+      lamb: 0.0000001
+      save_freq: 10
+      use_clf: False
+
