@@ -17,7 +17,7 @@ from src.utils.torch.model import (
 )
 
 
-class TwoDomainTranslationExperiment(BaseExperiment):
+class ImageSeqTranslationExperiment(BaseExperiment):
     def __init__(
         self,
         output_dir: str,
@@ -138,7 +138,7 @@ class TwoDomainTranslationExperiment(BaseExperiment):
         recon_loss_config = self.seq_model_config["loss_config"]
 
         seq_domain_config = get_domain_configuration(
-            name="RNA",
+            name="rna",
             model_dict=model_config,
             data_loader_dict=self.seq_data_loader_dict,
             data_key=self.seq_data_key,
@@ -162,7 +162,7 @@ class TwoDomainTranslationExperiment(BaseExperiment):
     def initialize_clf_model(self):
         model_config = self.latent_clf_config["model_config"]
         optimizer_config = self.latent_clf_config["optimizer_config"]
-        loss_config = self.latent_clf_config["dcm_loss_config"]
+        loss_config = self.latent_clf_config["loss_config"]
         self.latent_clf_config = get_latent_model_configuration(
             model_dict=model_config,
             optimizer_dict=optimizer_config,

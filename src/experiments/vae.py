@@ -16,7 +16,7 @@ from src.utils.torch.model import (
 )
 
 
-class VaeExperiment(BaseExperiment):
+class ImageVaeExperiment(BaseExperiment):
     def __init__(
         self,
         output_dir: str,

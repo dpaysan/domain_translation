@@ -93,11 +93,11 @@ def train_autoencoders_two_domains(
     recons_j, latents_j, mu_j, logvar_j = vae_j(inputs_j)
 
     if use_dcm:
-        if use_clf:
-            raise RuntimeError(
-                "Latent discriminator cannot be used jointly with the latent"
-                " classifier."
-            )
+        # if use_clf:
+        #     raise RuntimeError(
+        #         "Latent discriminator cannot be used jointly with the latent"
+        #         " classifier."
+        #     )
         labels_i, labels_j = (
             Variable(labels_i).to(device),
             Variable(labels_j).to(device),
@@ -141,7 +141,6 @@ def train_autoencoders_two_domains(
     # discriminator and encourage learning autoencoder that make the distinction between the modalities in the latent
     # space as difficult as possible for the discriminator
 
-    # Todo remove .item() from first term
     dcm_loss = 0.5 * latent_dcm_loss(
         dcm_output_i, domain_labels_j
     ) + 0.5 * latent_dcm_loss(dcm_output_j, domain_labels_i)
@@ -172,8 +171,6 @@ def train_autoencoders_two_domains(
     # Get summary statistics
     batch_size_i = inputs_i.size(0)
     batch_size_j = inputs_j.size(0)
-    latent_size_i = mu_i.size(0)
-    latent_size_j = mu_j.size(0)
     summary_stats = {
         "recon_loss_i": recon_loss_i.item() * batch_size_i,
         "recon_loss_j": recon_loss_j.item() * batch_size_j,
@@ -182,7 +179,7 @@ def train_autoencoders_two_domains(
         "total_loss": total_loss.item(),
     }
     if use_clf:
-        summary_stats["clf_loss"] = clf_loss.item()
+        summary_stats["clf_loss"] = clf_loss.item() * (batch_size_i + batch_size_j)
 
     del recon_loss_i
     del recon_loss_j
@@ -291,6 +288,8 @@ def train_latent_dcm_two_domains(
     if phase == "train":
         dcm_loss.backward()
         latent_dcm_optimizer.step()
+    else:
+        pass
 
     # Get summary statistics
     batch_size_i = inputs_i.size(0)
@@ -400,7 +399,6 @@ def process_epoch_two_domains(
         kl_loss += ae_train_summary["kl_loss"]
 
         if use_clf:
-            assert latent_clf is None
             clf_loss += ae_train_summary["clf_loss"]
 
         clf_train_summary = train_latent_dcm_two_domains(
@@ -674,12 +672,13 @@ def train_val_test_loop_two_domains(
                         domain_configs[0].domain_model_config,
                         domain_configs[1].domain_model_config,
                     ]
-                    visualize_image_translation_performance(
+                    if domain_names[0] == 'image':
+                        visualize_image_translation_performance(
                         domain_model_configs=domain_model_configs,
                         epoch=i,
                         output_dir=output_dir,
                         device=device,
-                    )
+                        )
 
                     # Save model states regularly
                     checkpoint_dir = "{}/epoch_{}".format(output_dir, i)

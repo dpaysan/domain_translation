@@ -10,7 +10,6 @@ from torch.utils.data import Dataset, Subset
 from torchvision import transforms
 from torchvision.transforms import Compose
 
-from src.helper.custom_transforms import NucleiImageTransform
 from src.utils.basic.io import get_data_list
 
 class LabeledDataset(Dataset):
@@ -22,7 +21,7 @@ class LabeledDataset(Dataset):
 
 class TorchNucleiImageDataset(LabeledDataset):
     def __init__(
-            self, image_dir: str, label_fname: str, transform_pipeline: Compose = NucleiImageTransform(),
+            self, image_dir: str, label_fname: str, transform_pipeline: Compose = None,
     ):
         super(TorchNucleiImageDataset, self).__init__()
 
@@ -39,7 +38,6 @@ class TorchNucleiImageDataset(LabeledDataset):
     def __getitem__(self, index: int) -> dict:
         img_loc = self.image_locs[index]
         image = self.process_image(image_loc=img_loc)
-        #image = self.load_image(image_loc=img_loc)
         if self.transform_pipeline is not None:
             image = self.transform_pipeline(image)
 
@@ -62,10 +60,16 @@ class TorchNucleiImageDataset(LabeledDataset):
 
 
 class TorchSeqDataset(LabeledDataset):
-    def __init__(self, seq_data_and_labels_fname: str, transform_pipeline: Compose = None):
+    def __init__(self, seq_data_and_labels_fname: str, transform_pipeline: Compose = None,
+                 sample_index:bool=True):
         super(TorchSeqDataset, self).__init__()
         self.seq_data_and_labels_fname = seq_data_and_labels_fname
         seq_data_and_labels = pd.read_csv(self.seq_data_and_labels_fname, index_col=0)
+
+        if sample_index:
+            self.sample_ids = list(seq_data_and_labels.index)
+        else:
+            self.sample_ids = None
 
         self.seq_data = np.array(seq_data_and_labels.iloc[:, :-1]).astype(np.float32)
         self.labels = np.array(seq_data_and_labels.iloc[:, -1]).astype(int)
@@ -78,6 +82,8 @@ class TorchSeqDataset(LabeledDataset):
         seq_data = torch.from_numpy(self.seq_data[index])
         label = torch.from_numpy(np.array(self.labels[index]))
         sample = {'seq_data': seq_data, 'label': label}
+        if self.sample_ids is not None:
+            sample['id'] = self.sample_ids[index]
         return sample
 
 

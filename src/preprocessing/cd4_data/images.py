@@ -96,9 +96,7 @@ def run_and_visualize_preprocessing_pipeline(
     save_images_to_disk(
         images=max_intensity_images,
         image_names=image_names,
-        save_dir=(
-            "../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_images/"
-        ),
+        save_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_images/",
     )
     resized_images = resize_images(max_intensity_images)
     save_images_to_disk(

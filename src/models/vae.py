@@ -182,6 +182,7 @@ class VanillaVAE(BaseVAE, ABC):
         latent_dim: int = 128,
         hidden_dims: List = None,
         batchnorm: bool = False,
+        lrelu_slope:float=0.2,
         **kwargs
     ) -> None:
         super(BaseVAE, self).__init__()
@@ -193,6 +194,7 @@ class VanillaVAE(BaseVAE, ABC):
             self.hidden_dims = hidden_dims
         self.batchnorm = batchnorm
         self.updated = False
+        self.lrelu_slope = lrelu_slope
 
         # encoder
         encoder_modules = [
@@ -200,14 +202,14 @@ class VanillaVAE(BaseVAE, ABC):
                 nn.Linear(self.in_dims, self.hidden_dims[0]),
                 nn.BatchNorm1d(self.hidden_dims[0]),
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(self.lrelu_slope),
         ]
         for i in range(1, len(self.hidden_dims)):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
                     nn.BatchNorm1d(self.hidden_dims[i]),
-                    nn.ReLU(),
+                    nn.LeakyReLU(self.lrelu_slope),
                 )
             )
 
@@ -230,39 +232,40 @@ class VanillaVAE(BaseVAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
-                    nn.ReLU(),
+                    nn.LeakyReLU(self.lrelu_slope),
                 )
             )
 
         decoder_modules.append(nn.Linear(self.hidden_dims[0], self.in_dims))
+        decoder_modules.append(nn.ReLU())
         self.decoder = nn.Sequential(*decoder_modules)
 
     def encode(self, input: Tensor) -> Tuple[Tensor, Tensor]:
         h = self.encoder(input)
         mu = self.mu_fc(h)
-        logsigma = self.logvar_fc(h)
+        logvar = self.logvar_fc(h)
 
-        return mu, logsigma
+        return mu, logvar
 
     def decode(self, input: Tensor) -> Tensor:
         output = self.decoder(input)
         return output
 
-    def reparameterize(self, mu: Tensor, logsigma: Tensor) -> Tensor:
-        std = logsigma.mul(0.5).exp()
+    def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
+        std = logvar.mul(0.5).exp()
         eps = Variable(torch.FloatTensor(std.size()).normal_().to(mu.device))
         z = eps * std + mu
         return z
 
     def forward(self, input: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-        mu, logsigma = self.encode(input)
-        z = self.reparameterize(mu, logsigma)
+        mu, logvar = self.encode(input)
+        z = self.reparameterize(mu, logvar)
         output = self.decode(z)
-        return output, z, mu, logsigma
+        return output, z, mu, logvar
 
     def get_latent_representation(self, input: Tensor) -> Tensor:
-        mu, logsigma = self.encode(input)
-        z = self.reparameterize(mu, logsigma)
+        mu, logvar = self.encode(input)
+        z = self.reparameterize(mu, logvar)
         return z
 
     def generate(self, z: Tensor, **kwargs) -> Tensor:

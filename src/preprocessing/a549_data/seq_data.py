@@ -8,110 +8,146 @@ from scipy.io import mmread
 from sklearn.preprocessing import StandardScaler
 
 
+class SeqDataPreprocessor(object):
+    def __init__(
+        self,
+        count_data_floc: str = None,
+        cell_data_floc: str = None,
+        structure_data_floc: str = None,
+        sample_column: str = None,
+        structure_column: str = None,
+        label_name: str = None,
+    ):
+        self.count_data_floc = count_data_floc
+        self.cell_data_floc = cell_data_floc
+        self.structure_data_floc = structure_data_floc
+        self.sample_column = sample_column
+        self.structure_column = structure_column
+        self.label_name = label_name
 
-def get_combined_data(
-    count_data_floc: str = "../../../data/a549_dex/raw/rna_only_gene_count.txt",
-    cell_data_floc: str = "../../../data/a549_dex/raw/rna_only_a549_cell.txt",
-    structure_data_floc: str = "../../../data/a549_dex/raw/rna_only_a549_gene.txt",
-    sample_column: str = "sample",
-    structure_column: str = "gene_id",
-    filter_cell_type: bool = True,
-    add_treatment_time_label:bool=True
-) -> DataFrame:
-    sparse_gene_counts = mmread(count_data_floc)
-    structure_counts = sparse_gene_counts.todense().transpose()
+        self.data = None
+        self.labels = None
 
-    cell_data = pd.read_csv(cell_data_floc)
-    structure_data = pd.read_csv(structure_data_floc)
+    def init_data(self, cell_filter: Tuple = ("cell_name", "A549")):
+        sparse_gene_counts = mmread(self.count_data_floc)
+        structure_counts = sparse_gene_counts.todense().transpose()
 
-    if filter_cell_type:
-        cell_data = cell_data.loc[cell_data["cell_name"] == "A549"]
-        cell_type_matches = cell_data.index
-        structure_counts = structure_counts[list(cell_type_matches)]
+        cell_data = pd.read_csv(self.cell_data_floc)
+        structure_data = pd.read_csv(self.structure_data_floc)
 
-    structure_df = DataFrame(
-        data=structure_counts,
-        index=list(cell_data[sample_column]),
-        columns=list(structure_data[structure_column]),
-    )
+        if cell_filter is not None:
+            cell_data = cell_data.loc[cell_data[cell_filter[0]] == cell_filter[1]]
+            cell_type_matches = cell_data.index
+            structure_counts = structure_counts[list(cell_type_matches)]
 
-    if add_treatment_time_label:
-        try:
-            structure_df['label'] = cell_data['treatment_time']
-        except KeyError:
-            pass
+        self.data = DataFrame(
+            data=structure_counts,
+            index=list(cell_data[self.sample_column]),
+            columns=list(structure_data[self.structure_column]),
+        )
 
-    return structure_df
+        if self.label_name in cell_data:
+            cell_data = cell_data.set_index(self.sample_column)
+            # Replace 3 hour label with 2
+            self.labels = cell_data[self.label_name].replace(3, 2)
+            # self.labels = self.labels.set_index(cell_data.index)
 
+    def set_data(self, data):
+        self.data = data
+        if self.labels is not None:
+            self.labels = self.labels.loc[self.data.index]
 
-def filter_data(
-    structure_df: DataFrame, columns_to_keep: List = None, rows_to_keep: List = None
-) -> DataFrame:
-    filtered_df = structure_df.copy()
-    if columns_to_keep is not None:
-        filtered_df = filtered_df[columns_to_keep]
-    if rows_to_keep is not None:
-        filtered_df = filtered_df.loc[rows_to_keep]
-    return filtered_df
+    def filter_data(self, columns_to_keep: List = None, rows_to_keep: List = None):
+        if columns_to_keep is not None:
+            self.data = self.data[columns_to_keep]
+        if rows_to_keep is not None:
+            self.data = self.data.loc[rows_to_keep]
+            if self.labels is not None:
+                self.labels = self.labels[rows_to_keep]
 
+    def transform_count_data(self, mode: str = "logx1"):
+        if mode == "logx1":
+            self.data = self.data.transform(lambda x: np.log(x + 1))
+        elif mode == "standardize":
+            index = self.data.index
+            cols = self.data.columns
+            sc = StandardScaler()
+            self.data = sc.fit_transform(self.data)
+            self.data = DataFrame(data=self.data, index=index, columns=cols)
+        else:
+            raise NotImplemented("Unknown mode given: {}.".format(mode))
 
-def transform_count_data(count_df: DataFrame, mode: str = "logx1") -> DataFrame:
-    transformed_df = count_df.copy()
-    if mode == "logx1":
-        transformed_df.transform(lambda x: np.log2(x + 1))
-    elif mode == "standardize":
-        sc = StandardScaler()
-        transformed_df = sc.fit_transform(transformed_df)
-    else:
-        raise NotImplemented("Unknown mode given: {}.".format(mode))
-    return transformed_df
-
-
-def get_differently_expressed_structures(
-    rna_data: DataFrame,
-    de_analysis_floc: str = "../../../data/a549_dex/analyses/de_genes.csv",
-    structure_column: str = "gene_id",
-) -> DataFrame:
-    de_data = pd.read_csv(de_analysis_floc)
-    de_data = de_data.loc[de_data["qval"] < 0.05, structure_column]
-    differently_expressed_structures = list(de_data)
-    rna_data = rna_data[differently_expressed_structures]
-    return rna_data.copy()
-
-
-def get_paired_data_only(
-    structure_df1: DataFrame, structure_df2: DataFrame
-) -> Tuple[DataFrame, DataFrame]:
-    index1 = structure_df1.index
-    index2 = structure_df2.index
-
-    intersection_index = pd.Index.intersection(index1, index2)
-    intersected_df1 = structure_df1.copy()
-    intersected_df2 = structure_df2.copy()
-    intersected_df1 = intersected_df1.loc[intersection_index]
-    intersected_df2 = intersected_df2.loc[intersection_index]
-
-    return intersected_df1, intersected_df2
+    def save_data_and_labels_to_disk(self, save_floc, label_column: str = "label"):
+        data = self.data
+        if self.labels is not None:
+            data[label_column] = self.labels
+        os.makedirs(os.path.split(save_floc)[0], exist_ok=True)
+        data.to_csv(save_floc)
 
 
-def save_data_to_disk(dataframe: DataFrame, save_floc: str):
-    os.makedirs(os.path.split(save_floc)[0], exist_ok=True)
-    dataframe.to_csv(save_floc)
+class RnaDataPreprocessor(SeqDataPreprocessor):
+    def __init__(
+        self,
+        count_data_floc: str = None,
+        cell_data_floc: str = None,
+        structure_data_floc: str = None,
+        sample_column: str = None,
+        structure_column: str = None,
+        label_name: str = "treatment_time",
+        de_analysis_floc: str = None,
+        qval_column: str = "qval",
+        threshold: float = 0.05,
+    ):
+        super().__init__(
+            count_data_floc=count_data_floc,
+            cell_data_floc=cell_data_floc,
+            structure_data_floc=structure_data_floc,
+            sample_column=sample_column,
+            structure_column=structure_column,
+            label_name=label_name,
+        )
+        self.de_analysis_floc = de_analysis_floc
+        self.qval_column = qval_column
+        self.threshold = threshold
+        self.de_data = None
+
+    def get_differently_expressed_structures(self,):
+        self.de_data = pd.read_csv(self.de_analysis_floc)
+        self.de_data = self.de_data.loc[
+            self.de_data[self.qval_column] < self.threshold, self.structure_column
+        ]
+        self.data = self.data[list(self.de_data)]
 
 
-def get_transcription_factor_motif_data(
-    tf_motif_data_floc: str = "../../../data/a549_dex/processed/atac_tf_motifs.csv",
-) -> DataFrame:
-    tf_motif_data = pd.read_csv(tf_motif_data_floc, index_col=0)
-    return tf_motif_data
+class PairedSeqPreprocessor(object):
+    def __init__(
+        self,
+        seq_data_processor_1: SeqDataPreprocessor,
+        seq_data_processor_2: SeqDataPreprocessor,
+    ):
+        self.processor_1 = seq_data_processor_1
+        self.processor_2 = seq_data_processor_2
 
-def add_treatment_time_label_to_atac_data(atac_data:DataFrame, rna_data:DataFrame)->Tuple[DataFrame, DataFrame]:
-    labeled_atac_data = atac_data.copy().sort_index()
-    labeled_rna_data = rna_data.copy().sort_index()
-    assert len(atac_data) != len(rna_data)
-    labeled_atac_data['label'] = labeled_rna_data['label']
-    return labeled_atac_data, labeled_rna_data
+    def select_paired_data_only(self):
+        data_1 = self.processor_1.data
+        data_2 = self.processor_2.data
+        index1 = data_1.index
+        index2 = data_2.index
 
+        intersection_index = pd.Index.intersection(index1, index2)
+        data_1 = data_1.loc[intersection_index]
+        data_2 = data_2.loc[intersection_index]
+
+        self.processor_1.set_data(data_1)
+        self.processor_2.set_data(data_2)
+
+    def add_labels_to_paired_data(self):
+        if self.processor_1.labels is not None:
+            self.processor_2.labels = self.processor_1.labels
+        elif self.processor_2.labels is not None:
+            self.processor_1.labels = self.processor_2.labels
+        else:
+            raise RuntimeError("Only unlabeled data is given.")
 
 
 def run_rna_atac_tf_pipeline(
@@ -120,59 +156,45 @@ def run_rna_atac_tf_pipeline(
     rna_structure_data_floc: str = "../../../data/a549_dex/raw/rna_gene.txt",
     rna_sample_column: str = "sample",
     rna_structure_column: str = "gene_id",
-    atac_tf_motif_data_floc: str = '../../../data/a549_dex/processed/atac_tf_motifs.csv',
-    atac_count_data_floc: str = "../../../data/a549_dex/raw/atac_peak_count.txt",
-    atac_cell_data_floc: str = "../../../data/a549_dex/raw/atac_cell.txt",
-    atac_structure_data_floc: str = "../../../data/a549_dex/raw/atac_peak.txt",
-    atac_sample_column: str = "sample",
-    atac_structure_column: str = "peak",
+    atac_tf_motif_data_floc: str = "../../../data/a549_dex/processed/atac_tf_motifs.csv",
     rna_de_analysis_floc: str = "../../../data/a549_dex/analyses/de_genes.csv",
     processed_rna_floc: str = "../../../data/a549_dex/processed/rna_data.csv",
     processed_atac_floc: str = "../../../data/a549_dex/processed/atac_data.csv",
 ):
 
-    rna_data = get_combined_data(
+    rna_preprocessor = RnaDataPreprocessor(
         count_data_floc=rna_count_data_floc,
         cell_data_floc=rna_cell_data_floc,
         structure_data_floc=rna_structure_data_floc,
         sample_column=rna_sample_column,
         structure_column=rna_structure_column,
-        filter_cell_type=True,
-        add_treatment_time_label=True,
-    )
-
-    # atac_data = get_combined_data(
-    #     count_data_floc=atac_count_data_floc,
-    #     cell_data_floc=atac_cell_data_floc,
-    #     structure_data_floc=atac_structure_data_floc,
-    #     sample_column=atac_sample_column,
-    #     structure_column=atac_structure_column,
-    #     filter_cell_type=False,
-    # )
-
-    atac_data = get_transcription_factor_motif_data(tf_motif_data_floc=atac_tf_motif_data_floc).transpose()
-
-    rna_data, atac_data = get_paired_data_only(rna_data, atac_data)
-
-    rna_data = get_differently_expressed_structures(
-        rna_data=rna_data,
         de_analysis_floc=rna_de_analysis_floc,
-        structure_column=rna_structure_column,
-    )
-    rna_data = transform_count_data(count_df=rna_data, mode="logx1")
-    scaled_rna_data = transform_count_data(count_df=rna_data, mode="standardize")
-    rna_data = DataFrame(
-        data=scaled_rna_data, index=rna_data.index, columns=rna_data.columns
     )
 
-    atac_data = transform_count_data(count_df=atac_data, mode="logx1")
-    scaled_atac_data = transform_count_data(count_df=atac_data, mode="standardize")
-    atac_data = DataFrame(
-        data=scaled_atac_data, index=atac_data.index, columns=atac_data.columns
+    rna_preprocessor.init_data()
+    rna_preprocessor.get_differently_expressed_structures()
+
+    atac_tf_motif_data = pd.read_csv(atac_tf_motif_data_floc, index_col=0).transpose()
+
+    atac_preprocessor = SeqDataPreprocessor()
+    atac_preprocessor.set_data(atac_tf_motif_data)
+
+    paired_processor = PairedSeqPreprocessor(
+        seq_data_processor_1=rna_preprocessor, seq_data_processor_2=atac_preprocessor
     )
 
-    save_data_to_disk(dataframe=rna_data, save_floc=processed_rna_floc)
-    save_data_to_disk(dataframe=atac_data, save_floc=processed_atac_floc)
+    paired_processor.select_paired_data_only()
+
+    paired_processor.processor_1.transform_count_data(mode="logx1")
+    #paired_processor.processor_1.transform_count_data(mode="standardize")
+
+    paired_processor.processor_2.transform_count_data(mode="logx1")
+    #paired_processor.processor_2.transform_count_data(mode="standardize")
+
+    paired_processor.add_labels_to_paired_data()
+
+    paired_processor.processor_1.save_data_and_labels_to_disk(processed_rna_floc)
+    paired_processor.processor_2.save_data_and_labels_to_disk(processed_atac_floc)
 
 
 if __name__ == "__main__":
