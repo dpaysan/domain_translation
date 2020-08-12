@@ -32,6 +32,7 @@ class ImageSeqTranslationExperiment(BaseExperiment):
         train_val_test_split: List[float] = [0.7, 0.2, 0.1],
         batch_size: int = 64,
         random_state: int = 42,
+        paired_data: bool = False,
     ):
         super().__init__(
             output_dir=output_dir,
@@ -46,6 +47,8 @@ class ImageSeqTranslationExperiment(BaseExperiment):
         self.seq_data_config = seq_data_config
         self.latent_dcm_config = latent_dcm_config
         self.latent_clf_config = latent_clf_config
+
+        self.paired_data = paired_data
 
         self.image_data_set = None
         self.image_data_transform_pipeline_dict = None
@@ -204,4 +207,5 @@ class ImageSeqTranslationExperiment(BaseExperiment):
             save_freq=save_freq,
             early_stopping=self.early_stopping,
             device=self.device,
+            paired_mode=self.paired_data,
         )

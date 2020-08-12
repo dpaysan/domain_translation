@@ -1,9 +1,9 @@
 output_dir: '../../data/cd4/experiments'
 module: src.experiments.vae
-class: VaeExperiment
+class: ImageVaeExperiment
 run_params:
-  data_config: {'image_dir':'../../data/nuclear_crops_all_experiments/labeled_images',
-                      'label_fname':'../../data/nuclear_crops_all_experiments/simple_image_labels.csv',
+  data_config: {'image_dir':'../../data/cd4/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images',
+                      'label_fname':'../../data/cd4/nuclear_crops_all_experiments/simple_image_labels.csv',
                       'data_key':'image', 'label_key':'label'}
 
   model_config: {'model_config':{'type':'VanillaConvVAE', 'latent_dim':128},
@@ -15,7 +15,7 @@ run_params:
                       'loss_config':{'type':'ce', 'weights':[4.5,0.5]}}
 
   domain_name: 'image'
-  num_epochs: 500
+  num_epochs: 2
   early_stopping: -1
   train_val_test_split: [0.7, 0.2, 0.1]
   batch_size: 128

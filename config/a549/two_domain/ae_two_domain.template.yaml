@@ -1,0 +1,62 @@
+output_dir: '../../data/a549_dex/experiments'
+module: src.experiments.seq_seq_domain_translation
+class: SeqSeqTranslationExperiment
+run_params:
+  seq_data_config_1: {'data_fname':'../../data/a549_dex/processed/rna_data.csv',
+                      'data_key':'seq_data',
+                      'label_key':'label'}
+
+  seq_model_config_1 : {'model_config':{'type':'VanillaAE',
+                        'hidden_dims':[2613, 2613, 2613, 128],
+                        'latent_dim': 64,
+                        'in_dims':2613},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.00001},
+                        'loss_config':{'type':'mae'}}
+
+  seq_data_config_2: {'data_fname':'../../data/a549_dex/processed/atac_data.csv',
+                      'data_key':'seq_data',
+                      'label_key':'label'}
+
+  seq_model_config_2 : {'model_config':{'type':'VanillaAE',
+                        'hidden_dims':[815, 815, 815, 128],
+                        'latent_dim': 64,
+                        'in_dims': 815},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.00001},
+                        'loss_config':{'type':'mae'}}
+
+  latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
+                      'latent_dim': 64, 'hidden_dims':[64, 64, 64]},
+                      'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
+                      'loss_config':{'type':'ce'}}
+
+  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':64, 'n_classes':3},
+                      'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
+                      'loss_config':{'type':'ce', 'weights':[0.250,0.375, 0.375]}}
+
+  num_epochs: 5000
+  early_stopping: 100
+  train_val_test_split: [0.7, 0.2, 0.1]
+  batch_size: 32
+  random_state: 1001
+  paired_data: True
+
+
+pipeline:
+  - method: initialize_seq_data_set_1
+  - method: initialize_seq_data_set_2
+  - method: initialize_seq_data_loader_dict_1
+  - method: initialize_seq_data_loader_dict_2
+  - method: initialize_seq_domain_config_1
+  - method: initialize_seq_domain_config_2
+  - method: initialize_dcm_model
+  - method: initialize_clf_model
+  - method: train_models
+    params:
+      alpha: 1.0
+      beta: 0.01
+      lamb: 0.00000001
+      save_freq: 100
+      use_dcm: True
+      use_clf: True
+
+

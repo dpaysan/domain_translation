@@ -186,10 +186,10 @@ def run_rna_atac_tf_pipeline(
     paired_processor.select_paired_data_only()
 
     paired_processor.processor_1.transform_count_data(mode="logx1")
-    #paired_processor.processor_1.transform_count_data(mode="standardize")
+    paired_processor.processor_1.transform_count_data(mode="standardize")
 
     paired_processor.processor_2.transform_count_data(mode="logx1")
-    #paired_processor.processor_2.transform_count_data(mode="standardize")
+    paired_processor.processor_2.transform_count_data(mode="standardize")
 
     paired_processor.add_labels_to_paired_data()
 

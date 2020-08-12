@@ -7,36 +7,36 @@ run_params:
                       'label_key':'label'}
 
   seq_model_config_1 : {'model_config':{'type':'VanillaVAE',
-                        'hidden_dims':[2048, 2048, 1024, 512, 128],
-                        'latent_dim': 128,
+                        'hidden_dims':[2048, 2048, 2048, 2048, 128],
+                        'latent_dim': 64,
                         'in_dims':2613},
-                        'optimizer_config':{'type':'adam', 'lr':0.00001},
-                        'loss_config':{'type':'mse'}}
+                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.001},
+                        'loss_config':{'type':'mae'}}
 
   seq_data_config_2: {'data_fname':'../../data/a549_dex/processed/atac_data.csv',
                       'data_key':'seq_data',
                       'label_key':'label'}
 
   seq_model_config_2 : {'model_config':{'type':'VanillaVAE',
-                        'hidden_dims':[768, 768, 512, 256, 128],
-                        'latent_dim': 128,
+                        'hidden_dims':[768, 768, 768, 768, 128],
+                        'latent_dim': 64,
                         'in_dims': 815},
-                        'optimizer_config':{'type':'adam', 'lr':0.00001},
-                        'loss_config':{'type':'mse'}}
+                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.001},
+                        'loss_config':{'type':'mae'}}
 
   latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
-                      'latent_dim': 128, 'hidden_dims':[128, 128]},
+                      'latent_dim': 64, 'hidden_dims':[64, 64, 64]},
                       'optimizer_config':{'type':'adam', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
-  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':128, 'n_classes':3},
+  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':64, 'n_classes':3},
                       'optimizer_config':{'type':'adam', 'lr':0.00001},
                       'loss_config':{'type':'ce', 'weights':[0.250,0.375, 0.375]}}
 
   num_epochs: 5000
-  early_stopping: 50
+  early_stopping: 100
   train_val_test_split: [0.7, 0.2, 0.1]
-  batch_size: 32
+  batch_size: 8
   random_state: 1001
 
 
@@ -51,10 +51,10 @@ pipeline:
   - method: initialize_clf_model
   - method: train_models
     params:
-      alpha: 1.0
+      alpha: 1
       beta: 1.0
       lamb: 0.00000001
-      save_freq: 20
+      save_freq: 100
       use_dcm: True
       use_clf: True
 

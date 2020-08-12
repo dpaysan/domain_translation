@@ -12,6 +12,7 @@ from torchvision.transforms import Compose
 
 from src.utils.basic.io import get_data_list
 
+
 class LabeledDataset(Dataset):
     def __init__(self):
         super(LabeledDataset, self).__init__()
@@ -21,14 +22,14 @@ class LabeledDataset(Dataset):
 
 class TorchNucleiImageDataset(LabeledDataset):
     def __init__(
-            self, image_dir: str, label_fname: str, transform_pipeline: Compose = None,
+        self, image_dir: str, label_fname: str, transform_pipeline: Compose = None,
     ):
         super(TorchNucleiImageDataset, self).__init__()
 
         self.image_dir = image_dir
         labels = pd.read_csv(label_fname, index_col=0)
-        labels = labels.sort_values(by='nucleus_id')
-        self.labels = np.array(labels.loc[:, 'binary_label'])
+        labels = labels.sort_values(by="nucleus_id")
+        self.labels = np.array(labels.loc[:, "binary_label"])
         self.image_locs = get_data_list(self.image_dir)
         self.transform_pipeline = transform_pipeline
 
@@ -48,7 +49,7 @@ class TorchNucleiImageDataset(LabeledDataset):
         return sample
 
     def set_transform_pipeline(
-            self, transform_pipeline: transforms.Compose = None
+        self, transform_pipeline: transforms.Compose = None
     ) -> None:
         self.transform_pipeline = transform_pipeline
 
@@ -60,8 +61,12 @@ class TorchNucleiImageDataset(LabeledDataset):
 
 
 class TorchSeqDataset(LabeledDataset):
-    def __init__(self, seq_data_and_labels_fname: str, transform_pipeline: Compose = None,
-                 sample_index:bool=True):
+    def __init__(
+        self,
+        seq_data_and_labels_fname: str,
+        transform_pipeline: Compose = None,
+        sample_index: bool = True,
+    ):
         super(TorchSeqDataset, self).__init__()
         self.seq_data_and_labels_fname = seq_data_and_labels_fname
         seq_data_and_labels = pd.read_csv(self.seq_data_and_labels_fname, index_col=0)
@@ -81,9 +86,9 @@ class TorchSeqDataset(LabeledDataset):
     def __getitem__(self, index: int) -> dict:
         seq_data = torch.from_numpy(self.seq_data[index])
         label = torch.from_numpy(np.array(self.labels[index]))
-        sample = {'seq_data': seq_data, 'label': label}
+        sample = {"seq_data": seq_data, "label": label}
         if self.sample_ids is not None:
-            sample['id'] = self.sample_ids[index]
+            sample["id"] = self.sample_ids[index]
         return sample
 
 

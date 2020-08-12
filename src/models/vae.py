@@ -51,6 +51,7 @@ class VanillaConvVAE(BaseVAE, ABC):
         self.lrelu_slope = lrelu_slope
         self.batchnorm = batchnorm
         self.updated = False
+        self.model_type = "VAE"
 
         # encoder
         encoder_modules = [
@@ -182,7 +183,7 @@ class VanillaVAE(BaseVAE, ABC):
         latent_dim: int = 128,
         hidden_dims: List = None,
         batchnorm: bool = False,
-        lrelu_slope:float=0.2,
+        lrelu_slope: float = 0.2,
         **kwargs
     ) -> None:
         super(BaseVAE, self).__init__()
@@ -195,6 +196,7 @@ class VanillaVAE(BaseVAE, ABC):
         self.batchnorm = batchnorm
         self.updated = False
         self.lrelu_slope = lrelu_slope
+        self.model_type = "VAE"
 
         # encoder
         encoder_modules = [
@@ -237,7 +239,6 @@ class VanillaVAE(BaseVAE, ABC):
             )
 
         decoder_modules.append(nn.Linear(self.hidden_dims[0], self.in_dims))
-        decoder_modules.append(nn.ReLU())
         self.decoder = nn.Sequential(*decoder_modules)
 
     def encode(self, input: Tensor) -> Tuple[Tensor, Tensor]:

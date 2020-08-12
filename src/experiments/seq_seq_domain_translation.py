@@ -31,6 +31,7 @@ class SeqSeqTranslationExperiment(BaseExperiment):
         train_val_test_split: List[float] = [0.7, 0.2, 0.1],
         batch_size: int = 64,
         random_state: int = 42,
+        paired_data: bool = False,
     ):
         super().__init__(
             output_dir=output_dir,
@@ -48,6 +49,8 @@ class SeqSeqTranslationExperiment(BaseExperiment):
 
         self.latent_dcm_config = latent_dcm_config
         self.latent_clf_config = latent_clf_config
+
+        self.paired_data = paired_data
 
         self.seq_data_set_1 = None
         self.seq_data_transform_pipeline_dict_1 = None
@@ -201,4 +204,5 @@ class SeqSeqTranslationExperiment(BaseExperiment):
             save_freq=save_freq,
             early_stopping=self.early_stopping,
             device=self.device,
+            paired_mode=self.paired_data,
         )

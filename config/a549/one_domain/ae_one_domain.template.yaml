@@ -1,0 +1,41 @@
+output_dir: '../../data/a549/experiments'
+module: src.experiments.model_pretraining
+class: PretrainAeExperiment
+run_params:
+  data_config: {'data_fname':'../../data/a549_dex/processed/rna_data.csv',
+                      'data_key':'seq_data', 'label_key':'label'}
+
+  model_config : {'model_config':{'type':'VanillaAE',
+                        'hidden_dims':[1024, 1024, 1024, 1024, 1024, 128],
+                        'latent_dim': 64,
+                        'in_dims':1276},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.000},
+                        'loss_config':{'type':'mse'}}
+
+  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':64, 'n_classes':3},
+                      'optimizer_config':{'type':'adam', 'lr':0.001},
+                      'loss_config':{'type':'ce', 'weights':[4, 3, 3]}}
+
+  domain_name: 'rna'
+  num_epochs: 4000
+  early_stopping: 50
+  train_val_test_split: [0.7, 0.2, 0.1]
+  batch_size: 32
+  random_state: 1
+
+
+pipeline:
+  - method: initialize_seq_data_set
+  - method: initialize_data_loader_dict
+  - method: initialize_domain_config
+  - method: initialize_clf_model
+  #- method: load_model
+  #  params:
+  #    weights_fname: '../../data/experiments/20200805_134219/best_vae.pth'
+  - method: train_models
+    params:
+      beta: 0.01
+      lamb: 0.0000001
+      save_freq: 1000
+      use_clf: True
+

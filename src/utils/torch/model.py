@@ -5,6 +5,7 @@ from torch.optim.optimizer import Optimizer
 from torch.optim.rmsprop import RMSprop
 
 from src.helper.models import DomainConfig
+from src.models.ae import VanillaAE
 from src.models.latent_models import LatentDiscriminator, LinearClassifier
 from src.models.vae import VanillaConvVAE, VanillaVAE
 from src.utils.torch.general import get_device
@@ -41,6 +42,8 @@ def get_domain_configuration(
         model = VanillaConvVAE(**model_dict)
     elif model_type == "VanillaVAE":
         model = VanillaVAE(**model_dict)
+    elif model_type == "VanillaAE":
+        model = VanillaAE(**model_dict)
     else:
         raise NotImplementedError('Unknown model type "{}"'.format(model_type))
 
