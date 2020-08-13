@@ -2,23 +2,23 @@ output_dir: '../../data/a549/experiments'
 module: src.experiments.model_pretraining
 class: PretrainAeExperiment
 run_params:
-  data_config: {'data_fname':'../../data/a549_dex/processed/rna_data.csv',
+  data_config: {'data_fname':'../../data/a549_dex/processed/atac_data.csv',
                       'data_key':'seq_data', 'label_key':'label'}
 
   model_config : {'model_config':{'type':'VanillaAE',
-                        'hidden_dims':[2048, 1024, 512, 128],
+                        'hidden_dims':[512, 256, 128, 64],
                         'latent_dim': 64,
-                        'in_dims':2613},
-                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.00},
+                        'in_dims':815},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.005},
                         'loss_config':{'type':'mae'}}
 
   latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':64, 'n_classes':3},
-                      'optimizer_config':{'type':'adam', 'lr':0.001},
+                      'optimizer_config':{'type':'adam', 'lr':0.0001},
                       'loss_config':{'type':'ce', 'weights':[4, 3, 3]}}
 
-  domain_name: 'rna'
+  domain_name: 'atac'
   num_epochs: 4000
-  early_stopping: -1
+  early_stopping: 100
   train_val_test_split: [0.7, 0.2, 0.1]
   batch_size: 32
   random_state: 1234
@@ -31,10 +31,10 @@ pipeline:
   - method: initialize_clf_model
   #- method: load_model
   #  params:
-  #    weights_fname: '../../data/experiments/20200805_134219/best_vae.pth'
+  #    weights_fname: '../../data/a549/experiments/20200813_153042/best_model.pth
   - method: train_models
     params:
-      beta: 0.0
+      beta: 0.001
       save_freq: 1000
-      use_clf: False
+      use_clf: True
 

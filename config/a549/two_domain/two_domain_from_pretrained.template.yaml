@@ -2,45 +2,58 @@ output_dir: '../../data/cd4/experiments'
 module: src.experiments.two_domain_translation
 class: ImageSeqTranslationExperiment
 run_params:
-  image_data_config: {'image_dir':'../../data/cd4/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images',
-                      'label_fname':'../../data/cd4/nuclear_crops_all_experiments/simple_image_labels.csv',
-                      'data_key':'image', 'label_key':'label'}
+  seq_data_config_1: {'data_fname':'../../data/a549_dex/processed/rna_data.csv',
+                      'data_key':'seq_data',
+                      'label_key':'label'}
 
-  image_model_config: {'model_config':{'type':'VanillaConvVAE'},
-                       'optimizer_config':{'type':'adam','lr':0.0001},
-                       'loss_config':{'type':'mse'}}
+  seq_model_config_1 : {'model_config':{'type':'VanillaAE',
+                        'hidden_dims':[2613, 2613, 2613, 2613],
+                        'latent_dim': 2613,
+                        'in_dims':2613},
+                        'optimizer_config':{'type':'adam', 'lr':0.0001, 'weight_decay':0.00001, 'betas':[0.5, 0.999]},
+                        'loss_config':{'type':'mae'}}
 
-  seq_data_config: {'data_fname':'../../data/cd4/cda_rna_seq/rna_seq_data_and_labels.csv', 'data_key':'seq_data',
-                    'label_key':'label'}
+  seq_data_config_2: {'data_fname':'../../data/a549_dex/processed/atac_data.csv',
+                      'data_key':'seq_data',
+                      'label_key':'label'}
 
-  seq_model_config : {'model_config':{'type':'VanillaVAE'},
-                      'optimizer_config':{'type':'adam', 'lr':0.0001},
-                      'loss_config':{'type':'mse'}}
+  seq_model_config_2 : {'model_config':{'type':'VanillaAE',
+                        'hidden_dims':[815, 815, 815, 815],
+                        'latent_dim': 2613,
+                        'in_dims': 815},
+                        'optimizer_config':{'type':'adam', 'lr':0.0001, 'weight_decay':0.00001, 'betas':[0.5, 0.999]},
+                        'loss_config':{'type':'mae'}}
 
-  latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2},
-                      'optimizer_config':{'type':'adam', 'lr':0.0001},
+  latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
+                      'latent_dim': 2613, 'hidden_dims':[2613, 2613]},
+                      'optimizer_config':{'type':'adam', 'lr':0.0001, 'betas':[0.5, 0.999]},
                       'loss_config':{'type':'ce'}}
 
-  num_epochs: 1000
-  early_stopping: 50
-  train_val_test_split: [0.9, 0.05, 0.05]
+  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':2613, 'n_classes':3},
+                      'optimizer_config':{'type':'adam', 'lr':0.0001, 'betas':[0.5, 0.999]},
+                      'loss_config':{'type':'ce'}}
+
+  num_epochs: 5000
+  early_stopping: 100
+  train_val_test_split: [0.7, 0.2, 0.1]
   batch_size: 32
-  random_state: 42
+  random_state: 1001
+  paired_data: True
 
 
 pipeline:
-  - method: initialize_image_data_set
-  - method: initialize_seq_data_set
-  - method: initialize_image_data_loader_dict
-  - method: initialize_seq_data_loader_dict
-  - method: initialize_image_domain_config
+  - method: initialize_image_data_set_1
+  - method: initialize_seq_data_set_2
+  - method: initialize_seq_data_loader_dict_1
+  - method: initialize_seq_data_loader_dict_2
+  - method: initialize_seq_domain_config_1
     params:
       train_model: False
-  - method: initialize_seq_domain_config
+  - method: initialize_seq_domain_config_2
   - method: initialize_dcm_model
   - method: load_model_for_domain_config
     params:
-      weights_fname: '../../data/cd4/experiments/pretrain_image_vae/best_vae.pth'
+      weights_fname: '../../data/a549/experiments/20200813_153042/best_model.pth'
       id: 0
   - method: train_models
     params:

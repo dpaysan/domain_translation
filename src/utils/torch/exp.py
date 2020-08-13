@@ -21,6 +21,8 @@ from src.utils.torch.visualization import (
     visualize_image_vae_performance,
 )
 
+from sklearn.neighbors import NearestNeighbors
+
 
 def train_autoencoders_two_domains(
     domain_model_configurations: List[DomainModelConfig],
@@ -39,6 +41,8 @@ def train_autoencoders_two_domains(
     vae_mode: bool = True,
     paired_mode: bool = False,
 ) -> dict:
+
+
     # Expects 2 model configurations (one for each domain)
     model_configuration_i = domain_model_configurations[0]
     model_configuration_j = domain_model_configurations[1]
@@ -194,9 +198,22 @@ def train_autoencoders_two_domains(
         total_loss_item += summary_stats["clf_loss"]
 
     if phase != "train" and paired_mode:
+        # nn_estimator = NearestNeighbors(n_neighbors=10)
+        # latents_i_arr = latents_i.cpu().detach().numpy()
+        # latents_j_arr = latents_j.cpu().detach().numpy()
+        # nn_estimator = nn_estimator.fit(latents_i_arr)
+        # among_knn = 0
+        # for i in range(len(latents_j_arr)):
+        #     latent_j = latents_j_arr[i]
+        #     knn_idc = nn_estimator.kneighbors(latent_j.reshape(1,-1), return_distance=False)
+        #     if i in knn_idc:
+        #         among_knn += 1
+        # knn_acc = among_knn/len(latents_j_arr)
+        # summary_stats['latent_l1_distance'] = among_knn
+
         summary_stats["latent_l1_distance"] = nn.L1Loss(reduction="sum")(
-            latents_i, latents_j
-        ).item()
+            latents_i, latents_j).item()
+
 
     summary_stats["total_loss"] = total_loss_item
 

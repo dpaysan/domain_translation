@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 from scipy.io import mmread
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 
 
 class SeqDataPreprocessor(object):
@@ -74,6 +74,12 @@ class SeqDataPreprocessor(object):
             sc = StandardScaler()
             self.data = sc.fit_transform(self.data)
             self.data = DataFrame(data=self.data, index=index, columns=cols)
+        elif mode == "robust_standardize":
+            index = self.data.index
+            cols = self.data.columns
+            rs = RobustScaler()
+            self.data = rs.fit_transform(self.data)
+            self.data = DataFrame(data=self.data, index=index, columns=cols)
         else:
             raise NotImplemented("Unknown mode given: {}.".format(mode))
 
@@ -96,7 +102,7 @@ class RnaDataPreprocessor(SeqDataPreprocessor):
         label_name: str = "treatment_time",
         de_analysis_floc: str = None,
         qval_column: str = "qval",
-        threshold: float = 0.05,
+        threshold: float = 0.001,
     ):
         super().__init__(
             count_data_floc=count_data_floc,
@@ -186,10 +192,10 @@ def run_rna_atac_tf_pipeline(
     paired_processor.select_paired_data_only()
 
     paired_processor.processor_1.transform_count_data(mode="logx1")
-    paired_processor.processor_1.transform_count_data(mode="standardize")
+    paired_processor.processor_1.transform_count_data(mode="robust_standardize")
 
     paired_processor.processor_2.transform_count_data(mode="logx1")
-    paired_processor.processor_2.transform_count_data(mode="standardize")
+    paired_processor.processor_2.transform_count_data(mode="robust_standardize")
 
     paired_processor.add_labels_to_paired_data()
 

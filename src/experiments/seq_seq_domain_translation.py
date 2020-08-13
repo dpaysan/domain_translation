@@ -110,7 +110,7 @@ class SeqSeqTranslationExperiment(BaseExperiment):
         dh.get_data_loader_dict()
         self.seq_data_loader_dict_2 = dh.data_loader_dict
 
-    def initialize_seq_domain_config_1(self, name: str = "RNA"):
+    def initialize_seq_domain_config_1(self, name: str = "RNA", train_model:bool=True):
         if self.domain_configs is None:
             self.domain_configs = []
 
@@ -126,10 +126,11 @@ class SeqSeqTranslationExperiment(BaseExperiment):
             label_key=self.seq_label_key_1,
             optimizer_dict=optimizer_config,
             recon_loss_fct_dict=recon_loss_config,
+            train_model=train_model
         )
         self.domain_configs.append(seq_domain_config)
 
-    def initialize_seq_domain_config_2(self, name: str = "ATAC"):
+    def initialize_seq_domain_config_2(self, name: str = "ATAC", train_model:bool=True):
         if self.domain_configs is None:
             self.domain_configs = []
 
@@ -145,6 +146,7 @@ class SeqSeqTranslationExperiment(BaseExperiment):
             label_key=self.seq_label_key_2,
             optimizer_dict=optimizer_config,
             recon_loss_fct_dict=recon_loss_config,
+            train_model=train_model
         )
         self.domain_configs.append(seq_domain_config)
 

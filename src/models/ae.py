@@ -26,7 +26,7 @@ class BaseAE(nn.Module):
 class VanillaAE(BaseAE, ABC):
     def __init__(
         self,
-        in_dims: int = 7633,
+        in_dims: int = 2613,
         latent_dim: int = 128,
         hidden_dims: List = None,
         batchnorm_latent: bool = False,
@@ -41,20 +41,24 @@ class VanillaAE(BaseAE, ABC):
         self.model_type = "AE"
 
         # Build encoder model
-        encoder_modules = [
+        if len(self.hidden_dims) > 0:
+            encoder_modules = [
             nn.Sequential(
                 nn.Linear(self.in_dims, self.hidden_dims[0]),
-                nn.BatchNorm1d(self.hidden_dims[0]),
+                #nn.BatchNorm1d(self.hidden_dims[0]),
                 nn.LeakyReLU(self.lrelu_slope),
+                nn.BatchNorm1d(self.hidden_dims[0]),
             )
         ]
+
 
         for i in range(1, len(hidden_dims)):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                    nn.BatchNorm1d(self.hidden_dims[i]),
+                    #nn.BatchNorm1d(self.hidden_dims[i]),
                     nn.LeakyReLU(self.lrelu_slope),
+                    nn.BatchNorm1d(self.hidden_dims[i]),
                 )
             )
         if self.batchnorm_latent:
@@ -73,16 +77,18 @@ class VanillaAE(BaseAE, ABC):
         decoder_modules = [
             nn.Sequential(
                 nn.Linear(self.latent_dim, self.hidden_dims[-1]),
-                nn.BatchNorm1d(self.hidden_dims[-1]),
+                #nn.BatchNorm1d(self.hidden_dims[-1]),
                 nn.LeakyReLU(self.lrelu_slope),
+                nn.BatchNorm1d(self.hidden_dims[-1]),
             )
         ]
         for i in range(len(hidden_dims) - 1):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                    nn.BatchNorm1d(self.hidden_dims[-2 - i]),
+                    #nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                     nn.LeakyReLU(self.lrelu_slope),
+                    nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                 )
             )
 

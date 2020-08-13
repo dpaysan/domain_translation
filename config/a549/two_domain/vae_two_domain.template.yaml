@@ -10,7 +10,7 @@ run_params:
                         'hidden_dims':[2048, 2048, 2048, 2048, 128],
                         'latent_dim': 64,
                         'in_dims':2613},
-                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.001},
+                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.0001},
                         'loss_config':{'type':'mae'}}
 
   seq_data_config_2: {'data_fname':'../../data/a549_dex/processed/atac_data.csv',
@@ -21,23 +21,24 @@ run_params:
                         'hidden_dims':[768, 768, 768, 768, 128],
                         'latent_dim': 64,
                         'in_dims': 815},
-                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.001},
+                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.0001},
                         'loss_config':{'type':'mae'}}
 
   latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
-                      'latent_dim': 64, 'hidden_dims':[64, 64, 64]},
+                      'latent_dim': 64, 'hidden_dims':[128, 64]},
                       'optimizer_config':{'type':'adam', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
   latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':64, 'n_classes':3},
                       'optimizer_config':{'type':'adam', 'lr':0.00001},
-                      'loss_config':{'type':'ce', 'weights':[0.250,0.375, 0.375]}}
+                      'loss_config':{'type':'ce', 'weights':[4.000, 2.667, 2.667]}}
 
   num_epochs: 5000
   early_stopping: 100
   train_val_test_split: [0.7, 0.2, 0.1]
-  batch_size: 8
+  batch_size: 32
   random_state: 1001
+  paired_data: True
 
 
 pipeline:
