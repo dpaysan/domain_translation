@@ -6,9 +6,10 @@ run_params:
                       'data_key':'seq_data',
                       'label_key':'label'}
 
-  seq_model_config_1 : {'model_config':{'type':'VanillaAE',
+  seq_model_config_1 : {'model_config':{'type':'TwoLatentSpaceAE',
                                         'hidden_dims':[1024, 512, 256, 128],
-                                        'latent_dim': 64,
+                                        'latent_dim_1': 48,
+                                        'latent_dim_2': 16,
                                         'in_dims':1276},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.005},
                         'loss_config':{'type':'mae'}}
@@ -17,21 +18,22 @@ run_params:
                       'data_key':'seq_data',
                       'label_key':'label'}
 
-  seq_model_config_2 : {'model_config':{'type':'VanillaAE',
+  seq_model_config_2 : {'model_config':{'type':'TwoLatentSpaceAE',
                                         'hidden_dims':[512, 256, 128, 64],
-                                        'latent_dim': 64,
+                                        'latent_dim_1': 48,
+                                        'latent_dim_2': 16,
                                         'in_dims':815},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.005},
                         'loss_config':{'type':'mae'}}
 
   latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
-                      'latent_dim': 64, 'hidden_dims':[64,128]},
+                      'latent_dim': 48, 'hidden_dims':[64,128]},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.0001},
                       'loss_config':{'type':'ce'}}
 
-  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':64, 'n_classes':3},
+  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':48, 'n_classes':3},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.0001},
-                      'loss_config':{'type':'ce', 'weights':[4, 3, 3]}}
+                      'loss_config':{'type':'ce', 'weights':[4, 2.67, 2.67]}}
 
   num_epochs: 5000
   early_stopping: 300
@@ -47,15 +49,9 @@ pipeline:
   - method: initialize_seq_data_loader_dict_1
   - method: initialize_seq_data_loader_dict_2
   - method: initialize_seq_domain_config_1
-    params:
-      train_model: True
   - method: initialize_seq_domain_config_2
   - method: initialize_dcm_model
   - method: initialize_clf_model
-  - method: load_model_for_domain_config
-    params:
-      weights_fname: '../../data/a549/experiments/pretrained_rna_model/best_model.pth'
-      id: 0
   - method: train_models
     params:
       alpha: 0.1

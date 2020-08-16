@@ -47,15 +47,9 @@ pipeline:
   - method: initialize_seq_data_loader_dict_1
   - method: initialize_seq_data_loader_dict_2
   - method: initialize_seq_domain_config_1
-    params:
-      train_model: True
   - method: initialize_seq_domain_config_2
   - method: initialize_dcm_model
   - method: initialize_clf_model
-  - method: load_model_for_domain_config
-    params:
-      weights_fname: '../../data/a549/experiments/pretrained_rna_model/best_model.pth'
-      id: 0
   - method: train_models
     params:
       alpha: 0.1

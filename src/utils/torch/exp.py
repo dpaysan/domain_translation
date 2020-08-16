@@ -9,19 +9,17 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 from torch.nn import Module
-from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 
 from src.functions.loss_functions import compute_KL_loss
-from src.functions.metrics import accuracy
+from src.functions.metric import accuracy
 from src.helper.models import DomainModelConfig, DomainConfig
+from src.utils.torch.evaluation import evaluate_latent_integration
 from src.utils.torch.general import get_device
 from src.utils.torch.visualization import (
     visualize_image_translation_performance,
     visualize_image_vae_performance,
 )
-
-from sklearn.neighbors import NearestNeighbors
 
 
 def train_autoencoders_two_domains(
@@ -39,9 +37,8 @@ def train_autoencoders_two_domains(
     use_clf: bool = True,
     phase: str = "train",
     vae_mode: bool = True,
-    paired_mode: bool = False,
+    partly_integrated_latent_space:bool=False,
 ) -> dict:
-
 
     # Expects 2 model configurations (one for each domain)
     model_configuration_i = domain_model_configurations[0]
@@ -96,12 +93,20 @@ def train_autoencoders_two_domains(
     # Forward pass of the AE/VAE
     inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
 
-    if vae_mode:
-        recons_i, latents_i, mu_i, logvar_i = model_i(inputs_i)
-        recons_j, latents_j, mu_j, logvar_j = model_j(inputs_j)
+    if partly_integrated_latent_space:
+        if vae_mode:
+            recons_i, latents_i, _, mu_i, logvar_i = model_i(inputs_i)
+            recons_j, latents_j, _, mu_j, logvar_j = model_j(inputs_j)
+        else:
+            recons_i, latents_i, _ = model_i(inputs_i)
+            recons_j, latents_j, _ = model_j(inputs_j)
     else:
-        recons_i, latents_i = model_i(inputs_i)
-        recons_j, latents_j = model_j(inputs_j)
+        if vae_mode:
+            recons_i, latents_i, mu_i, logvar_i = model_i(inputs_i)
+            recons_j, latents_j, mu_j, logvar_j = model_j(inputs_j)
+        else:
+            recons_i, latents_i = model_i(inputs_i)
+            recons_j, latents_j = model_j(inputs_j)
 
     if use_dcm:
         labels_i, labels_j = (
@@ -197,51 +202,33 @@ def train_autoencoders_two_domains(
         summary_stats["clf_loss"] = clf_loss.item() * (batch_size_i + batch_size_j)
         total_loss_item += summary_stats["clf_loss"]
 
-    if phase != "train" and paired_mode:
-        # nn_estimator = NearestNeighbors(n_neighbors=10)
-        # latents_i_arr = latents_i.cpu().detach().numpy()
-        # latents_j_arr = latents_j.cpu().detach().numpy()
-        # nn_estimator = nn_estimator.fit(latents_i_arr)
-        # among_knn = 0
-        # for i in range(len(latents_j_arr)):
-        #     latent_j = latents_j_arr[i]
-        #     knn_idc = nn_estimator.kneighbors(latent_j.reshape(1,-1), return_distance=False)
-        #     if i in knn_idc:
-        #         among_knn += 1
-        # knn_acc = among_knn/len(latents_j_arr)
-        # summary_stats['latent_l1_distance'] = among_knn
-
-        summary_stats["latent_l1_distance"] = nn.L1Loss(reduction="sum")(
-            latents_i, latents_j).item()
-
-
     summary_stats["total_loss"] = total_loss_item
 
-    del recon_loss_i
-    del recon_loss_j
-    del dcm_loss
-    del total_loss
-    del domain_labels_i
-    del domain_labels_j
-    del dcm_input_i
-    del dcm_input_j
-    del dcm_output_i
-    del dcm_output_j
-    del latents_i
-    del latents_j
-    del inputs_i
-    del inputs_j
-    if use_dcm:
-        del labels_i
-        del labels_j
-    del recons_i
-    del recons_j
-    if vae_mode:
-        del mu_i
-        del mu_j
-        del logvar_i
-        del logvar_j
-        del kl_loss
+    # del recon_loss_i
+    # del recon_loss_j
+    # del dcm_loss
+    # del total_loss
+    # del domain_labels_i
+    # del domain_labels_j
+    # del dcm_input_i
+    # del dcm_input_j
+    # del dcm_output_i
+    # del dcm_output_j
+    # del inputs_i
+    # del inputs_j
+    # del latents_i
+    # del latents_j
+    # if use_dcm:
+    #     del labels_i
+    #     del labels_j
+    # del recons_i
+    # del recons_j
+    # if vae_mode:
+    #     del mu_i
+    #     del mu_j
+    #     del logvar_i
+    #     del logvar_j
+    #     del kl_loss
 
     return summary_stats
 
@@ -254,7 +241,6 @@ def train_latent_dcm_two_domains(
     use_dcm: bool,
     device: str = "cuda:0",
     phase: str = "train",
-    vae_mode: bool = True,
 ) -> dict:
     # Get the model configurations for the two domains
     model_configuration_i = domain_model_configurations[0]
@@ -289,12 +275,8 @@ def train_latent_dcm_two_domains(
     latent_dcm.to(device)
 
     # Forward pass
-    if vae_mode:
-        _, latents_i, _, _ = model_i(inputs_i)
-        _, latents_j, _, _ = model_j(inputs_j)
-    else:
-        _, latents_i = model_i(inputs_i)
-        _, latents_j = model_j(inputs_j)
+    latents_i = model_i(inputs_i)[1]
+    latents_j = model_j(inputs_j)[1]
 
     if use_dcm:
         labels_i, labels_j = (
@@ -346,18 +328,18 @@ def train_latent_dcm_two_domains(
         "accuracy_j": accuracy_j,
     }
 
-    del dcm_loss
-    del domain_labels_i
-    del domain_labels_j
-    del dcm_output_i
-    del dcm_output_j
-    del latents_i
-    del latents_j
-    del inputs_i
-    del inputs_j
-    if use_dcm:
-        del labels_i
-        del labels_j
+    # del dcm_loss
+    # del domain_labels_i
+    # del domain_labels_j
+    # del dcm_output_i
+    # del dcm_output_j
+    # del latents_i
+    # del latents_j
+    # del inputs_i
+    # del inputs_j
+    # if use_dcm:
+    #     del labels_i
+    #     del labels_j
 
     return summary_stats
 
@@ -419,6 +401,7 @@ def process_epoch_two_domains(
         )
 
     vae_mode = domain_model_config_i.model.model_type.upper() == "VAE"
+    partly_integrated_latent_space = domain_model_config_i.model.n_latent_spaces == 2
 
     # Iterate over batches
     for index, (samples_i, samples_j) in enumerate(zip(train_loader_i, train_loader_j)):
@@ -446,7 +429,7 @@ def process_epoch_two_domains(
             phase=phase,
             device=device,
             vae_mode=vae_mode,
-            paired_mode=paired_mode,
+            partly_integrated_latent_space=partly_integrated_latent_space
         )
         # Update statistics after training the AE
         recon_loss_i += ae_train_summary["recon_loss_i"]
@@ -459,10 +442,7 @@ def process_epoch_two_domains(
         if use_clf:
             clf_loss += ae_train_summary["clf_loss"]
 
-        if phase != "train" and paired_mode:
-            latent_l1_distance += ae_train_summary["latent_l1_distance"]
-
-        clf_train_summary = train_latent_dcm_two_domains(
+        dcm_train_summary = train_latent_dcm_two_domains(
             domain_model_configurations=domain_model_configs,
             latent_dcm=latent_dcm,
             latent_dcm_loss=latent_dcm_loss,
@@ -470,15 +450,14 @@ def process_epoch_two_domains(
             use_dcm=use_dcm,
             phase=phase,
             device=device,
-            vae_mode=vae_mode,
         )
 
         # Update statistics after training the DCM:
-        dcm_loss += clf_train_summary["dcm_loss"]
-        correct_preds_i += clf_train_summary["accuracy_i"][0]
-        n_preds_i += clf_train_summary["accuracy_i"][1]
-        correct_preds_j += clf_train_summary["accuracy_j"][0]
-        n_preds_j += clf_train_summary["accuracy_j"][1]
+        dcm_loss += dcm_train_summary["dcm_loss"]
+        correct_preds_i += dcm_train_summary["accuracy_i"][0]
+        n_preds_i += dcm_train_summary["accuracy_i"][1]
+        correct_preds_j += dcm_train_summary["accuracy_j"][0]
+        n_preds_j += dcm_train_summary["accuracy_j"][1]
 
     # Get average over batches for statistics
     recon_loss_i /= n_preds_i
@@ -510,10 +489,6 @@ def process_epoch_two_domains(
     if use_clf:
         clf_loss /= n_preds_i + n_preds_j
         epoch_statistics["clf_loss"] = clf_loss
-
-    if phase != "train" and paired_mode:
-        latent_l1_distance /= n_preds_i + n_preds_j
-        epoch_statistics["latent_l1_distance"] = latent_l1_distance
 
     return epoch_statistics
 
@@ -550,6 +525,8 @@ def train_val_test_loop_two_domains(
         early_stopping = num_epochs
 
     total_loss_dict = {"train": [], "val": []}
+
+    epoch_with_best_model = 0
 
     # Reserve space to save best model configurations
     domain_names = [domain_configs[0].name, domain_configs[1].name]
@@ -686,12 +663,26 @@ def train_val_test_loop_two_domains(
                     )
                 )
 
-            if "latent_l1_distance" in epoch_statistics:
-                logging.debug(
-                    "Latent l1 distance of paired data: {:.8f}".format(
-                        epoch_statistics["latent_l1_distance"]
+            if phase == "val" and paired_mode:
+                n_neighbours = 10
+                metrics = evaluate_latent_integration(
+                        model_i=domain_configs[0].domain_model_config.model,
+                        model_j=domain_configs[1].domain_model_config.model,
+                        data_loader_i=domain_configs[0].data_loader_dict["val"],
+                        data_loader_j=domain_configs[1].data_loader_dict["val"],
+                        n_neighbours=n_neighbours,
+                        device=device,
                     )
-                )
+                logging.debug(
+                        "Latent l1 distance of paired data: {:.8f}".format(
+                            metrics["latent_l1_distance"]
+                        )
+                    )
+                logging.debug(
+                        "{}-NN accuracy for the paired data: {:.8f}".format(
+                            n_neighbours, metrics["knn_acc"]
+                        )
+                    )
 
             logging.debug("***" * 20)
 
@@ -701,9 +692,10 @@ def train_val_test_loop_two_domains(
 
             total_loss_dict[phase].append(epoch_total_loss)
 
-            if phase == "val":
+            if phase == 'val':
                 # Save model states if current parameters give the best validation loss
                 if epoch_total_loss < best_total_loss:
+                    epoch_with_best_model = i + 1
                     es_counter = 0
                     best_total_loss = epoch_total_loss
 
@@ -802,6 +794,11 @@ def train_val_test_loop_two_domains(
     )
 
     # Load best models
+    logging.debug(
+        "Load best model configurations found in epoch {}.".format(
+            epoch_with_best_model
+        )
+    )
     domain_configs[0].domain_model_config.model.load_state_dict(best_model_i_weights)
     domain_configs[1].domain_model_config.model.load_state_dict(best_model_j_weights)
 
@@ -875,6 +872,28 @@ def train_val_test_loop_two_domains(
             logging.debug(
                 "Latent l1 distance of paired data: {:.8f}".format(
                     epoch_statistics["latent_l1_distance"]
+                )
+            )
+
+        if paired_mode:
+            n_neighbours = 10
+            metrics = evaluate_latent_integration(
+                model_i=domain_configs[0].domain_model_config.model,
+                model_j=domain_configs[1].domain_model_config.model,
+                data_loader_i=domain_configs[0].data_loader_dict["test"],
+                data_loader_j=domain_configs[1].data_loader_dict["test"],
+                n_neighbours=n_neighbours,
+                device=device,
+                shared_latent_dim=shared_latent_dim
+            )
+            logging.debug(
+                "Latent l1 distance of paired data: {:.8f}".format(
+                    metrics["latent_l1_distance"]
+                )
+            )
+            logging.debug(
+                "{}-NN accuracy for the paired data: {:.8f}".format(
+                    n_neighbours, metrics["knn_acc"]
                 )
             )
 

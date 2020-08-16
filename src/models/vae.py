@@ -52,6 +52,7 @@ class VanillaConvVAE(BaseVAE, ABC):
         self.batchnorm = batchnorm
         self.updated = False
         self.model_type = "VAE"
+        self.n_latent_spaces = 1
 
         # encoder
         encoder_modules = [

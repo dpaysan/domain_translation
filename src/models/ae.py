@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 from typing import Any, List, Tuple
 
+import torch
 from torch import nn, Tensor
 
 
@@ -25,12 +26,12 @@ class BaseAE(nn.Module):
 
 class VanillaAE(BaseAE, ABC):
     def __init__(
-        self,
-        in_dims: int = 2613,
-        latent_dim: int = 128,
-        hidden_dims: List = None,
-        batchnorm_latent: bool = False,
-        lrelu_slope: float = 0.2,
+            self,
+            in_dims: int = 2613,
+            latent_dim: int = 128,
+            hidden_dims: List = None,
+            batchnorm_latent: bool = False,
+            lrelu_slope: float = 0.2,
     ):
         super(VanillaAE, self).__init__()
         self.in_dims = in_dims
@@ -39,24 +40,24 @@ class VanillaAE(BaseAE, ABC):
         self.batchnorm_latent = batchnorm_latent
         self.lrelu_slope = lrelu_slope
         self.model_type = "AE"
+        self.n_latent_spaces = 1
 
         # Build encoder model
         if len(self.hidden_dims) > 0:
             encoder_modules = [
-            nn.Sequential(
-                nn.Linear(self.in_dims, self.hidden_dims[0]),
-                #nn.BatchNorm1d(self.hidden_dims[0]),
-                nn.LeakyReLU(self.lrelu_slope),
-                nn.BatchNorm1d(self.hidden_dims[0]),
-            )
-        ]
-
+                nn.Sequential(
+                    nn.Linear(self.in_dims, self.hidden_dims[0]),
+                    # nn.BatchNorm1d(self.hidden_dims[0]),
+                    nn.LeakyReLU(self.lrelu_slope),
+                    nn.BatchNorm1d(self.hidden_dims[0]),
+                )
+            ]
 
         for i in range(1, len(hidden_dims)):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                    #nn.BatchNorm1d(self.hidden_dims[i]),
+                    # nn.BatchNorm1d(self.hidden_dims[i]),
                     nn.LeakyReLU(self.lrelu_slope),
                     nn.BatchNorm1d(self.hidden_dims[i]),
                 )
@@ -77,7 +78,7 @@ class VanillaAE(BaseAE, ABC):
         decoder_modules = [
             nn.Sequential(
                 nn.Linear(self.latent_dim, self.hidden_dims[-1]),
-                #nn.BatchNorm1d(self.hidden_dims[-1]),
+                # nn.BatchNorm1d(self.hidden_dims[-1]),
                 nn.LeakyReLU(self.lrelu_slope),
                 nn.BatchNorm1d(self.hidden_dims[-1]),
             )
@@ -86,7 +87,7 @@ class VanillaAE(BaseAE, ABC):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                    #nn.BatchNorm1d(self.hidden_dims[-2 - i]),
+                    # nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                     nn.LeakyReLU(self.lrelu_slope),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                 )
@@ -108,3 +109,89 @@ class VanillaAE(BaseAE, ABC):
         latents = self.encode(input=inputs)
         output = self.decode(latents)
         return output, latents
+
+
+class TwoLatentSpaceAE(BaseAE, ABC):
+    def __init__(
+            self,
+            in_dims: int = 2613,
+            latent_dim_1: int = 128,
+            latent_dim_2: int = 64,
+            hidden_dims: List = None,
+            batchnorm_latent: bool = False,
+            lrelu_slope: float = 0.2,
+    ):
+        super(TwoLatentSpaceAE, self).__init__()
+        self.in_dims = in_dims
+        self.latent_dim_1 = latent_dim_1
+        self.latent_dim_2 = latent_dim_2
+        self.hidden_dims = hidden_dims
+        self.batchnorm_latent = batchnorm_latent
+        self.lrelu_slope = lrelu_slope
+        self.model_type = "AE"
+        self.n_latent_spaces = 2
+
+        # Build encoder model
+        if len(self.hidden_dims) > 0:
+            encoder_modules = [
+                nn.Sequential(
+                    nn.Linear(self.in_dims, self.hidden_dims[0]),
+                    # nn.BatchNorm1d(self.hidden_dims[0]),
+                    nn.LeakyReLU(self.lrelu_slope),
+                    nn.BatchNorm1d(self.hidden_dims[0]),
+                )
+            ]
+
+        for i in range(1, len(hidden_dims)):
+            encoder_modules.append(
+                nn.Sequential(
+                    nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
+                    # nn.BatchNorm1d(self.hidden_dims[i]),
+                    nn.LeakyReLU(self.lrelu_slope),
+                    nn.BatchNorm1d(self.hidden_dims[i]),
+                )
+            )
+
+        self.encoder = nn.Sequential(*encoder_modules)
+
+        self.l1 = nn.Linear(self.hidden_dims[-1], self.latent_dim_1)
+        self.l2 = nn.Linear(self.hidden_dims[-1], self.latent_dim_2)
+
+        # Build decoder model
+        decoder_modules = [
+            nn.Sequential(
+                nn.Linear(self.latent_dim_1 + latent_dim_2, self.hidden_dims[-1]),
+                # nn.BatchNorm1d(self.hidden_dims[-1]),
+                nn.LeakyReLU(self.lrelu_slope),
+                nn.BatchNorm1d(self.hidden_dims[-1]),
+            )
+        ]
+        for i in range(len(hidden_dims) - 1):
+            decoder_modules.append(
+                nn.Sequential(
+                    nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
+                    # nn.BatchNorm1d(self.hidden_dims[-2 - i]),
+                    nn.LeakyReLU(self.lrelu_slope),
+                    nn.BatchNorm1d(self.hidden_dims[-2 - i]),
+                )
+            )
+
+        decoder_modules.append(nn.Linear(self.hidden_dims[0], self.in_dims))
+
+        self.decoder = nn.Sequential(*decoder_modules)
+
+    def encode(self, input: Tensor) -> Tuple[Tensor, Tensor]:
+        h = self.encoder(input=input)
+        latents_1 = self.l1(h)
+        latents_2 = self.l2(h)
+        return latents_1, latents_2
+
+    def decode(self, input: Tensor) -> Any:
+        output = self.decoder(input=input)
+        return output
+
+    def forward(self, inputs: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+        latents_1, latents_2 = self.encode(input=inputs)
+        latents = torch.cat([latents_1, latents_2], dim=1)
+        output = self.decode(latents)
+        return output, latents_1, latents_2
