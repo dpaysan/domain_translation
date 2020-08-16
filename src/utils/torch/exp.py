@@ -884,7 +884,6 @@ def train_val_test_loop_two_domains(
                 data_loader_j=domain_configs[1].data_loader_dict["test"],
                 n_neighbours=n_neighbours,
                 device=device,
-                shared_latent_dim=shared_latent_dim
             )
             logging.debug(
                 "Latent l1 distance of paired data: {:.8f}".format(
