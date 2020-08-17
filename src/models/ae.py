@@ -26,12 +26,12 @@ class BaseAE(nn.Module):
 
 class VanillaAE(BaseAE, ABC):
     def __init__(
-            self,
-            in_dims: int = 2613,
-            latent_dim: int = 128,
-            hidden_dims: List = None,
-            batchnorm_latent: bool = False,
-            lrelu_slope: float = 0.2,
+        self,
+        in_dims: int = 2613,
+        latent_dim: int = 128,
+        hidden_dims: List = None,
+        batchnorm_latent: bool = False,
+        lrelu_slope: float = 0.2,
     ):
         super(VanillaAE, self).__init__()
         self.in_dims = in_dims
@@ -113,13 +113,13 @@ class VanillaAE(BaseAE, ABC):
 
 class TwoLatentSpaceAE(BaseAE, ABC):
     def __init__(
-            self,
-            in_dims: int = 2613,
-            latent_dim_1: int = 128,
-            latent_dim_2: int = 64,
-            hidden_dims: List = None,
-            batchnorm_latent: bool = False,
-            lrelu_slope: float = 0.2,
+        self,
+        in_dims: int = 2613,
+        latent_dim_1: int = 128,
+        latent_dim_2: int = 64,
+        hidden_dims: List = None,
+        batchnorm_latent: bool = False,
+        lrelu_slope: float = 0.2,
     ):
         super(TwoLatentSpaceAE, self).__init__()
         self.in_dims = in_dims

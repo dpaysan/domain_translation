@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List
 
 import torch
@@ -8,6 +9,7 @@ from src.utils.torch.data import (
     init_seq_dataset,
     DataHandler,
 )
+from src.utils.torch.evaluation import save_latents_and_labels_to_csv
 from src.utils.torch.exp import train_val_test_loop_two_domains
 from src.utils.torch.general import get_device
 from src.utils.torch.model import (
@@ -212,3 +214,33 @@ class SeqSeqTranslationExperiment(BaseExperiment):
             device=self.device,
             paired_mode=self.paired_data,
         )
+
+    def save_latents_to_csv(
+        self, domain: int = 0, dataset_type: str = "val", save_path: str = None, posfix:str=''
+    ):
+        domain_config = self.domain_configs[domain]
+        if save_path is None:
+            save_path = os.path.join(
+                self.output_dir,
+                "latents_" + domain_config.name + "_" + dataset_type +posfix + ".csv",
+            )
+        model = domain_config.domain_model_config.model
+        try:
+            dataset = domain_config.data_loader_dict[dataset_type].dataset
+        except KeyError:
+            raise RuntimeError(
+                "Unknown dataset_type: {}, expected one of the following: train, val, test".format(
+                    dataset_type
+                )
+            )
+        save_latents_and_labels_to_csv(
+            model=model,
+            dataset=dataset,
+            data_key=domain_config.data_key,
+            label_key=domain_config.label_key,
+            device=self.device,
+            save_path=save_path,
+        )
+
+    def visualize_loss_evolution(self):
+        super().visualize_loss_evolution()

@@ -1,9 +1,12 @@
+from typing import Tuple
+
 from torch import nn
 from torch.nn import Module
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 import numpy as np
 import torch
 
+from src.utils.basic.export import dict_to_csv
 from src.utils.basic.metric import knn_accuracy
 
 
@@ -59,3 +62,80 @@ def evaluate_latent_integration(
 
     metrics = {"knn_acc": knn_acc, "latent_l1_distance": latent_l1_distance}
     return metrics
+
+
+def get_latent_representations_for_model(
+    model: Module,
+    dataset: Dataset,
+    data_key: str = "seq_data",
+    label_key: str = "label",
+    device: str = "cuda:0",
+) -> dict:
+    # create Dataloader
+    dataloader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+
+    shared_latent_representations = []
+    domain_specific_latent_representations = []
+    labels = []
+    model.eval().to(device)
+
+    for (idx, sample) in enumerate(dataloader):
+        input = sample[data_key].to(device)
+        if label_key is not None:
+            labels.append(sample[label_key].item())
+
+        output = model(input)
+        shared_latent_representation = output[1]
+        shared_latent_representations.append(
+            shared_latent_representation.detach().cpu().numpy()
+        )
+        if hasattr(model, "n_latent_spaces") and model.n_latent_spaces == 2:
+            domain_specific_latent_representation = output[2]
+            domain_specific_latent_representations.append(
+                domain_specific_latent_representation.detach().cpu().numpy()
+            )
+
+    shared_latent_representations = np.array(shared_latent_representations).squeeze()
+    domain_specific_latent_representations = np.array(
+        domain_specific_latent_representations
+    ).squeeze()
+    labels = np.array(labels).squeeze()
+
+    latent_dict = {"shared_latents": shared_latent_representations}
+
+    if len(domain_specific_latent_representations) != 0:
+        latent_dict["domain_specific_latents"] = domain_specific_latent_representations
+    if len(labels) != 0:
+        latent_dict["labels"] = labels
+
+    return latent_dict
+
+
+def save_latents_and_labels_to_csv(
+    model: Module,
+    dataset: Dataset,
+    save_path: str,
+    data_key: str = "seq_data",
+    label_key: str = "label",
+    device: str = "cuda:0",
+):
+    data = get_latent_representations_for_model(
+            model=model,
+            dataset=dataset,
+            data_key=data_key,
+            label_key=label_key,
+            device=device,)
+
+    expanded_data = {}
+    if 'shared_latents' in data:
+        shared_latents = data['shared_latents']
+        for i in range(shared_latents.shape[1]):
+            expanded_data['zs_{}'.format(i)] = shared_latents[:, i]
+    if 'domain_specific_latents' in data:
+        domain_specific_latents = data['domain_specific_latents']
+        for i in range(domain_specific_latents.shape[1]):
+            expanded_data['zd_{}'.format(i)] = domain_specific_latents[:,i]
+    if 'labels' in data:
+        expanded_data['labels'] = data['labels']
+
+    dict_to_csv(data=expanded_data, save_path=save_path)

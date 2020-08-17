@@ -3,6 +3,8 @@ from typing import List
 import numpy as np
 import torch
 
+from src.utils.basic.visualization import plot_train_val_hist
+
 
 class BaseExperiment:
     def __init__(
@@ -34,4 +36,10 @@ class BaseExperiment:
         # torch.backends.cudnn.benchmark = False
 
     def visualize_loss_evolution(self):
-        assert self.loss_dict is None
+        plot_train_val_hist(
+            training_history=self.loss_dict["train"],
+            validation_history=self.loss_dict["val"],
+            output_dir=self.output_dir + "/",
+            y_label="total_loss",
+            title="Fitting history",
+        )

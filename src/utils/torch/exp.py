@@ -37,7 +37,7 @@ def train_autoencoders_two_domains(
     use_clf: bool = True,
     phase: str = "train",
     vae_mode: bool = True,
-    partly_integrated_latent_space:bool=False,
+    partly_integrated_latent_space: bool = False,
 ) -> dict:
 
     # Expects 2 model configurations (one for each domain)
@@ -390,7 +390,7 @@ def process_epoch_two_domains(
             phase=phase,
             device=device,
             vae_mode=vae_mode,
-            partly_integrated_latent_space=partly_integrated_latent_space
+            partly_integrated_latent_space=partly_integrated_latent_space,
         )
         # Update statistics after training the AE
         recon_loss_i += ae_train_summary["recon_loss_i"]
@@ -627,23 +627,23 @@ def train_val_test_loop_two_domains(
             if phase == "val" and paired_mode:
                 n_neighbours = 10
                 metrics = evaluate_latent_integration(
-                        model_i=domain_configs[0].domain_model_config.model,
-                        model_j=domain_configs[1].domain_model_config.model,
-                        data_loader_i=domain_configs[0].data_loader_dict["val"],
-                        data_loader_j=domain_configs[1].data_loader_dict["val"],
-                        n_neighbours=n_neighbours,
-                        device=device,
-                    )
+                    model_i=domain_configs[0].domain_model_config.model,
+                    model_j=domain_configs[1].domain_model_config.model,
+                    data_loader_i=domain_configs[0].data_loader_dict["val"],
+                    data_loader_j=domain_configs[1].data_loader_dict["val"],
+                    n_neighbours=n_neighbours,
+                    device=device,
+                )
                 logging.debug(
-                        "Latent l1 distance of paired data: {:.8f}".format(
-                            metrics["latent_l1_distance"]
-                        )
+                    "Latent l1 distance of paired data: {:.8f}".format(
+                        metrics["latent_l1_distance"]
                     )
+                )
                 logging.debug(
-                        "{}-NN accuracy for the paired data: {:.8f}".format(
-                            n_neighbours, metrics["knn_acc"]
-                        )
+                    "{}-NN accuracy for the paired data: {:.8f}".format(
+                        n_neighbours, metrics["knn_acc"]
                     )
+                )
 
             logging.debug("***" * 20)
 
@@ -653,7 +653,7 @@ def train_val_test_loop_two_domains(
 
             total_loss_dict[phase].append(epoch_total_loss)
 
-            if phase == 'val':
+            if phase == "val":
                 # Save model states if current parameters give the best validation loss
                 if epoch_total_loss < best_total_loss:
                     epoch_with_best_model = i + 1
