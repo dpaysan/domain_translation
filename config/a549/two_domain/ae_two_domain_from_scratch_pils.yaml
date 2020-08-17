@@ -7,11 +7,11 @@ run_params:
                       'label_key':'label'}
 
   seq_model_config_1 : {'model_config':{'type':'TwoLatentSpaceAE',
-                                        'hidden_dims':[1024, 512, 256, 128],
+                                        'hidden_dims':[1024, 512, 256, 128, 64],
                                         'latent_dim_1': 48,
                                         'latent_dim_2': 16,
                                         'in_dims':1276},
-                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.005},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
 
   seq_data_config_2: {'data_fname':'../../data/a549_dex/processed/atac_data.csv',
@@ -19,20 +19,20 @@ run_params:
                       'label_key':'label'}
 
   seq_model_config_2 : {'model_config':{'type':'TwoLatentSpaceAE',
-                                        'hidden_dims':[512, 256, 128, 64],
+                                        'hidden_dims':[512, 256, 128, 64, 64],
                                         'latent_dim_1': 48,
                                         'latent_dim_2': 16,
                                         'in_dims':815},
-                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.005},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
 
   latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
-                      'latent_dim': 48, 'hidden_dims':[64,128]},
-                      'optimizer_config':{'type':'rmsprop', 'lr':0.0001},
+                      'latent_dim': 48, 'hidden_dims':[64,128, 64]},
+                      'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
   latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':48, 'n_classes':3},
-                      'optimizer_config':{'type':'rmsprop', 'lr':0.0001},
+                      'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce', 'weights':[4, 2.67, 2.67]}}
 
   num_epochs: 5000

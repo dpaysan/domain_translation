@@ -1,12 +1,11 @@
 from numpy import ndarray
-import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
 
 def knn_accuracy(
     samples_i: ndarray, samples_j: ndarray, n_neighbours: int = 5
 ) -> float:
-    nn_estimator = NearestNeighbors(n_neighbors=n_neighbours)
+    nn_estimator = NearestNeighbors(n_neighbors=n_neighbours, p=1)
     nn_estimator = nn_estimator.fit(samples_i)
     among_knn = 0
     for j in range(len(samples_j)):

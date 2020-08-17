@@ -204,32 +204,6 @@ def train_autoencoders_two_domains(
 
     summary_stats["total_loss"] = total_loss_item
 
-    # del recon_loss_i
-    # del recon_loss_j
-    # del dcm_loss
-    # del total_loss
-    # del domain_labels_i
-    # del domain_labels_j
-    # del dcm_input_i
-    # del dcm_input_j
-    # del dcm_output_i
-    # del dcm_output_j
-    # del inputs_i
-    # del inputs_j
-    # del latents_i
-    # del latents_j
-    # if use_dcm:
-    #     del labels_i
-    #     del labels_j
-    # del recons_i
-    # del recons_j
-    # if vae_mode:
-    #     del mu_i
-    #     del mu_j
-    #     del logvar_i
-    #     del logvar_j
-    #     del kl_loss
-
     return summary_stats
 
 
@@ -327,19 +301,6 @@ def train_latent_dcm_two_domains(
         "accuracy_i": accuracy_i,
         "accuracy_j": accuracy_j,
     }
-
-    # del dcm_loss
-    # del domain_labels_i
-    # del domain_labels_j
-    # del dcm_output_i
-    # del dcm_output_j
-    # del latents_i
-    # del latents_j
-    # del inputs_i
-    # del inputs_j
-    # if use_dcm:
-    #     del labels_i
-    #     del labels_j
 
     return summary_stats
 
@@ -817,6 +778,8 @@ def train_val_test_loop_two_domains(
             latent_clf_optimizer=latent_clf_optimizer,
             latent_clf_loss=latent_clf_loss,
             alpha=alpha,
+            beta=beta,
+            lamb=lamb,
             use_dcm=use_dcm,
             use_clf=use_clf,
             phase="test",
