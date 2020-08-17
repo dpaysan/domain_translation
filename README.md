@@ -1,7 +1,13 @@
 # Domain translation
 
-This project is a different implementation to run the experiments described in 
->Karren Dai Yang, Anastasiya Belyaeva, Saradha Venkatachalapathy, Karthik Damodaran, Adityanarayanan Radhakrishnan, Abigail Katcoff, GV Shivashankar, Caroline Uhler
-bioRxiv 2019.12.13.875922; doi: https://doi.org/10.1101/2019.12.13.875922
+The code can be used to train uncoupeled autoencoders for domain translation learning partly or fully integrated latent spaces.
 
-including the code available at https://github.com/uhlerlab/cross-modal-autoencoders .
+## Credits
+The code is based on the ideas presented in 
+>Yang et al.: "Multi-Domain Translation between Single-Cell Imaging and Sequencing Data using Autoencoders."  bioRxiv 2019.12.13.875922; doi: https://doi.org/10.1101/2019.12.13.875922
+
+>Yang & Uhler Yang: "Multi-domain translation by learning uncoupled autoencoders." arXiv preprint arXiv:1902.03515 (2019).
+
+
+## Run guide
+to be added
