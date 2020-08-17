@@ -4,7 +4,7 @@ The code can be used to train uncoupeled autoencoders for domain translation lea
 
 ## Credits
 The code is based on the ideas presented in 
->Yang et al.: "Multi-Domain Translation between Single-Cell Imaging and Sequencing Data using Autoencoders."  bioRxiv 2019.12.13.875922; doi: https://doi.org/10.1101/2019.12.13.875922
+>Yang et al.: "Multi-Domain Translation between Single-Cell Imaging and Sequencing Data using Autoencoders."  bioRxiv 2019.12.13.875922 (2019)
 
 >Yang & Uhler Yang: "Multi-domain translation by learning uncoupled autoencoders." arXiv preprint arXiv:1902.03515 (2019).
 
