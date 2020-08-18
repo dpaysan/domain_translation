@@ -1,3 +1,4 @@
+import os
 from typing import Tuple
 
 from torch import nn
@@ -6,6 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 import numpy as np
 import torch
 
+from src.helper.models import DomainConfig
 from src.utils.basic.export import dict_to_csv
 from src.utils.basic.metric import knn_accuracy
 
@@ -139,3 +141,24 @@ def save_latents_and_labels_to_csv(
         expanded_data['labels'] = data['labels']
 
     dict_to_csv(data=expanded_data, save_path=save_path)
+
+
+def save_latents_to_csv(domain_config:DomainConfig, save_path:str, dataset_type: str = "val",
+    device:str='cuda:0'):
+    model = domain_config.domain_model_config.model
+    try:
+        dataset = domain_config.data_loader_dict[dataset_type].dataset
+    except KeyError:
+        raise RuntimeError(
+                "Unknown dataset_type: {}, expected one of the following: train, val, test".format(
+                    dataset_type
+                )
+            )
+    save_latents_and_labels_to_csv(
+            model=model,
+            dataset=dataset,
+            data_key=domain_config.data_key,
+            label_key=domain_config.label_key,
+            device=device,
+            save_path=save_path,
+        )
