@@ -1,15 +1,13 @@
 import copy
 import logging
 import os
-
 from typing import List
 
 import torch
 
 from src.experiments.base import BaseTwoDomainExperiment, BaseTwoDomainExperimentCV
-from src.utils.torch.data import init_seq_dataset
 from src.helper.data import DataHandler, DataHandlerCV
-
+from src.utils.torch.data import init_seq_dataset
 from src.utils.torch.exp import train_val_test_loop_two_domains
 from src.utils.torch.model import (
     get_domain_configuration,
@@ -443,6 +441,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             output_dir = "{}/fold_{}".format(self.output_dir, i)
             os.makedirs(output_dir)
 
+            logging.debug("@")
             logging.debug("|||" * 20)
             logging.debug("Start processing fold {}/{}".format(i + 1, self.n_folds))
             logging.debug("|||" * 20)

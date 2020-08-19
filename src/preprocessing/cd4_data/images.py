@@ -1,4 +1,5 @@
 import os
+from shutil import copyfile
 from typing import List, Tuple
 
 import cv2
@@ -6,7 +7,6 @@ import numpy as np
 import pandas as pd
 from numpy import ndarray
 from skimage import io
-from shutil import copyfile
 
 from src.utils.basic.io import get_data_list
 

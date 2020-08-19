@@ -1,5 +1,5 @@
 import logging
-import os
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,11 @@ class LabeledDataset(Dataset):
 
 class TorchNucleiImageDataset(LabeledDataset):
     def __init__(
-        self, image_dir: str, label_fname: str, transform_pipeline: Compose = None,
+        self,
+        image_dir: str,
+        label_fname: str,
+        transform_pipeline: Compose = None,
+        paired_training_idc: List[int] = None,
     ):
         super(TorchNucleiImageDataset, self).__init__()
 
@@ -32,6 +36,7 @@ class TorchNucleiImageDataset(LabeledDataset):
         self.labels = np.array(labels.loc[:, "binary_label"])
         self.image_locs = get_data_list(self.image_dir)
         self.transform_pipeline = transform_pipeline
+        self.paired_training_idc = paired_training_idc
 
     def __len__(self) -> int:
         return len(self.image_locs)
@@ -46,6 +51,11 @@ class TorchNucleiImageDataset(LabeledDataset):
         label = torch.from_numpy(label)
 
         sample = {"image": image, "label": label}
+        if self.paired_training_idc is not None:
+            if index in self.paired_training_idc:
+                sample["train_pair"] = torch.from_numpy(np.array(1))
+            else:
+                sample["train_pair"] = torch.from_numpy(np.array(0))
         return sample
 
     def set_transform_pipeline(
@@ -66,6 +76,7 @@ class TorchSeqDataset(LabeledDataset):
         seq_data_and_labels_fname: str,
         transform_pipeline: Compose = None,
         sample_index: bool = True,
+        paired_training_idc: List[int] = None,
     ):
         super(TorchSeqDataset, self).__init__()
         self.seq_data_and_labels_fname = seq_data_and_labels_fname
@@ -80,6 +91,8 @@ class TorchSeqDataset(LabeledDataset):
         self.labels = np.array(seq_data_and_labels.iloc[:, -1]).astype(int)
         self.transform_pipeline = transform_pipeline
 
+        self.paired_training_idc = paired_training_idc
+
     def __len__(self) -> int:
         return len(self.labels)
 
@@ -89,6 +102,12 @@ class TorchSeqDataset(LabeledDataset):
         sample = {"seq_data": seq_data, "label": label}
         if self.sample_ids is not None:
             sample["id"] = self.sample_ids[index]
+        if self.paired_training_idc is not None:
+            if index in self.paired_training_idc:
+                sample["train_pair"] = torch.from_numpy(np.array(1))
+            else:
+                sample["train_pair"] = torch.from_numpy(np.array(0))
+
         return sample
 
 

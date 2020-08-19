@@ -1,16 +1,14 @@
+import logging
+import os
 from typing import List
 
-from numpy import ndarray
-import os
 import matplotlib.pyplot as plt
-import logging
 import numpy as np
-from umap import UMAP
-from umap.plot import points
-from sklearn.manifold import TSNE
-from pandas import DataFrame
-import seaborn as sns
 import pandas as pd
+import seaborn as sns
+from numpy import ndarray
+from sklearn.manifold import TSNE
+from umap import UMAP
 
 from src.helper.models import DomainConfig
 from src.utils.torch.evaluation import get_latent_space_dict_for_multiple_domains

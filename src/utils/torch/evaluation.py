@@ -1,10 +1,10 @@
 from typing import Tuple, List
 
+import numpy as np
+import torch
 from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader, Dataset
-import numpy as np
-import torch
 
 from src.helper.models import DomainConfig
 from src.utils.basic.export import dict_to_csv
@@ -18,7 +18,7 @@ def evaluate_latent_integration(
     data_loader_j: DataLoader,
     data_key_i: str = "seq_data",
     data_key_j: str = "seq_data",
-    n_neighbours: int = 5,
+    neighbors: int = 5,
     device: str = "cuda:0",
 ) -> dict:
     if model_i.model_type != model_j.model_type:
@@ -55,7 +55,7 @@ def evaluate_latent_integration(
     latents_j = np.array(latents_j).squeeze()
 
     knn_acc = knn_accuracy(
-        samples_i=latents_i, samples_j=latents_j, n_neighbours=n_neighbours
+        samples_i=latents_i, samples_j=latents_j, n_neighbours=neighbors
     )
     latent_l1_distance = nn.L1Loss()(
         torch.from_numpy(latents_i), torch.from_numpy(latents_j)
