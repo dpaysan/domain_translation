@@ -7,9 +7,9 @@ run_params:
                       'label_key':'label'}
 
   seq_model_config_1 : {'model_config':{'type':'TwoLatentSpaceAE',
-                                        'hidden_dims':[1024, 512, 256, 128, 64],
-                                        'latent_dim_1': 48,
-                                        'latent_dim_2': 16,
+                                        'hidden_dims':[1024, 512, 256, 128, 128],
+                                        'latent_dim_1': 70,
+                                        'latent_dim_2': 2,
                                         'in_dims':1276},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
@@ -19,23 +19,23 @@ run_params:
                       'label_key':'label'}
 
   seq_model_config_2 : {'model_config':{'type':'TwoLatentSpaceAE',
-                                        'hidden_dims':[512, 256, 128, 64, 64],
-                                        'latent_dim_1': 48,
-                                        'latent_dim_2': 16,
+                                        'hidden_dims':[512, 256, 128, 128, 128],
+                                        'latent_dim_1': 70,
+                                        'latent_dim_2': 2,
                                         'in_dims':815},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
 
   latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
-                      'latent_dim': 48, 'hidden_dims':[64, 128, 64]},
+                      'latent_dim': 70, 'hidden_dims':[64, 128, 64]},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
-  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':48, 'n_classes':3},
+  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':70, 'n_classes':3},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce', 'weights':[4, 2.67, 2.67]}}
 
-  num_epochs: 1
+  num_epochs: 5000
   early_stopping: 300
   train_val_test_split: [0.7, 0.2, 0.1]
   batch_size: 32
@@ -52,36 +52,48 @@ pipeline:
   - method: initialize_seq_domain_config_2
   - method: initialize_dcm_model
   - method: initialize_clf_model
-  - method: save_latents_to_csv
+  - method: visualize_shared_latent_space
     params:
-      domain: 0
+      posfix: '_untrained'
       dataset_type: 'train'
-      posfix: '_untrained'
-  - method: save_latents_to_csv
+  - method: visualize_shared_latent_space
     params:
-      domain: 1
-      dataset_type: 'train'
       posfix: '_untrained'
-  - method: save_latents_to_csv
-    params:
-      domain: 0
       dataset_type: 'val'
-      posfix: '_untrained'
-  - method: save_latents_to_csv
+  - method: visualize_shared_latent_space
     params:
-      domain: 1
-      dataset_type: 'val'
       posfix: '_untrained'
-  - method: save_latents_to_csv
-    params:
-      domain: 0
       dataset_type: 'test'
-      posfix: '_untrained'
-  - method: save_latents_to_csv
-    params:
-      domain: 1
-      dataset_type: 'test'
-      posfix: '_untrained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 0
+#      dataset_type: 'train'
+#      posfix: '_untrained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 1
+#      dataset_type: 'train'
+#      posfix: '_untrained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 0
+#      dataset_type: 'val'
+#      posfix: '_untrained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 1
+#      dataset_type: 'val'
+#      posfix: '_untrained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 0
+#      dataset_type: 'test'
+#      posfix: '_untrained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 1
+#      dataset_type: 'test'
+#      posfix: '_untrained'
   - method: train_models
     params:
       alpha: 0.1
@@ -89,36 +101,48 @@ pipeline:
       save_freq: 50
       use_dcm: True
       use_clf: True
-  - method: save_latents_to_csv
+  - method: visualize_shared_latent_space
     params:
-      domain: 0
+      posfix: '_trained'
       dataset_type: 'train'
-      posfix: '_trained'
-  - method: save_latents_to_csv
+  - method: visualize_shared_latent_space
     params:
-      domain: 1
-      dataset_type: 'train'
       posfix: '_trained'
-  - method: save_latents_to_csv
-    params:
-      domain: 0
       dataset_type: 'val'
-      posfix: '_trained'
-  - method: save_latents_to_csv
+  - method: visualize_shared_latent_space
     params:
-      domain: 1
-      dataset_type: 'val'
       posfix: '_trained'
-  - method: save_latents_to_csv
-    params:
-      domain: 0
       dataset_type: 'test'
-      posfix: '_trained'
-  - method: save_latents_to_csv
-    params:
-      domain: 1
-      dataset_type: 'test'
-      posfix: '_trained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 0
+#      dataset_type: 'train'
+#      posfix: '_trained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 1
+#      dataset_type: 'train'
+#      posfix: '_trained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 0
+#      dataset_type: 'val'
+#      posfix: '_trained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 1
+#      dataset_type: 'val'
+#      posfix: '_trained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 0
+#      dataset_type: 'test'
+#      posfix: '_trained'
+#  - method: save_latents_to_csv
+#    params:
+#      domain: 1
+#      dataset_type: 'test'
+#      posfix: '_trained'
   - method: visualize_loss_evolution
 
 
