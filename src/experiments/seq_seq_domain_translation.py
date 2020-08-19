@@ -1,28 +1,24 @@
 import logging
-import os
+
 from typing import List
 
 import torch
 
-from src.experiments.base import BaseExperiment
-from src.utils.basic.visualization import visualize_shared_latent_space
+from src.experiments.base import BaseTwoDomainExperiment
 from src.utils.torch.data import (
     init_seq_dataset,
     DataHandler,
 )
-from src.utils.torch.evaluation import (
-    save_latents_and_labels_to_csv,
-    save_latents_to_csv,
-)
+
+
 from src.utils.torch.exp import train_val_test_loop_two_domains
-from src.utils.torch.general import get_device
 from src.utils.torch.model import (
     get_domain_configuration,
     get_latent_model_configuration,
 )
 
 
-class SeqSeqTranslationExperiment(BaseExperiment):
+class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
     def __init__(
         self,
         output_dir: str,
@@ -41,22 +37,20 @@ class SeqSeqTranslationExperiment(BaseExperiment):
     ):
         super().__init__(
             output_dir=output_dir,
+            latent_clf_config=latent_clf_config,
+            latent_dcm_config=latent_dcm_config,
             num_epochs=num_epochs,
             early_stopping=early_stopping,
             train_val_test_split=train_val_test_split,
             batch_size=batch_size,
             random_state=random_state,
+            paired_data=paired_data,
         )
 
         self.seq_data_config_1 = seq_data_config_1
         self.seq_data_config_2 = seq_data_config_2
         self.seq_model_config_1 = seq_model_config_1
         self.seq_model_config_2 = seq_model_config_2
-
-        self.latent_dcm_config = latent_dcm_config
-        self.latent_clf_config = latent_clf_config
-
-        self.paired_data = paired_data
 
         self.seq_data_set_1 = None
         self.seq_data_transform_pipeline_dict_1 = None
@@ -69,12 +63,6 @@ class SeqSeqTranslationExperiment(BaseExperiment):
         self.seq_data_loader_dict_2 = None
         self.seq_data_key_2 = None
         self.seq_label_key_2 = None
-
-        self.trained_models = None
-        self.loss_dict = None
-
-        self.domain_configs = None
-        self.device = get_device()
 
     def initialize_seq_data_set_1(self):
         seq_data_and_labels_fname = self.seq_data_config_1["data_fname"]
@@ -221,22 +209,16 @@ class SeqSeqTranslationExperiment(BaseExperiment):
 
     def save_latents_to_csv(
         self,
-        domain: int = 0,
+        domain_id: int = 0,
         dataset_type: str = "val",
         save_path: str = None,
         posfix: str = "",
     ):
-        domain_config = self.domain_configs[domain]
-        if save_path is None:
-            save_path = os.path.join(
-                self.output_dir,
-                "latents_" + domain_config.name + "_" + dataset_type + posfix + ".csv",
-            )
-        save_latents_to_csv(
-            domain_config=domain_config,
+        super().save_latents_to_csv(
+            domain_id=domain_id,
             dataset_type=dataset_type,
             save_path=save_path,
-            device=self.device,
+            posfix=posfix,
         )
 
     def visualize_loss_evolution(self):
@@ -249,15 +231,9 @@ class SeqSeqTranslationExperiment(BaseExperiment):
         save_path: str = None,
         posfix: str = "",
     ):
-        if save_path is None:
-            save_path = os.path.join(
-                self.output_dir,
-                "shared_latent_space_" + dataset_type + posfix + ".png",
-            )
-        visualize_shared_latent_space(
-            domain_configs=self.domain_configs,
-            save_path=save_path,
-            random_state=self.random_state,
+        super().visualize_shared_latent_space(
             reduction=reduction,
-            device=self.device,
+            dataset_type=dataset_type,
+            save_path=save_path,
+            posfix=posfix,
         )

@@ -58,7 +58,7 @@ def plot_train_val_hist(
 def plot_latent_representations(
     latents_domain_dict: dict,
     save_path: str,
-    random_state:int,
+    random_state: int,
     reduction: str = "umap",
     label_dict: dict = None,
 ):
@@ -92,7 +92,9 @@ def plot_latent_representations(
     else:
         raise RuntimeError("Unknown reduction mode encountered {}".format(reduction))
 
-    transformed = pd.DataFrame(data=transformed, columns=[reduction+'-c1', reduction+'-c2'])
+    transformed = pd.DataFrame(
+        data=transformed, columns=[reduction + "-c1", reduction + "-c2"]
+    )
 
     # Plot the data
 
@@ -107,7 +109,12 @@ def plot_latent_representations(
         alpha=0.7,
     )
     if labels is not None:
-        label_point(transformed.iloc[:, 0], transformed.iloc[:, 1], pd.Series(labels.astype(np.int), dtype=int), plt.gca())
+        label_point(
+            transformed.iloc[:, 0],
+            transformed.iloc[:, 1],
+            pd.Series(labels.astype(np.int), dtype=int),
+            plt.gca(),
+        )
 
     plt.savefig(save_path)
     plt.close()
@@ -122,7 +129,7 @@ def label_point(x, y, val, ax):
 def visualize_shared_latent_space(
     domain_configs: List[DomainConfig],
     save_path: str,
-    random_state:int,
+    random_state: int,
     reduction: str = "umap",
     dataset_type: str = "val",
     device: str = "cuda:0",

@@ -3,21 +3,20 @@ from typing import List
 
 import torch
 
-from src.experiments.base import BaseExperiment
+from src.experiments.base import BaseTwoDomainExperiment
 from src.utils.torch.data import (
     init_nuclei_image_dataset,
     init_seq_dataset,
     DataHandler,
 )
 from src.utils.torch.exp import train_val_test_loop_two_domains
-from src.utils.torch.general import get_device
 from src.utils.torch.model import (
     get_domain_configuration,
     get_latent_model_configuration,
 )
 
 
-class ImageSeqTranslationExperiment(BaseExperiment):
+class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
     def __init__(
         self,
         output_dir: str,
@@ -36,19 +35,18 @@ class ImageSeqTranslationExperiment(BaseExperiment):
     ):
         super().__init__(
             output_dir=output_dir,
+            latent_dcm_config=latent_dcm_config,
+            latent_clf_config=latent_clf_config,
             num_epochs=num_epochs,
             early_stopping=early_stopping,
             train_val_test_split=train_val_test_split,
             batch_size=batch_size,
             random_state=random_state,
+            paired_data=paired_data,
         )
 
         self.image_data_config = image_data_config
         self.seq_data_config = seq_data_config
-        self.latent_dcm_config = latent_dcm_config
-        self.latent_clf_config = latent_clf_config
-
-        self.paired_data = paired_data
 
         self.image_data_set = None
         self.image_data_transform_pipeline_dict = None
@@ -62,14 +60,8 @@ class ImageSeqTranslationExperiment(BaseExperiment):
         self.seq_data_key = None
         self.seq_label_key = None
 
-        self.trained_models = None
-        self.loss_dict = None
-
         self.image_model_config = image_model_config
         self.seq_model_config = seq_model_config
-
-        self.domain_configs = None
-        self.device = get_device()
 
     def initialize_image_data_set(self):
         image_dir = self.image_data_config["image_dir"]
@@ -208,4 +200,35 @@ class ImageSeqTranslationExperiment(BaseExperiment):
             early_stopping=self.early_stopping,
             device=self.device,
             paired_mode=self.paired_data,
+        )
+
+    def save_latents_to_csv(
+        self,
+        domain_id: int = 0,
+        dataset_type: str = "val",
+        save_path: str = None,
+        posfix: str = "",
+    ):
+        super().save_latents_to_csv(
+            domain_id=domain_id,
+            dataset_type=dataset_type,
+            save_path=save_path,
+            posfix=posfix,
+        )
+
+    def visualize_loss_evolution(self):
+        super().visualize_loss_evolution()
+
+    def visualize_shared_latent_space(
+        self,
+        reduction: str = "umap",
+        dataset_type: str = "val",
+        save_path: str = None,
+        posfix: str = "",
+    ):
+        super().visualize_shared_latent_space(
+            reduction=reduction,
+            dataset_type=dataset_type,
+            save_path=save_path,
+            posfix=posfix,
         )
