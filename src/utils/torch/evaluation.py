@@ -1,5 +1,4 @@
-import os
-from typing import Tuple
+from typing import Tuple, List
 
 from torch import nn
 from torch.nn import Module
@@ -122,43 +121,83 @@ def save_latents_and_labels_to_csv(
     device: str = "cuda:0",
 ):
     data = get_latent_representations_for_model(
-            model=model,
-            dataset=dataset,
-            data_key=data_key,
-            label_key=label_key,
-            device=device,)
+        model=model,
+        dataset=dataset,
+        data_key=data_key,
+        label_key=label_key,
+        device=device,
+    )
 
     expanded_data = {}
-    if 'shared_latents' in data:
-        shared_latents = data['shared_latents']
+    if "shared_latents" in data:
+        shared_latents = data["shared_latents"]
         for i in range(shared_latents.shape[1]):
-            expanded_data['zs_{}'.format(i)] = shared_latents[:, i]
-    if 'domain_specific_latents' in data:
-        domain_specific_latents = data['domain_specific_latents']
+            expanded_data["zs_{}".format(i)] = shared_latents[:, i]
+    if "domain_specific_latents" in data:
+        domain_specific_latents = data["domain_specific_latents"]
         for i in range(domain_specific_latents.shape[1]):
-            expanded_data['zd_{}'.format(i)] = domain_specific_latents[:,i]
-    if 'labels' in data:
-        expanded_data['labels'] = data['labels']
+            expanded_data["zd_{}".format(i)] = domain_specific_latents[:, i]
+    if "labels" in data:
+        expanded_data["labels"] = data["labels"]
 
     dict_to_csv(data=expanded_data, save_path=save_path)
 
 
-def save_latents_to_csv(domain_config:DomainConfig, save_path:str, dataset_type: str = "val",
-    device:str='cuda:0'):
+def save_latents_to_csv(
+    domain_config: DomainConfig,
+    save_path: str,
+    dataset_type: str = "val",
+    device: str = "cuda:0",
+):
     model = domain_config.domain_model_config.model
     try:
         dataset = domain_config.data_loader_dict[dataset_type].dataset
     except KeyError:
         raise RuntimeError(
+            "Unknown dataset_type: {}, expected one of the following: train, val, test".format(
+                dataset_type
+            )
+        )
+    save_latents_and_labels_to_csv(
+        model=model,
+        dataset=dataset,
+        data_key=domain_config.data_key,
+        label_key=domain_config.label_key,
+        device=device,
+        save_path=save_path,
+    )
+
+
+def get_latent_space_dict_for_multiple_domains(
+    domain_configs: List[DomainConfig],
+    dataset_type: str = "val",
+    device: str = "cuda:0",
+) -> Tuple[dict, dict]:
+    latents_dict = {}
+    label_dict = {}
+    for domain_config in domain_configs:
+        model = domain_config.domain_model_config.model
+        try:
+            dataset = domain_config.data_loader_dict[dataset_type].dataset
+        except KeyError:
+            raise RuntimeError(
                 "Unknown dataset_type: {}, expected one of the following: train, val, test".format(
                     dataset_type
                 )
             )
-    save_latents_and_labels_to_csv(
+        data = get_latent_representations_for_model(
             model=model,
             dataset=dataset,
             data_key=domain_config.data_key,
             label_key=domain_config.label_key,
             device=device,
-            save_path=save_path,
         )
+
+        latents_dict[domain_config.name] = data["shared_latents"]
+        if "labels" in data:
+            label_dict[domain_config.name] = data["labels"]
+
+    if len(label_dict) == 0:
+        label_dict = None
+
+    return latents_dict, label_dict

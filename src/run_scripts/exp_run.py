@@ -29,7 +29,7 @@ logging.basicConfig(
 
 mpl_logger = logging.getLogger("matplotlib")
 mpl_logger.setLevel(logging.WARNING)
-numba_logger = logging.getLogger('numba')
+numba_logger = logging.getLogger("numba")
 numba_logger.setLevel(logging.WARNING)
 
 

@@ -12,13 +12,16 @@ from pandas import DataFrame
 import seaborn as sns
 import pandas as pd
 
+from src.helper.models import DomainConfig
+from src.utils.torch.evaluation import get_latent_space_dict_for_multiple_domains
+
 
 def plot_train_val_hist(
-        training_history: ndarray,
-        validation_history: ndarray,
-        output_dir: str,
-        y_label: str,
-        title=None,
+    training_history: ndarray,
+    validation_history: ndarray,
+    output_dir: str,
+    y_label: str,
+    title=None,
 ):
     r""" A function to visualize the evolution of the training and validation loss during the training.
     Parameters
@@ -52,13 +55,19 @@ def plot_train_val_hist(
     plt.close()
 
 
-def plot_latent_representations(latents_domain_dict: dict, save_path:str, reduction: str = 'umap', label_dict: dict = None):
+def plot_latent_representations(
+    latents_domain_dict: dict,
+    save_path: str,
+    random_state:int,
+    reduction: str = "umap",
+    label_dict: dict = None,
+):
     latent_representations = []
     domain_names = []
     labels = []
 
-    for domain_name, latents in latents_domain_dict:
-        domain_names.append([domain_name]*len(latents))
+    for domain_name, latents in latents_domain_dict.items():
+        domain_names.append([domain_name] * len(latents))
         latent_representations.append(latents)
         if label_dict is not None and domain_name in label_dict:
             labels.append(label_dict[domain_name])
@@ -71,37 +80,60 @@ def plot_latent_representations(latents_domain_dict: dict, save_path:str, reduct
     else:
         labels = None
 
-    if reduction == 'umap':
-        mapper = UMAP()
+    if reduction == "umap":
+        mapper = UMAP(random_state=random_state)
         transformed = mapper.fit_transform(latent_representations)
-    elif reduction == 'umap_labeled':
-        mapper = UMAP()
+    elif reduction == "umap_labeled":
+        mapper = UMAP(random_state=random_state)
         transformed = mapper.fit_transform(latent_representations, labels)
-    elif reduction == 'tsne':
-        mapper = TSNE()
+    elif reduction == "tsne":
+        mapper = TSNE(random_state=random_state)
         transformed = mapper.fit_transform(latent_representations)
     else:
-        raise RuntimeError('Unknown reduction mode encountered {}'.format(reduction))
+        raise RuntimeError("Unknown reduction mode encountered {}".format(reduction))
+
+    transformed = pd.DataFrame(data=transformed, columns=[reduction+'-c1', reduction+'-c2'])
 
     # Plot the data
 
     plt.figure(figsize=(16, 10))
     sns.scatterplot(
-        x=reduction+'-c1', y=reduction+'-c2',
+        x=reduction + "-c1",
+        y=reduction + "-c2",
         hue=domain_names,
-        palette=sns.color_palette("hls", 10),
+        palette=sns.color_palette("dark", len(set(domain_names))),
         data=transformed,
         legend="full",
-        alpha=0.3
+        alpha=0.7,
     )
     if labels is not None:
-        label_point(transformed[:,0], transformed[:,1], labels, plt.gca())
+        label_point(transformed.iloc[:, 0], transformed.iloc[:, 1], pd.Series(labels.astype(np.int), dtype=int), plt.gca())
 
     plt.savefig(save_path)
     plt.close()
 
 
 def label_point(x, y, val, ax):
-    a = pd.concat({'x': x, 'y': y, 'val': val}, axis=1)
+    a = pd.concat({"x": x, "y": y, "val": val}, axis=1)
     for i, point in a.iterrows():
-        ax.text(point['x']+.02, point['y'], str(point['val']))
+        ax.text(point["x"] + 0.02, point["y"], str(int(point["val"])), fontsize=6)
+
+
+def visualize_shared_latent_space(
+    domain_configs: List[DomainConfig],
+    save_path: str,
+    random_state:int,
+    reduction: str = "umap",
+    dataset_type: str = "val",
+    device: str = "cuda:0",
+):
+    latents_domain_dict, label_dict = get_latent_space_dict_for_multiple_domains(
+        domain_configs=domain_configs, dataset_type=dataset_type, device=device
+    )
+    plot_latent_representations(
+        latents_domain_dict=latents_domain_dict,
+        save_path=save_path,
+        random_state=random_state,
+        reduction=reduction,
+        label_dict=label_dict,
+    )

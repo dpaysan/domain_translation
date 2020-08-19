@@ -5,11 +5,15 @@ from typing import List
 import torch
 
 from src.experiments.base import BaseExperiment
+from src.utils.basic.visualization import visualize_shared_latent_space
 from src.utils.torch.data import (
     init_seq_dataset,
     DataHandler,
 )
-from src.utils.torch.evaluation import save_latents_and_labels_to_csv, save_latents_to_csv
+from src.utils.torch.evaluation import (
+    save_latents_and_labels_to_csv,
+    save_latents_to_csv,
+)
 from src.utils.torch.exp import train_val_test_loop_two_domains
 from src.utils.torch.general import get_device
 from src.utils.torch.model import (
@@ -216,15 +220,44 @@ class SeqSeqTranslationExperiment(BaseExperiment):
         )
 
     def save_latents_to_csv(
-        self, domain: int = 0, dataset_type: str = "val", save_path: str = None, posfix:str=''
+        self,
+        domain: int = 0,
+        dataset_type: str = "val",
+        save_path: str = None,
+        posfix: str = "",
     ):
         domain_config = self.domain_configs[domain]
         if save_path is None:
             save_path = os.path.join(
                 self.output_dir,
-                "latents_" + domain_config.name + "_" + dataset_type +posfix + ".csv",
+                "latents_" + domain_config.name + "_" + dataset_type + posfix + ".csv",
             )
-        save_latents_to_csv(domain_config=domain_config, dataset_type=dataset_type, save_path=save_path, device=self.device)
+        save_latents_to_csv(
+            domain_config=domain_config,
+            dataset_type=dataset_type,
+            save_path=save_path,
+            device=self.device,
+        )
 
     def visualize_loss_evolution(self):
         super().visualize_loss_evolution()
+
+    def visualize_shared_latent_space(
+        self,
+        reduction: str = "umap",
+        dataset_type: str = "val",
+        save_path: str = None,
+        posfix: str = "",
+    ):
+        if save_path is None:
+            save_path = os.path.join(
+                self.output_dir,
+                "shared_latent_space_" + dataset_type + posfix + ".png",
+            )
+        visualize_shared_latent_space(
+            domain_configs=self.domain_configs,
+            save_path=save_path,
+            random_state=self.random_state,
+            reduction=reduction,
+            device=self.device,
+        )
