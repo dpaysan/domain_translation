@@ -22,6 +22,7 @@ def plot_train_val_hist(
     output_dir: str,
     y_label: str,
     title=None,
+    posfix: str = "",
 ):
     r""" A function to visualize the evolution of the training and validation loss during the training.
     Parameters
@@ -36,6 +37,8 @@ def plot_train_val_hist(
         The label of the y-axis of the visualization.
     title : None, str
         The title of the visualization. If ``None`` is given, it is `'Fitting History` by default.
+    posfix : str
+        An additional posfix for the file path.
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -51,7 +54,7 @@ def plot_train_val_hist(
     if title is None:
         title = "Fitting History"
     plt.title(title)
-    plt.savefig(output_dir + "plotted_fitting_hist.png")
+    plt.savefig(output_dir + "plotted_fitting_hist{}.png".format(posfix))
     plt.close()
 
 

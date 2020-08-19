@@ -131,6 +131,7 @@ class BaseExperimentCV:
     def __init__(
         self,
         output_dir: str,
+        n_folds: int = 4,
         latent_clf_config: dict = None,
         train_val_split: List = [0.8, 0.2],
         batch_size: int = 32,
@@ -138,9 +139,9 @@ class BaseExperimentCV:
         early_stopping: int = 20,
         random_state: int = 42,
     ):
-
         self.output_dir = output_dir
         self.latent_clf_config = latent_clf_config
+        self.n_folds = n_folds
         self.train_val_split = train_val_split
         self.batch_size = batch_size
         self.num_epochs = num_epochs
@@ -158,10 +159,98 @@ class BaseExperimentCV:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-
+    def visualize_loss_evolution(self, fold_id, output_dir: str = None):
+        if output_dir is None:
+            output_dir = self.output_dir
+        plot_train_val_hist(
+            training_history=self.loss_dicts[fold_id]["train"],
+            validation_history=self.loss_dicts[fold_id]["val"],
+            output_dir=output_dir + "/",
+            y_label="total_loss",
+            title="Fitting history",
+            posfix="_fold{}".format(fold_id + 1),
+        )
 
 
 class BaseTwoDomainExperimentCV(BaseExperimentCV):
-    def __init__(self):
-        super().__init__()
-        pass
+    def __init__(
+        self,
+        output_dir,
+        n_folds: int = 4,
+        latent_clf_config: dict = None,
+        latent_dcm_config: dict = None,
+        train_val_split: List = [0.8, 0.2],
+        batch_size: int = 32,
+        num_epochs: int = 500,
+        early_stopping: int = 20,
+        random_state: int = 42,
+        paired_data: bool = True,
+    ):
+        super().__init__(
+            output_dir=output_dir,
+            n_folds=n_folds,
+            latent_clf_config=latent_clf_config,
+            train_val_split=train_val_split,
+            batch_size=batch_size,
+            num_epochs=num_epochs,
+            early_stopping=early_stopping,
+            random_state=random_state,
+        )
+
+        self.latent_dcm_config = latent_dcm_config
+        self.paired_data = paired_data
+
+        self.domain_configs = None
+        self.trained_models = None
+
+    def visualize_shared_latent_space(
+        self,
+        fold_id: int,
+        reduction: str = "umap",
+        dataset_type: str = "val",
+        save_path: str = None,
+        posfix: str = "",
+    ):
+
+        if save_path is None:
+            save_path = os.path.join(
+                self.output_dir,
+                "shared_latent_space_"
+                + dataset_type
+                + posfix
+                + "_fold{}.png".format(fold_id),
+            )
+        visualize_shared_latent_space(
+            domain_configs=self.domain_configs,
+            save_path=save_path,
+            dataset_type=dataset_type,
+            random_state=self.random_state,
+            reduction=reduction,
+            device=self.device,
+        )
+
+    def save_latents_to_csv(
+        self,
+        fold_id: int,
+        domain_id: int = 0,
+        dataset_type: str = "val",
+        save_path: str = None,
+        posfix: str = "",
+    ):
+        domain_config = self.domain_configs[domain_id]
+        if save_path is None:
+            save_path = os.path.join(
+                self.output_dir,
+                "latents_"
+                + domain_config.name
+                + "_"
+                + dataset_type
+                + posfix
+                + "_fold{}.csv".format(fold_id),
+            )
+        save_latents_to_csv(
+            domain_config=domain_config,
+            dataset_type=dataset_type,
+            save_path=save_path,
+            device=self.device,
+        )

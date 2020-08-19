@@ -1,3 +1,5 @@
+import copy
+
 from torch import Tensor
 from torch.nn import Module
 from torch.optim.optimizer import Optimizer
@@ -19,6 +21,9 @@ class DomainModelConfig(object):
         self.inputs = inputs
         self.labels = labels
         self.train = train
+
+    def reset_model(self):
+        self.model.load_state_dict(self.initial_weights)
 
 
 class DomainConfig(object):
