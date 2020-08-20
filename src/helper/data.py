@@ -92,7 +92,7 @@ class DataHandler(BaseDataHandler):
                 shuffle=shuffle and k == "train",
                 num_workers=self.num_workers,
                 drop_last=self.drop_last_batch,
-                worker_init_fn=torch.manual_seed(self.random_state)
+                worker_init_fn=torch.manual_seed(self.random_state),
             )
 
         self.data_loader_dict = data_loader_dict
@@ -176,20 +176,19 @@ class DataHandlerCV(BaseDataHandler):
                     )
             data_loader_dict = {}
             for k, dataset in train_val_test_datasets_dict.items():
-                if shuffle and k == 'train':
+                if shuffle and k == "train":
                     generator = torch.Generator().manual_seed(self.random_state)
-                    sampler = RandomSampler(data_source=dataset,
-                                            generator=generator)
+                    sampler = RandomSampler(data_source=dataset, generator=generator)
                 else:
                     sampler = SequentialSampler(data_source=dataset)
                 data_loader_dict[k] = DataLoader(
                     dataset=dataset,
                     batch_size=self.batch_size,
-                    #shuffle=shuffle and k == "train",
+                    # shuffle=shuffle and k == "train",
                     sampler=sampler,
                     num_workers=self.num_workers,
                     drop_last=self.drop_last_batch,
-                    worker_init_fn=torch.manual_seed(self.random_state)
+                    worker_init_fn=torch.manual_seed(self.random_state),
                 )
 
             self.data_loader_dicts.append(data_loader_dict)

@@ -18,14 +18,15 @@ def evaluate_latent_integration(
     data_loader_j: DataLoader,
     data_key_i: str = "seq_data",
     data_key_j: str = "seq_data",
-    neighbors: int = 5,
+    # neighbors: int = 5,
     device: str = "cuda:0",
 ) -> dict:
     if model_i.model_type != model_j.model_type:
         raise RuntimeError("Models must be of the same type, i.e. AE/AE or VAE/VAE.")
     if len(data_loader_i.dataset) != len(data_loader_j.dataset):
         raise RuntimeError(
-            "Paired input data is required where sample k in dataset i refers to sample k in dataset j."
+            "Paired input data is required where sample k in dataset i refers to sample"
+            " k in dataset j."
         )
 
     # Store batch size to reset it after obtaining the latent representations.
@@ -53,15 +54,23 @@ def evaluate_latent_integration(
     # Compute metrices
     latents_i = np.array(latents_i).squeeze()
     latents_j = np.array(latents_j).squeeze()
+    knn_accs = {}
+    for neighbors in [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]:
+        knn_acc = 0.5 * (
+            knn_accuracy(
+                samples_i=latents_i, samples_j=latents_j, n_neighbours=neighbors
+            )
+            + knn_accuracy(
+                samples_i=latents_j, samples_j=latents_i, n_neighbours=neighbors
+            )
+        )
+        knn_accs[str(neighbors)] = knn_acc
 
-    knn_acc = knn_accuracy(
-        samples_i=latents_i, samples_j=latents_j, n_neighbours=neighbors
-    )
     latent_l1_distance = nn.L1Loss()(
         torch.from_numpy(latents_i), torch.from_numpy(latents_j)
     ).item()
 
-    metrics = {"knn_acc": knn_acc, "latent_l1_distance": latent_l1_distance}
+    metrics = {"knn_accs": knn_accs, "latent_l1_distance": latent_l1_distance}
     return metrics
 
 
@@ -154,9 +163,8 @@ def save_latents_to_csv(
         dataset = domain_config.data_loader_dict[dataset_type].dataset
     except KeyError:
         raise RuntimeError(
-            "Unknown dataset_type: {}, expected one of the following: train, val, test".format(
-                dataset_type
-            )
+            "Unknown dataset_type: {}, expected one of the following: train, val, test"
+            .format(dataset_type)
         )
     save_latents_and_labels_to_csv(
         model=model,
@@ -181,9 +189,8 @@ def get_latent_space_dict_for_multiple_domains(
             dataset = domain_config.data_loader_dict[dataset_type].dataset
         except KeyError:
             raise RuntimeError(
-                "Unknown dataset_type: {}, expected one of the following: train, val, test".format(
-                    dataset_type
-                )
+                "Unknown dataset_type: {}, expected one of the following: train, val,"
+                " test".format(dataset_type)
             )
         data = get_latent_representations_for_model(
             model=model,

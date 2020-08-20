@@ -102,7 +102,7 @@ class RnaDataPreprocessor(SeqDataPreprocessor):
         label_name: str = "treatment_time",
         de_analysis_floc: str = None,
         qval_column: str = "qval",
-        threshold: float = 0.001,
+        threshold: float = 0.05,
     ):
         super().__init__(
             count_data_floc=count_data_floc,

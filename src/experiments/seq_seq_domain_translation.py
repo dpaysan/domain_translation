@@ -89,8 +89,8 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             raise RuntimeError("Datasets must be initialized!")
         if len(self.seq_data_set_1) != len(self.seq_data_set_2):
             raise RuntimeError(
-                "Supervised training in the latent space requires paired data matching in the "
-                "samples-dimension"
+                "Supervised training in the latent space requires paired data matching"
+                " in the samples-dimension"
             )
         else:
             n_samples = len(self.seq_data_set_1)
@@ -111,7 +111,10 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             transformation_dict=self.seq_data_transform_pipeline_dict_1,
         )
         dh.stratified_train_val_test_split(splits=self.train_val_test_split)
-        dh.get_data_loader_dict(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
+        dh.get_data_loader_dict(
+            shuffle=self.latent_distance_loss is None
+            or self.latent_supervision_rate == 0
+        )
         self.seq_data_loader_dict_1 = dh.data_loader_dict
 
     def initialize_seq_data_loader_dict_2(self):
@@ -123,7 +126,10 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             transformation_dict=self.seq_data_transform_pipeline_dict_2,
         )
         dh.stratified_train_val_test_split(splits=self.train_val_test_split)
-        dh.get_data_loader_dict(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
+        dh.get_data_loader_dict(
+            shuffle=self.latent_distance_loss is None
+            or self.latent_supervision_rate == 0
+        )
         self.seq_data_loader_dict_2 = dh.data_loader_dict
 
     def initialize_seq_domain_config_1(
@@ -207,6 +213,7 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
         self,
         alpha: float = 0.1,
         beta: float = 1.0,
+        gamma: float = 1.0,
         lamb: float = 0.00000001,
         use_dcm: bool = True,
         use_clf: bool = False,
@@ -219,6 +226,7 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             latent_clf_config=self.latent_clf_config,
             alpha=alpha,
             beta=beta,
+            gamma=gamma,
             lamb=lamb,
             use_dcm=use_dcm,
             use_clf=use_clf,
@@ -345,8 +353,8 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             raise RuntimeError("Datasets must be initialized!")
         if len(self.seq_data_set_1) != len(self.seq_data_set_2):
             raise RuntimeError(
-                "Supervised training in the latent space requires paired data matching in the "
-                "samples-dimension"
+                "Supervised training in the latent space requires paired data matching"
+                " in the samples-dimension"
             )
         else:
             n_samples = len(self.seq_data_set_1)
@@ -369,7 +377,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             transformation_dict=self.seq_data_transform_pipeline_dict_1,
         )
         dh.stratified_kfold_split()
-        #dh.get_data_loader_dicts(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
+        # dh.get_data_loader_dicts(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
         dh.get_data_loader_dicts()
         self.seq_data_loader_dicts_1 = dh.data_loader_dicts
 
@@ -384,7 +392,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             transformation_dict=self.seq_data_transform_pipeline_dict_2,
         )
         dh.stratified_kfold_split()
-        #dh.get_data_loader_dicts(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
+        # dh.get_data_loader_dicts(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
         dh.get_data_loader_dicts()
         self.seq_data_loader_dicts_2 = dh.data_loader_dicts
 
@@ -481,6 +489,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         self,
         alpha: float = 0.1,
         beta: float = 1.0,
+        gamma: float = 1.0,
         lamb: float = 0.00000001,
         use_dcm: bool = True,
         use_clf: bool = True,
@@ -545,6 +554,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                 latent_clf_config=self.latent_clf_config,
                 alpha=alpha,
                 beta=beta,
+                gamma=gamma,
                 lamb=lamb,
                 use_dcm=use_dcm,
                 use_clf=use_clf,

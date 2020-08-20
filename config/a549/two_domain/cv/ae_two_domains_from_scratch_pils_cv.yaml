@@ -7,11 +7,11 @@ run_params:
                       'label_key':'label'}
 
   seq_model_config_1 : {'model_config':{'type':'TwoLatentSpaceAE',
-                                        'hidden_dims':[1024, 512, 256, 128, 64],
-                                        'latent_dim_1': 48,
-                                        'latent_dim_2': 16,
-                                        'in_dims':1276},
-                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
+                                        'hidden_dims':[2048, 1024, 512, 256, 128],
+                                        'latent_dim_1': 40,
+                                        'latent_dim_2': 5,
+                                        'in_dims':2613},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0001},
                         'loss_config':{'type':'mae'}}
 
   seq_data_config_2: {'data_fname':'../../data/a549_dex/processed/atac_data.csv',
@@ -20,30 +20,31 @@ run_params:
 
   seq_model_config_2 : {'model_config':{'type':'TwoLatentSpaceAE',
                                         'hidden_dims':[512, 256, 128, 64, 64],
-                                        'latent_dim_1': 48,
-                                        'latent_dim_2': 16,
+                                        'latent_dim_1': 40,
+                                        'latent_dim_2': 5,
                                         'in_dims':815},
-                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0001},
                         'loss_config':{'type':'mae'}}
 
   latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
-                      'latent_dim': 48, 'hidden_dims':[64, 128, 64]},
+                      'latent_dim': 40, 'hidden_dims':[64, 128, 64]},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
-  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':48, 'n_classes':3},
+  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':40, 'n_classes':3},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce', 'weights':[4, 2.67, 2.67]}}
 
-  num_epochs: 5000
-  early_stopping: 300
+  num_epochs: 4000
+  early_stopping: 250
   n_folds: 5
   train_val_split: [0.8, 0.2]
   batch_size: 32
   random_state: 1001
   paired_data: True
   latent_distance_loss: 'mae'
-  latent_supervision_rate: 0.1
+  latent_supervision_rate: 0.0
+  n_neighbors: 50
 
 
 pipeline:
@@ -60,7 +61,8 @@ pipeline:
     params:
       alpha: 0.1
       beta: 0.001
-      save_freq: 500
+      gamma: 0
+      save_freq: 250
       use_dcm: True
       use_clf: True
 

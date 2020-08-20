@@ -93,8 +93,8 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             raise RuntimeError("Datasets must be initialized!")
         if len(self.seq_data_set) != len(self.image_data_set):
             raise RuntimeError(
-                "Supervised training in the latent space requires paired data matching in the "
-                "samples-dimension"
+                "Supervised training in the latent space requires paired data matching"
+                " in the samples-dimension"
             )
         else:
             n_samples = len(self.seq_data_set)
@@ -115,7 +115,10 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             transformation_dict=self.image_data_transform_pipeline_dict,
         )
         dh.stratified_train_val_test_split(splits=self.train_val_test_split)
-        dh.get_data_loader_dict(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
+        dh.get_data_loader_dict(
+            shuffle=self.latent_distance_loss is None
+            or self.latent_supervision_rate == 0
+        )
         self.image_data_loader_dict = dh.data_loader_dict
 
     def initialize_seq_data_loader_dict(self):
@@ -127,7 +130,10 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             transformation_dict=self.seq_data_transform_pipeline_dict,
         )
         dh.stratified_train_val_test_split(splits=self.train_val_test_split)
-        dh.get_data_loader_dict(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
+        dh.get_data_loader_dict(
+            shuffle=self.latent_distance_loss is None
+            or self.latent_supervision_rate == 0
+        )
         self.seq_data_loader_dict = dh.data_loader_dict
 
     def initialize_image_domain_config(self, train_model: bool = True):
@@ -206,6 +212,7 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
         self,
         alpha: float = 0.1,
         beta: float = 1.0,
+        gamma: float = 1.0,
         lamb: float = 0.00000001,
         use_dcm: bool = True,
         use_clf: bool = False,
@@ -218,6 +225,7 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             latent_clf_config=self.latent_clf_config,
             alpha=alpha,
             beta=beta,
+            gamma=gamma,
             lamb=lamb,
             use_dcm=use_dcm,
             use_clf=use_clf,

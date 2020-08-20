@@ -14,6 +14,7 @@ from torch.optim.optimizer import Optimizer
 from src.functions.loss_functions import compute_KL_loss
 from src.functions.metric import accuracy
 from src.helper.models import DomainModelConfig, DomainConfig
+from src.utils.basic.visualization import visualize_shared_latent_space
 from src.utils.torch.evaluation import evaluate_latent_integration
 from src.utils.torch.general import get_device
 from src.utils.torch.visualization import (
@@ -179,7 +180,8 @@ def train_autoencoders_two_domains(
         paired_distance_samples = paired_training_mask.sum().item()
         if paired_distance_samples > 0:
             paired_supervision_loss = latent_distance_loss(
-            latents_i[paired_training_mask], latents_j[paired_training_mask])
+                latents_i[paired_training_mask], latents_j[paired_training_mask]
+            )
         else:
             paired_supervision_loss = 0
         paired_supervision_loss *= gamma
@@ -217,9 +219,11 @@ def train_autoencoders_two_domains(
         summary_stats["clf_loss"] = clf_loss.item() * (batch_size_i + batch_size_j)
         total_loss_item += summary_stats["clf_loss"]
 
-    if paired_training_mask is not None and paired_distance_samples > 0 :
-        summary_stats["latent_distance_loss"] = paired_supervision_loss.item() * paired_distance_samples
-        summary_stats['paired_distance_samples'] = paired_distance_samples
+    if paired_training_mask is not None and paired_distance_samples > 0:
+        summary_stats["latent_distance_loss"] = (
+            paired_supervision_loss.item() * paired_distance_samples
+        )
+        summary_stats["paired_distance_samples"] = paired_distance_samples
 
     summary_stats["total_loss"] = total_loss_item
 
@@ -428,9 +432,12 @@ def process_epoch_two_domains(
         ae_dcm_loss += ae_train_summary["dcm_loss"]
         total_loss += ae_train_summary["total_loss"]
 
-        if paired_training_mask is not None and 'latent_distance_loss' in ae_train_summary:
+        if (
+            paired_training_mask is not None
+            and "latent_distance_loss" in ae_train_summary
+        ):
             distance_loss = ae_train_summary["latent_distance_loss"]
-            paired_distance_samples += ae_train_summary['paired_distance_samples']
+            paired_distance_samples += ae_train_summary["paired_distance_samples"]
 
         if vae_mode:
             kl_loss += ae_train_summary["kl_loss"]
@@ -486,8 +493,10 @@ def process_epoch_two_domains(
         clf_loss /= n_preds_i + n_preds_j
         epoch_statistics["clf_loss"] = clf_loss
 
-    if paired_training_mask is not None:
-        epoch_statistics["latent_distance_loss"] = distance_loss/paired_distance_samples
+    if paired_training_mask is not None and paired_distance_samples > 0:
+        epoch_statistics["latent_distance_loss"] = (
+            distance_loss / paired_distance_samples
+        )
 
     return epoch_statistics
 
@@ -679,7 +688,6 @@ def train_val_test_loop_two_domains(
                     model_j=domain_configs[1].domain_model_config.model,
                     data_loader_i=domain_configs[0].data_loader_dict["val"],
                     data_loader_j=domain_configs[1].data_loader_dict["val"],
-                    neighbors=n_neighbors,
                     device=device,
                 )
                 logging.debug(
@@ -687,11 +695,10 @@ def train_val_test_loop_two_domains(
                         metrics["latent_l1_distance"]
                     )
                 )
-                logging.debug(
-                    "{}-NN accuracy for the paired data: {:.8f}".format(
-                        n_neighbors, metrics["knn_acc"]
+                for k, v in metrics["knn_accs"].items():
+                    logging.debug(
+                        "{}-NN accuracy for the paired data: {:.8f}".format(k, v)
                     )
-                )
 
             logging.debug("***" * 20)
 
@@ -765,6 +772,15 @@ def train_val_test_loop_two_domains(
                     # Save model states regularly
                     checkpoint_dir = "{}/epoch_{}".format(output_dir, i)
                     os.makedirs(checkpoint_dir, exist_ok=True)
+
+                    visualize_shared_latent_space(
+                        domain_configs=domain_configs,
+                        save_path=checkpoint_dir + "/shared_latent_space_val.png",
+                        dataset_type="val",
+                        random_state=42,
+                        reduction="umap",
+                        device=device,
+                    )
 
                     vae_i_weights = (
                         domain_configs[0].domain_model_config.model.cpu().state_dict()
@@ -893,7 +909,6 @@ def train_val_test_loop_two_domains(
                 model_j=domain_configs[1].domain_model_config.model,
                 data_loader_i=domain_configs[0].data_loader_dict["test"],
                 data_loader_j=domain_configs[1].data_loader_dict["test"],
-                neighbors=n_neighbors,
                 device=device,
             )
             logging.debug(
@@ -901,11 +916,8 @@ def train_val_test_loop_two_domains(
                     metrics["latent_l1_distance"]
                 )
             )
-            logging.debug(
-                "{}-NN accuracy for the paired data: {:.8f}".format(
-                    n_neighbors, metrics["knn_acc"]
-                )
-            )
+            for k, v in metrics["knn_accs"].items():
+                logging.debug("{}-NN accuracy for the paired data: {.:8f}".format(k, v))
 
         logging.debug("***" * 20)
 
