@@ -42,11 +42,14 @@ run_params:
   batch_size: 32
   random_state: 1001
   paired_data: True
+  latent_distance_loss: 'mae'
+  latent_supervision_rate: 0.1
 
 
 pipeline:
   - method: initialize_seq_data_set_1
   - method: initialize_seq_data_set_2
+  - method: get_and_set_paired_training_idc
   - method: initialize_seq_data_loader_dict_1
   - method: initialize_seq_data_loader_dict_2
   - method: initialize_seq_domain_config_1

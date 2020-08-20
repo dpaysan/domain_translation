@@ -2,6 +2,7 @@ import logging
 from typing import List
 
 import torch
+import numpy as np
 
 from src.experiments.base import BaseTwoDomainExperiment
 from src.helper.data import DataHandler
@@ -32,6 +33,9 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
         batch_size: int = 64,
         random_state: int = 42,
         paired_data: bool = False,
+        n_neighbors: int = 10,
+        latent_distance_loss: str = None,
+        latent_supervision_rate: float = 0.0,
     ):
         super().__init__(
             output_dir=output_dir,
@@ -43,6 +47,9 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             batch_size=batch_size,
             random_state=random_state,
             paired_data=paired_data,
+            n_neighbors=n_neighbors,
+            latent_distance_loss=latent_distance_loss,
+            latent_supervision_rate=latent_supervision_rate,
         )
 
         self.image_data_config = image_data_config
@@ -80,6 +87,25 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             seq_data_and_labels_fname=seq_data_and_labels_fname
         )
 
+    def get_and_set_paired_training_idc(self):
+        np.random.seed(self.random_state)
+        if self.seq_data_set is None or self.image_data_set is None:
+            raise RuntimeError("Datasets must be initialized!")
+        if len(self.seq_data_set) != len(self.image_data_set):
+            raise RuntimeError(
+                "Supervised training in the latent space requires paired data matching in the "
+                "samples-dimension"
+            )
+        else:
+            n_samples = len(self.seq_data_set)
+            paired_training_idc = np.random.choice(
+                list(range(n_samples)),
+                size=int(n_samples * self.latent_supervision_rate),
+                replace=False,
+            )
+            self.seq_data_set.paired_training_idc = paired_training_idc
+            self.image_data_set.paired_training_idc = paired_training_idc
+
     def initialize_image_data_loader_dict(self):
         dh = DataHandler(
             dataset=self.image_data_set,
@@ -89,7 +115,7 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             transformation_dict=self.image_data_transform_pipeline_dict,
         )
         dh.stratified_train_val_test_split(splits=self.train_val_test_split)
-        dh.get_data_loader_dict()
+        dh.get_data_loader_dict(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
         self.image_data_loader_dict = dh.data_loader_dict
 
     def initialize_seq_data_loader_dict(self):
@@ -101,7 +127,7 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             transformation_dict=self.seq_data_transform_pipeline_dict,
         )
         dh.stratified_train_val_test_split(splits=self.train_val_test_split)
-        dh.get_data_loader_dict()
+        dh.get_data_loader_dict(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
         self.seq_data_loader_dict = dh.data_loader_dict
 
     def initialize_image_domain_config(self, train_model: bool = True):

@@ -4,6 +4,7 @@ import os
 from typing import List
 
 import torch
+import numpy as np
 
 from src.experiments.base import BaseTwoDomainExperiment, BaseTwoDomainExperimentCV
 from src.helper.data import DataHandler, DataHandlerCV
@@ -31,6 +32,9 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
         batch_size: int = 64,
         random_state: int = 42,
         paired_data: bool = False,
+        n_neighbors: int = 10,
+        latent_distance_loss: str = None,
+        latent_supervision_rate: float = 0.0,
     ):
         super().__init__(
             output_dir=output_dir,
@@ -42,6 +46,9 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             batch_size=batch_size,
             random_state=random_state,
             paired_data=paired_data,
+            n_neighbors=n_neighbors,
+            latent_distance_loss=latent_distance_loss,
+            latent_supervision_rate=latent_supervision_rate,
         )
 
         self.seq_data_config_1 = seq_data_config_1
@@ -77,6 +84,24 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             seq_data_and_labels_fname=seq_data_and_labels_fname
         )
 
+    def get_and_set_paired_training_idc(self):
+        if self.seq_data_set_1 is None or self.seq_data_set_2 is None:
+            raise RuntimeError("Datasets must be initialized!")
+        if len(self.seq_data_set_1) != len(self.seq_data_set_2):
+            raise RuntimeError(
+                "Supervised training in the latent space requires paired data matching in the "
+                "samples-dimension"
+            )
+        else:
+            n_samples = len(self.seq_data_set_1)
+            paired_training_idc = np.random.choice(
+                list(range(n_samples)),
+                size=int(n_samples * self.latent_supervision_rate),
+                replace=False,
+            )
+            self.seq_data_set_1.paired_training_idc = paired_training_idc
+            self.seq_data_set_2.paired_training_idc = paired_training_idc
+
     def initialize_seq_data_loader_dict_1(self):
         dh = DataHandler(
             dataset=self.seq_data_set_1,
@@ -86,7 +111,7 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             transformation_dict=self.seq_data_transform_pipeline_dict_1,
         )
         dh.stratified_train_val_test_split(splits=self.train_val_test_split)
-        dh.get_data_loader_dict()
+        dh.get_data_loader_dict(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
         self.seq_data_loader_dict_1 = dh.data_loader_dict
 
     def initialize_seq_data_loader_dict_2(self):
@@ -98,7 +123,7 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             transformation_dict=self.seq_data_transform_pipeline_dict_2,
         )
         dh.stratified_train_val_test_split(splits=self.train_val_test_split)
-        dh.get_data_loader_dict()
+        dh.get_data_loader_dict(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
         self.seq_data_loader_dict_2 = dh.data_loader_dict
 
     def initialize_seq_domain_config_1(
@@ -202,6 +227,8 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             early_stopping=self.early_stopping,
             device=self.device,
             paired_mode=self.paired_data,
+            n_neighbors=self.n_neighbors,
+            latent_distance_loss=self.latent_distance_loss,
         )
 
     def save_latents_to_csv(
@@ -253,6 +280,9 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         batch_size: int = 64,
         random_state: int = 42,
         paired_data: bool = False,
+        n_neighbors: int = 10,
+        latent_distance_loss: str = None,
+        latent_supervision_rate: float = 0.0,
     ):
         super().__init__(
             output_dir=output_dir,
@@ -265,6 +295,9 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             batch_size=batch_size,
             random_state=random_state,
             paired_data=paired_data,
+            n_neighbors=n_neighbors,
+            latent_distance_loss=latent_distance_loss,
+            latent_supervision_rate=latent_supervision_rate,
         )
 
         self.seq_data_config_1 = seq_data_config_1
@@ -307,6 +340,24 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             seq_data_and_labels_fname=seq_data_and_labels_fname
         )
 
+    def get_and_set_paired_training_idc(self):
+        if self.seq_data_set_1 is None or self.seq_data_set_2 is None:
+            raise RuntimeError("Datasets must be initialized!")
+        if len(self.seq_data_set_1) != len(self.seq_data_set_2):
+            raise RuntimeError(
+                "Supervised training in the latent space requires paired data matching in the "
+                "samples-dimension"
+            )
+        else:
+            n_samples = len(self.seq_data_set_1)
+            paired_training_idc = np.random.choice(
+                list(range(n_samples)),
+                size=int(n_samples * self.latent_supervision_rate),
+                replace=False,
+            )
+            self.seq_data_set_1.paired_training_idc = paired_training_idc
+            self.seq_data_set_2.paired_training_idc = paired_training_idc
+
     def initialize_seq_data_loader_dict_1(self):
         dh = DataHandlerCV(
             dataset=self.seq_data_set_1,
@@ -318,6 +369,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             transformation_dict=self.seq_data_transform_pipeline_dict_1,
         )
         dh.stratified_kfold_split()
+        #dh.get_data_loader_dicts(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
         dh.get_data_loader_dicts()
         self.seq_data_loader_dicts_1 = dh.data_loader_dicts
 
@@ -332,6 +384,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             transformation_dict=self.seq_data_transform_pipeline_dict_2,
         )
         dh.stratified_kfold_split()
+        #dh.get_data_loader_dicts(shuffle=self.latent_distance_loss is None or self.latent_supervision_rate == 0)
         dh.get_data_loader_dicts()
         self.seq_data_loader_dicts_2 = dh.data_loader_dicts
 
@@ -500,6 +553,8 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                 early_stopping=self.early_stopping,
                 device=self.device,
                 paired_mode=self.paired_data,
+                n_neighbors=self.n_neighbors,
+                latent_distance_loss=self.latent_distance_loss,
             )
             self.loss_dicts.append(loss_dict)
 

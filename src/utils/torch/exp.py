@@ -176,9 +176,12 @@ def train_autoencoders_two_domains(
     # Add loss measuring the distance between a pair of samples in the latent space if this is desired
     # Be careful using this option as it is important that the samples in the batch are actually paired
     if paired_training_mask is not None:
-        paired_supervision_loss = latent_distance_loss(
-            latents_i * paired_training_mask, latents_j * paired_training_mask
-        )
+        paired_distance_samples = paired_training_mask.sum().item()
+        if paired_distance_samples > 0:
+            paired_supervision_loss = latent_distance_loss(
+            latents_i[paired_training_mask], latents_j[paired_training_mask])
+        else:
+            paired_supervision_loss = 0
         paired_supervision_loss *= gamma
         total_loss += paired_supervision_loss
 
@@ -214,10 +217,9 @@ def train_autoencoders_two_domains(
         summary_stats["clf_loss"] = clf_loss.item() * (batch_size_i + batch_size_j)
         total_loss_item += summary_stats["clf_loss"]
 
-    if paired_training_mask is not None:
-        summary_stats["latent_distance_loss"] = latent_distance_loss.item()(
-            batch_size_i
-        )
+    if paired_training_mask is not None and paired_distance_samples > 0 :
+        summary_stats["latent_distance_loss"] = paired_supervision_loss.item() * paired_distance_samples
+        summary_stats['paired_distance_samples'] = paired_distance_samples
 
     summary_stats["total_loss"] = total_loss_item
 
@@ -369,6 +371,7 @@ def process_epoch_two_domains(
     n_preds_i = 0
     correct_preds_j = 0
     n_preds_j = 0
+    paired_distance_samples = 0
 
     if domain_model_config_i.model.model_type != domain_model_config_i.model.model_type:
         raise RuntimeError(
@@ -392,7 +395,7 @@ def process_epoch_two_domains(
 
         if "train_pair" in samples_i and "train_pair" in samples_j:
             paired_training_mask = samples_i["train_pair"]
-            if not torch.all(torch.eq(paired_training_mask), samples_j["train_pair"]):
+            if not torch.all(torch.eq(paired_training_mask, samples_j["train_pair"])):
                 raise RuntimeError("Samples seemed to be not aligned!")
         else:
             paired_training_mask = None
@@ -425,8 +428,9 @@ def process_epoch_two_domains(
         ae_dcm_loss += ae_train_summary["dcm_loss"]
         total_loss += ae_train_summary["total_loss"]
 
-        if paired_training_mask is not None:
+        if paired_training_mask is not None and 'latent_distance_loss' in ae_train_summary:
             distance_loss = ae_train_summary["latent_distance_loss"]
+            paired_distance_samples += ae_train_summary['paired_distance_samples']
 
         if vae_mode:
             kl_loss += ae_train_summary["kl_loss"]
@@ -483,8 +487,7 @@ def process_epoch_two_domains(
         epoch_statistics["clf_loss"] = clf_loss
 
     if paired_training_mask is not None:
-        distance_loss /= n_preds_i
-        epoch_statistics["latent_distance_loss"] = distance_loss
+        epoch_statistics["latent_distance_loss"] = distance_loss/paired_distance_samples
 
     return epoch_statistics
 

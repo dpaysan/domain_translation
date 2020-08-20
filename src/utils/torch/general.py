@@ -6,6 +6,7 @@ from torchvision.transforms import (
     ToPILImage,
     ToTensor,
 )
+from torch.nn import Module, L1Loss, MSELoss
 
 
 def get_device():
@@ -38,3 +39,15 @@ def get_transformation_dict_for_train_val_test():
         "test": test_transforms,
     }
     return transformation_dict
+
+
+def get_latent_distance_loss(loss_type: str = "mae") -> Module:
+    if loss_type == "mae":
+        latent_distance_loss = L1Loss()
+    elif loss_type == "mse":
+        latent_distance_loss = MSELoss()
+    else:
+        raise RuntimeError(
+            "Unknown loss type given: {}, expected mse or mae.".format(loss_type)
+        )
+    return latent_distance_loss

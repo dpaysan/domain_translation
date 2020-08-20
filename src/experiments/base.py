@@ -10,7 +10,7 @@ from src.utils.basic.visualization import (
     visualize_shared_latent_space,
 )
 from src.utils.torch.evaluation import save_latents_to_csv
-from src.utils.torch.general import get_device
+from src.utils.torch.general import get_device, get_latent_distance_loss
 
 
 class BaseExperiment:
@@ -67,7 +67,10 @@ class BaseTwoDomainExperiment(BaseExperiment):
         num_epochs: int = 500,
         early_stopping: int = 20,
         random_state: int = 42,
-        paired_data=False,
+        paired_data: bool = False,
+        n_neighbors: int = 10,
+        latent_distance_loss: str = None,
+        latent_supervision_rate: float = 0.0,
     ):
         super().__init__(
             output_dir=output_dir,
@@ -81,6 +84,12 @@ class BaseTwoDomainExperiment(BaseExperiment):
 
         self.latent_dcm_config = latent_dcm_config
         self.paired_data = paired_data
+        if self.paired_data and latent_distance_loss is not None:
+            self.latent_distance_loss = get_latent_distance_loss(latent_distance_loss)
+        else:
+            self.latent_distance_loss = None
+        self.n_neighbors = n_neighbors
+        self.latent_supervision_rate = latent_supervision_rate
 
         self.domain_configs = None
         self.trained_models = None
@@ -184,7 +193,10 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
         num_epochs: int = 500,
         early_stopping: int = 20,
         random_state: int = 42,
-        paired_data: bool = True,
+        paired_data: bool = False,
+        n_neighbors: int = 10,
+        latent_distance_loss: str = None,
+        latent_supervision_rate: float = 0.0,
     ):
         super().__init__(
             output_dir=output_dir,
@@ -199,6 +211,13 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
 
         self.latent_dcm_config = latent_dcm_config
         self.paired_data = paired_data
+        if self.paired_data and latent_distance_loss is not None:
+            self.latent_distance_loss = get_latent_distance_loss(latent_distance_loss)
+        else:
+            self.latent_distance_loss = None
+
+        self.n_neighbors = n_neighbors
+        self.latent_supervision_rate = latent_supervision_rate
 
         self.domain_configs = None
         self.trained_models = None
