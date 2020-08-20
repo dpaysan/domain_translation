@@ -781,6 +781,14 @@ def train_val_test_loop_two_domains(
                         reduction="umap",
                         device=device,
                     )
+                    visualize_shared_latent_space(
+                        domain_configs=domain_configs,
+                        save_path=checkpoint_dir + "/shared_latent_space_train.png",
+                        dataset_type="train",
+                        random_state=42,
+                        reduction="umap",
+                        device=device,
+                    )
 
                     vae_i_weights = (
                         domain_configs[0].domain_model_config.model.cpu().state_dict()
