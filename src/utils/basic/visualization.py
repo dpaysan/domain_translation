@@ -107,7 +107,7 @@ def plot_latent_representations(
         palette=sns.color_palette("dark", len(set(domain_names))),
         data=transformed,
         legend="full",
-        alpha=0.7,
+        alpha=0.3,
     )
     if labels is not None:
         label_point(

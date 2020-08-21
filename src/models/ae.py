@@ -48,7 +48,8 @@ class VanillaAE(BaseAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.in_dims, self.hidden_dims[0]),
                     # nn.BatchNorm1d(self.hidden_dims[0]),
-                    nn.LeakyReLU(self.lrelu_slope),
+                    #nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
                 )
             ]
@@ -58,7 +59,8 @@ class VanillaAE(BaseAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
                     # nn.BatchNorm1d(self.hidden_dims[i]),
-                    nn.LeakyReLU(self.lrelu_slope),
+                    #nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[i]),
                 )
             )
@@ -79,7 +81,8 @@ class VanillaAE(BaseAE, ABC):
             nn.Sequential(
                 nn.Linear(self.latent_dim, self.hidden_dims[-1]),
                 # nn.BatchNorm1d(self.hidden_dims[-1]),
-                nn.LeakyReLU(self.lrelu_slope),
+                #nn.LeakyReLU(self.lrelu_slope),
+                nn.PReLU(),
                 nn.BatchNorm1d(self.hidden_dims[-1]),
             )
         ]
@@ -88,7 +91,8 @@ class VanillaAE(BaseAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
                     # nn.BatchNorm1d(self.hidden_dims[-2 - i]),
-                    nn.LeakyReLU(self.lrelu_slope),
+                    #nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                 )
             )
@@ -137,7 +141,8 @@ class TwoLatentSpaceAE(BaseAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.in_dims, self.hidden_dims[0]),
                     # nn.BatchNorm1d(self.hidden_dims[0]),
-                    nn.LeakyReLU(self.lrelu_slope),
+                    #nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
                 )
             ]
@@ -147,7 +152,8 @@ class TwoLatentSpaceAE(BaseAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
                     # nn.BatchNorm1d(self.hidden_dims[i]),
-                    nn.LeakyReLU(self.lrelu_slope),
+                    #nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[i]),
                 )
             )
@@ -162,7 +168,8 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             nn.Sequential(
                 nn.Linear(self.latent_dim_1 + latent_dim_2, self.hidden_dims[-1]),
                 # nn.BatchNorm1d(self.hidden_dims[-1]),
-                nn.LeakyReLU(self.lrelu_slope),
+                #nn.LeakyReLU(self.lrelu_slope),
+                nn.PReLU(),
                 nn.BatchNorm1d(self.hidden_dims[-1]),
             )
         ]
@@ -171,7 +178,8 @@ class TwoLatentSpaceAE(BaseAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
                     # nn.BatchNorm1d(self.hidden_dims[-2 - i]),
-                    nn.LeakyReLU(self.lrelu_slope),
+                    #nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                 )
             )

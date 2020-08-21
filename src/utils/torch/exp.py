@@ -272,8 +272,8 @@ def train_latent_dcm_two_domains(
     latent_dcm.to(device)
 
     # Forward pass
-    latents_i = model_i(inputs_i)[1]
-    latents_j = model_j(inputs_j)[1]
+    latents_i = Variable(model_i(inputs_i)[1])
+    latents_j = Variable(model_j(inputs_j)[1])
 
     if use_dcm:
         labels_i, labels_j = (
@@ -775,7 +775,7 @@ def train_val_test_loop_two_domains(
 
                     visualize_shared_latent_space(
                         domain_configs=domain_configs,
-                        save_path=checkpoint_dir + "/shared_latent_space_val.png",
+                        save_path=checkpoint_dir + "/shared_latent_space_umap_val.png",
                         dataset_type="val",
                         random_state=42,
                         reduction="umap",
@@ -783,10 +783,27 @@ def train_val_test_loop_two_domains(
                     )
                     visualize_shared_latent_space(
                         domain_configs=domain_configs,
-                        save_path=checkpoint_dir + "/shared_latent_space_train.png",
+                        save_path=checkpoint_dir + "/shared_latent_space_umap_train.png",
                         dataset_type="train",
                         random_state=42,
                         reduction="umap",
+                        device=device,
+                    )
+
+                    visualize_shared_latent_space(
+                        domain_configs=domain_configs,
+                        save_path=checkpoint_dir + "/shared_latent_space_tsne_val.png",
+                        dataset_type="val",
+                        random_state=42,
+                        reduction="tsne",
+                        device=device,
+                    )
+                    visualize_shared_latent_space(
+                        domain_configs=domain_configs,
+                        save_path=checkpoint_dir + "/shared_latent_space_tsne_train.png",
+                        dataset_type="train",
+                        random_state=42,
+                        reduction="tsne",
                         device=device,
                     )
 
@@ -832,13 +849,16 @@ def train_val_test_loop_two_domains(
             epoch_with_best_model
         )
     )
-    domain_configs[0].domain_model_config.model.load_state_dict(best_model_i_weights)
-    domain_configs[1].domain_model_config.model.load_state_dict(best_model_j_weights)
+    # Todo removed loading of best model - because for adversarial training the total loss is to unstable that the
+    # this model selection works.
 
-    if latent_dcm is not None:
-        latent_dcm.load_state_dict(best_latent_dcm_weights)
-    if latent_clf is not None:
-        latent_clf.load_state_dict(best_latent_clf_weights)
+    # domain_configs[0].domain_model_config.model.load_state_dict(best_model_i_weights)
+    # domain_configs[1].domain_model_config.model.load_state_dict(best_model_j_weights)
+    #
+    # if latent_dcm is not None:
+    #     latent_dcm.load_state_dict(best_latent_dcm_weights)
+    # if latent_clf is not None:
+    #     latent_clf.load_state_dict(best_latent_clf_weights)
 
     if "test" in domain_configs[0].data_loader_dict:
         epoch_statistics = process_epoch_two_domains(
@@ -925,7 +945,7 @@ def train_val_test_loop_two_domains(
                 )
             )
             for k, v in metrics["knn_accs"].items():
-                logging.debug("{}-NN accuracy for the paired data: {.:8f}".format(k, v))
+                logging.debug("{}-NN accuracy for the paired data: {:.8f}".format(k, v))
 
         logging.debug("***" * 20)
 
