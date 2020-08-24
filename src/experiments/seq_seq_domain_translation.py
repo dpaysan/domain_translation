@@ -46,7 +46,6 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             batch_size=batch_size,
             random_state=random_state,
             paired_data=paired_data,
-            n_neighbors=n_neighbors,
             latent_distance_loss=latent_distance_loss,
             latent_supervision_rate=latent_supervision_rate,
         )
@@ -214,6 +213,7 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
         alpha: float = 0.1,
         beta: float = 1.0,
         gamma: float = 1.0,
+        delta: float = 1.0,
         lamb: float = 0.00000001,
         use_dcm: bool = True,
         use_clf: bool = False,
@@ -227,6 +227,7 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             alpha=alpha,
             beta=beta,
             gamma=gamma,
+            delta=delta,
             lamb=lamb,
             use_dcm=use_dcm,
             use_clf=use_clf,
@@ -235,7 +236,6 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
             early_stopping=self.early_stopping,
             device=self.device,
             paired_mode=self.paired_data,
-            n_neighbors=self.n_neighbors,
             latent_distance_loss=self.latent_distance_loss,
         )
 
@@ -490,6 +490,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         alpha: float = 0.1,
         beta: float = 1.0,
         gamma: float = 1.0,
+        delta: float = 1.0,
         lamb: float = 0.00000001,
         use_dcm: bool = True,
         use_clf: bool = True,
@@ -555,6 +556,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                 alpha=alpha,
                 beta=beta,
                 gamma=gamma,
+                delta=delta,
                 lamb=lamb,
                 use_dcm=use_dcm,
                 use_clf=use_clf,
@@ -563,7 +565,6 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                 early_stopping=self.early_stopping,
                 device=self.device,
                 paired_mode=self.paired_data,
-                n_neighbors=self.n_neighbors,
                 latent_distance_loss=self.latent_distance_loss,
             )
             self.loss_dicts.append(loss_dict)

@@ -10,7 +10,7 @@ run_params:
                        'optimizer_config':{'type':'adam','lr':0.001},
                        'loss_config':{'type':'mse'}}
 
-  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':128, 'n_classes':2},
+  latent_clf_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':128, 'n_classes':2},
                       'optimizer_config':{'type':'adam', 'lr':0.001},
                       'loss_config':{'type':'ce', 'weights':[4.5,0.5]}}
 

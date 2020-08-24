@@ -33,6 +33,7 @@ def train_autoencoders_two_domains(
     alpha: float = 0.1,
     beta: float = 1.0,
     gamma: float = 1.0,
+    delta: float = 1.0,
     lamb: float = 0.00000001,
     device: str = "cuda:0",
     use_dcm: bool = True,
@@ -67,6 +68,7 @@ def train_autoencoders_two_domains(
     # Set VAE models to train if defined in respective configuration
     if phase == "train" and train_i:
         model_i.train()
+        model_i.zero_grad()
     else:
         model_i.eval()
 
@@ -75,11 +77,12 @@ def train_autoencoders_two_domains(
 
     if phase == "train" and train_j:
         model_j.train()
+#        model_j.zero_grad()
     else:
         model_j.eval()
 
     model_j.to(device)
-    model_j.zero_grad()
+#    model_j.zero_grad()
 
     # The discriminator will not be trained but only used to compute the adversarial loss for the AE updates
     latent_dcm.eval()
@@ -152,8 +155,8 @@ def train_autoencoders_two_domains(
 
     if vae_mode:
         kl_loss = compute_KL_loss(mu_i, logvar_i) + compute_KL_loss(mu_j, logvar_j)
-        kl_loss *= lamb
-        total_loss += kl_loss
+#        kl_loss *= lamb
+        total_loss += kl_loss * lamb
 
     # Calculate adversarial loss - by mixing labels indicating domain with output predictions to "confuse" the
     # discriminator and encourage learning autoencoder that make the distinction between the modalities in the latent
@@ -163,7 +166,7 @@ def train_autoencoders_two_domains(
         dcm_output_i, domain_labels_j
     ) + 0.5 * latent_dcm_loss(dcm_output_j, domain_labels_i)
 
-    total_loss += dcm_loss
+    total_loss += dcm_loss * beta
 
     # Add loss of latent classifier if this is trained
     if use_clf:
@@ -171,8 +174,7 @@ def train_autoencoders_two_domains(
             latent_clf_loss(clf_output_i, labels_i)
             + latent_clf_loss(clf_output_j, labels_j)
         )
-        clf_loss *= beta
-        total_loss += clf_loss
+        total_loss += clf_loss * gamma
 
     # Add loss measuring the distance between a pair of samples in the latent space if this is desired
     # Be careful using this option as it is important that the samples in the batch are actually paired
@@ -184,8 +186,7 @@ def train_autoencoders_two_domains(
             )
         else:
             paired_supervision_loss = 0
-        paired_supervision_loss *= gamma
-        total_loss += paired_supervision_loss
+        total_loss += paired_supervision_loss * delta
 
     # Backpropagate loss and update parameters if we are in the training phase
     if phase == "train":
@@ -340,6 +341,7 @@ def process_epoch_two_domains(
     alpha: float = 0.1,
     beta: float = 1.0,
     gamma: float = 1.0,
+    delta: float = 1.0,
     lamb: float = 0.00000001,
     use_dcm: bool = True,
     use_clf: bool = False,
@@ -416,6 +418,7 @@ def process_epoch_two_domains(
             alpha=alpha,
             beta=beta,
             gamma=gamma,
+            delta=delta,
             lamb=lamb,
             use_dcm=use_dcm,
             use_clf=use_clf,
@@ -509,7 +512,8 @@ def train_val_test_loop_two_domains(
     alpha: float = 0.1,
     beta: float = 1.0,
     gamma: float = 1.0,
-    lamb: float = 0.00000001,
+    delta: float = 1.0,
+    lamb: float = 0.0000001,
     use_dcm: bool = True,
     use_clf: bool = False,
     num_epochs: int = 500,
@@ -517,7 +521,6 @@ def train_val_test_loop_two_domains(
     early_stopping: int = 20,
     device: str = None,
     paired_mode: bool = False,
-    n_neighbors: int = 10,
     latent_distance_loss: Module = None,
 ) -> Tuple[dict, dict]:
     if not os.path.exists(output_dir):
@@ -619,6 +622,7 @@ def train_val_test_loop_two_domains(
                 alpha=alpha,
                 beta=beta,
                 gamma=gamma,
+                delta=delta,
                 lamb=lamb,
                 use_dcm=use_dcm,
                 use_clf=use_clf,
@@ -844,11 +848,11 @@ def train_val_test_loop_two_domains(
     )
 
     # Load best models
-    logging.debug(
-        "Load best model configurations found in epoch {}.".format(
-            epoch_with_best_model
-        )
-    )
+    # logging.debug(
+    #     "Load best model configurations found in epoch {}.".format(
+    #         epoch_with_best_model
+    #     )
+    # )
     # Todo removed loading of best model - because for adversarial training the total loss is to unstable that the
     # this model selection works.
 

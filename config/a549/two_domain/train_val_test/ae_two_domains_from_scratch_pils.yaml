@@ -31,7 +31,7 @@ run_params:
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
-  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':70, 'n_classes':3},
+  latent_clf_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':70, 'n_classes':3},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce', 'weights':[4, 2.67, 2.67]}}
 

@@ -12,7 +12,7 @@ run_params:
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.00},
                         'loss_config':{'type':'mae'}}
 
-  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':64, 'n_classes':3},
+  latent_clf_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':64, 'n_classes':3},
                       'optimizer_config':{'type':'adam', 'lr':0.001},
                       'loss_config':{'type':'ce', 'weights':[4, 3, 3]}}
 

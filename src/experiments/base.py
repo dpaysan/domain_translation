@@ -68,7 +68,6 @@ class BaseTwoDomainExperiment(BaseExperiment):
         early_stopping: int = 20,
         random_state: int = 42,
         paired_data: bool = False,
-        n_neighbors: int = 10,
         latent_distance_loss: str = None,
         latent_supervision_rate: float = 0.0,
     ):
@@ -88,7 +87,6 @@ class BaseTwoDomainExperiment(BaseExperiment):
             self.latent_distance_loss = get_latent_distance_loss(latent_distance_loss)
         else:
             self.latent_distance_loss = None
-        self.n_neighbors = n_neighbors
         self.latent_supervision_rate = latent_supervision_rate
 
         self.domain_configs = None
@@ -194,7 +192,6 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
         early_stopping: int = 20,
         random_state: int = 42,
         paired_data: bool = False,
-        n_neighbors: int = 10,
         latent_distance_loss: str = None,
         latent_supervision_rate: float = 0.0,
     ):
@@ -216,7 +213,6 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
         else:
             self.latent_distance_loss = None
 
-        self.n_neighbors = n_neighbors
         self.latent_supervision_rate = latent_supervision_rate
 
         self.domain_configs = None

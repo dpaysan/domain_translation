@@ -44,7 +44,7 @@ run_params:
   random_state: 1001
   paired_data: True
   latent_distance_loss: 'mae'
-  latent_supervision_rate: 0.0
+  latent_supervision_rate: 1.0
 
 
 pipeline:
@@ -62,7 +62,7 @@ pipeline:
       alpha: 0.1
       beta: 1.0
       gamma: 0.001
-      delta: 0.0
+      delta: 0.001
       lambda: 0.0
       save_freq: 50
       use_dcm: True

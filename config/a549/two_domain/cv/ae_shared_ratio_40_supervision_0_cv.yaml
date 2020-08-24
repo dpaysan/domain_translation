@@ -8,8 +8,8 @@ run_params:
 
   seq_model_config_1 : {'model_config':{'type':'TwoLatentSpaceAE',
                                         'hidden_dims':[1024, 512, 256, 128],
-                                        'latent_dim_1': 40,
-                                        'latent_dim_2': 5,
+                                        'latent_dim_1': 20,
+                                        'latent_dim_2': 15,
                                         'in_dims':2613},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
@@ -20,8 +20,8 @@ run_params:
 
   seq_model_config_2 : {'model_config':{'type':'TwoLatentSpaceAE',
                                         'hidden_dims':[512, 256, 128, 64, 48],
-                                        'latent_dim_1': 40,
-                                        'latent_dim_2': 5,
+                                        'latent_dim_1': 20,
+                                        'latent_dim_2': 15,
                                         'in_dims':815},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}

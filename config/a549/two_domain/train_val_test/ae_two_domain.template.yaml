@@ -29,7 +29,7 @@ run_params:
                       'optimizer_config':{'type':'adam', 'lr':0.0001, 'betas':[0.5, 0.999]},
                       'loss_config':{'type':'ce'}}
 
-  latent_clf_config: {'model_config':{'type':'LinearClassifier', 'latent_dim':2613, 'n_classes':3},
+  latent_clf_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':2613, 'n_classes':3},
                       'optimizer_config':{'type':'adam', 'lr':0.0001, 'betas':[0.5, 0.999]},
                       'loss_config':{'type':'ce'}}
 
