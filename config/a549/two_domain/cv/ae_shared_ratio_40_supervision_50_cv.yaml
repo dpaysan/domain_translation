@@ -27,12 +27,12 @@ run_params:
                         'loss_config':{'type':'mae'}}
 
   latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
-                      'latent_dim': 40, 'hidden_dims':[128, 128, 128,]},
+                      'latent_dim': 20, 'hidden_dims':[128, 128, 128,]},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
   latent_clf_config: {'model_config':{'type':'LatentClassifier',
-                                      'latent_dim':40, 'n_classes':3},
+                                      'latent_dim':20, 'n_classes':3},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 

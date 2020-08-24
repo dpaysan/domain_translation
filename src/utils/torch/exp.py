@@ -155,7 +155,6 @@ def train_autoencoders_two_domains(
 
     if vae_mode:
         kl_loss = compute_KL_loss(mu_i, logvar_i) + compute_KL_loss(mu_j, logvar_j)
-#        kl_loss *= lamb
         total_loss += kl_loss * lamb
 
     # Calculate adversarial loss - by mixing labels indicating domain with output predictions to "confuse" the
@@ -210,19 +209,19 @@ def train_autoencoders_two_domains(
     }
     total_loss_item = (
         alpha * (summary_stats["recon_loss_i"] + summary_stats["recon_loss_j"])
-        + summary_stats["dcm_loss"]
+        + summary_stats["dcm_loss"] * beta
     )
     if vae_mode:
         summary_stats["kl_loss"] = kl_loss.item()
-        total_loss_item += kl_loss.item()
+        total_loss_item += kl_loss.item() * lamb
 
     if use_clf:
         summary_stats["clf_loss"] = clf_loss.item() * (batch_size_i + batch_size_j)
-        total_loss_item += summary_stats["clf_loss"]
+        total_loss_item += summary_stats["clf_loss"] * gamma
 
     if paired_training_mask is not None and paired_distance_samples > 0:
         summary_stats["latent_distance_loss"] = (
-            paired_supervision_loss.item() * paired_distance_samples
+            paired_supervision_loss.item() * paired_distance_samples * delta
         )
         summary_stats["paired_distance_samples"] = paired_distance_samples
 
@@ -976,7 +975,7 @@ def train_autoencoder(
     latent_clf: Module,
     latent_clf_optimizer: Optimizer,
     latent_clf_loss: Module,
-    beta: float = 0.001,
+    gamma: float = 0.001,
     lamb: float = 1e-8,
     phase: str = "train",
     use_clf: bool = True,
@@ -1035,8 +1034,7 @@ def train_autoencoder(
     # Add loss of latent classifier if this is trained
     if use_clf:
         clf_loss = latent_clf_loss(clf_output, labels.view(-1).long())
-        clf_loss *= beta
-        total_loss += clf_loss
+        total_loss += clf_loss * gamma
 
     # Backpropagate loss and update parameters if we are in the training phase
     if phase == "train":
@@ -1082,7 +1080,7 @@ def process_epoch_single_domain(
     latent_clf: Module = None,
     latent_clf_optimizer: Optimizer = None,
     latent_clf_loss: Module = None,
-    beta: float = 0.001,
+    gamma: float = 0.001,
     lamb: float = 1e-8,
     use_clf: bool = True,
     phase: str = "train",
@@ -1118,7 +1116,7 @@ def process_epoch_single_domain(
             latent_clf=latent_clf,
             latent_clf_optimizer=latent_clf_optimizer,
             latent_clf_loss=latent_clf_loss,
-            beta=beta,
+            beta=gamma,
             lamb=lamb,
             phase=phase,
             device=device,
@@ -1163,7 +1161,7 @@ def train_val_test_loop_vae(
     output_dir: str,
     domain_config: DomainConfig,
     latent_clf_config: dict = None,
-    beta: float = 0.001,
+    gamma: float = 0.001,
     lamb: float = 0.0000001,
     use_clf: bool = False,
     num_epochs: int = 500,
@@ -1235,7 +1233,7 @@ def train_val_test_loop_vae(
                 latent_clf=latent_clf,
                 latent_clf_optimizer=latent_clf_optimizer,
                 latent_clf_loss=latent_clf_loss,
-                beta=beta,
+                gamma=gamma,
                 lamb=lamb,
                 use_clf=use_clf,
                 phase=phase,
@@ -1352,7 +1350,7 @@ def train_val_test_loop_vae(
             latent_clf=latent_clf,
             latent_clf_optimizer=latent_clf_optimizer,
             latent_clf_loss=latent_clf_loss,
-            beta=beta,
+            gamma=gamma,
             lamb=lamb,
             use_clf=use_clf,
             phase="test",

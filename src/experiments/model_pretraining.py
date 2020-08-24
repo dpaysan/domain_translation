@@ -126,7 +126,7 @@ class PretrainAeExperiment(BaseExperiment):
             num_epochs=self.num_epochs,
             early_stopping=self.early_stopping,
             device=self.device,
-            beta=beta,
+            gamma=beta,
             lamb=lamb,
             use_clf=use_clf,
             save_freq=save_freq,
