@@ -63,7 +63,6 @@ pipeline:
       beta: 1.0
       gamma: 0.001
       delta: 0.0
-      lambda: 0.0
       save_freq: 50
       use_dcm: True
       use_clf: True
