@@ -221,7 +221,7 @@ def train_autoencoders_two_domains(
 
     if paired_training_mask is not None and paired_distance_samples > 0:
         summary_stats["latent_distance_loss"] = (
-            paired_supervision_loss.item() * paired_distance_samples * delta
+            paired_supervision_loss.item() * paired_distance_samples
         )
         summary_stats["paired_distance_samples"] = paired_distance_samples
 
