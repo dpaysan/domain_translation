@@ -1,0 +1,248 @@
+---
+title: "Visualization: Partly-Integrated Latent Space learning"
+output: html_notebook
+---
+
+This notebook serves to visualize the results of the experiments using partly integrated latent spaces for the paired RNAseq and ATACseq data of the 1874 A549 cells to which a DEX treatment was applied. For the RNAseq data 2613 genes were selected that were differently expressed with a FWER of less than 5% and for the ATACseq data 815 transcription factor motifs were derived.
+
+The experiment data can be find in the project directory in 'data/final_experiments/pils'.
+```{r}
+library(ggplot2)
+```
+
+
+```{r}
+results_40_0 = data.frame('rna_recon_mae'=c(0.22353226, 0.16940460, 0.16879097, 0.17508526, 0.17869675), 
+                     'atac_recon_mae'=c(0.33427233, 0.34240424, 0.33885545, 0.33783905, 0.33872039), 
+                     'latent_mae'=c(1.21587372, 1.00461519, 1.25768650, 1.21894324, 1.02673769), 
+                     '5nn_acc'=c(0.02400000, 0.00933333, 0.02400000, 0.00933333, 0.02005348), 
+                     '10nn_acc'=c(0.04666667, 0.02533333, 0.04133333, 0.03600000, 0.03743316), 
+                     '15nn_acc'=c(0.05866667, 0.04000000, 0.06533333, 0.05200000, 0.06283422), 
+                     '20nn_acc'=c(0.07333333, 0.06000000, 0.08133333, 0.06666667, 0.08556150), 
+                     '25nn_acc'=c(0.10000000, 0.07733333, 0.09200000, 0.08000000, 0.10160428), 
+                     '30nn_acc'=c(0.12400000, 0.08933333, 0.11466667, 0.09866667, 0.12566845), 
+                     '35nn_acc'=c(0.14933333, 0.10800000, 0.13066667, 0.12000000, 0.14171123), 
+                     '40nn_acc'=c(0.16533333, 0.12800000, 0.14933333, 0.14400000, 0.15909091), 
+                     '45nn_acc'=c(0.18266667, 0.15066667, 0.16666667, 0.17333333, 0.17513369), 
+                     '50nn_acc'=c(0.19466667, 0.16666667, 0.18000000, 0.19600000, 0.19117647),
+                     'supervision'=c(0, 0, 0, 0, 0),
+                     'shared_latent_space_ratio'=c(40, 40, 40, 40, 40))
+
+results_80_0 = data.frame('rna_recon_mae'=c(0.22393370, 0.16843224, 0.16835596, 0.17615030, 0.17741353), 
+                     'atac_recon_mae'=c(0.33296858, 0.33329240, 0.33218730, 0.33043914, 0.32858014), 
+                     'latent_mae'=c(1.09775674, 0.64187604, 0.75147408, 0.75389433, 0.98276365), 
+                     '5nn_acc'=c(0.02800000, 0.02933333, 0.01600000, 0.01733333, 0.03208556), 
+                     '10nn_acc'=c(0.04533333, 0.06666667, 0.03733333, 0.03733333, 0.04679144), 
+                     '15nn_acc'=c(0.07066667, 0.08933333, 0.05066667, 0.05733333, 0.05882353), 
+                     '20nn_acc'=c(0.09333333, 0.11200000, 0.06266667, 0.07733333, 0.09625668), 
+                     '25nn_acc'=c(0.11333333, 0.12400000, 0.08133333, 0.10133333, 0.12032086), 
+                     '30nn_acc'=c(0.13200000, 0.14400000, 0.10266667, 0.13466667, 0.07219251), 
+                     '35nn_acc'=c(0.15200000, 0.16133333, 0.12800000, 0.15066667, 0.10828877), 
+                     '40nn_acc'=c(0.17200000, 0.18400000, 0.14666667, 0.16666667, 0.12566845), 
+                     '45nn_acc'=c(0.19600000, 0.20800000, 0.16933333, 0.17333333, 0.15240642), 
+                     '50nn_acc'=c(0.20800000, 0.22533333, 0.19066667, 0.19200000, 0.17245989),
+                     'supervision'=c(0, 0, 0, 0, 0),
+                     'shared_latent_space_ratio'=c(80, 80, 80, 80, 80))
+
+results_100_0 = data.frame('rna_recon_mae'=c(0.22507326, 0.16858753, 0.16845130, 0.17710733, 0.17771498), 
+                     'atac_recon_mae'=c(0.33258448, 0.33669700, 0.33223893, 0.33183877, 0.33427753), 
+                     'latent_mae'=c(0.76085782, 0.65272450, 0.72701377, 0.80351210, 0.92230958), 
+                     '5nn_acc'=c(0.03066667, 0.01866667, 0.01466667, 0.02266667, 0.02139037), 
+                     '10nn_acc'=c(0.05866667, 0.03600000, 0.03333333, 0.03466667, 0.03475936), 
+                     '15nn_acc'=c(0.07600000, 0.05200000, 0.04933333, 0.05200000, 0.05748663), 
+                     '20nn_acc'=c(0.08933333, 0.06800000, 0.06800000, 0.07066667, 0.08021390), 
+                     '25nn_acc'=c(0.10800000, 0.08933333, 0.09066667, 0.09200000, 0.10294118), 
+                     '30nn_acc'=c(0.13200000, 0.11466667, 0.12000000, 0.11866667, 0.13101604), 
+                     '35nn_acc'=c(0.15066667, 0.13066667, 0.14000000, 0.13733333, 0.14037433), 
+                     '40nn_acc'=c(0.17066667, 0.14133333, 0.15466667, 0.16533333, 0.14973262), 
+                     '45nn_acc'=c(0.19600000, 0.16666667, 0.17600000, 0.17866667, 0.16711230), 
+                     '50nn_acc'=c(0.21600000, 0.19333333, 0.19333333, 0.19333333, 0.18850267),
+                     'supervision'=c(0, 0, 0, 0, 0),
+                     'shared_latent_space_ratio'=c(100, 100, 100, 100, 100))
+
+
+```
+
+
+```{r}
+results_40_50 = data.frame('rna_recon_mae'=c(0.22563298, 0.16895249, 0.16925240, 0.17460202, 0.17802727), 
+                     'atac_recon_mae'=c(0.33172786, 0.34414392,  0.33905005, 0.33423861, 0.33527538), 
+                     'latent_mae'=c(0.97821587, 0.92631489, 0.81853437, 0.77450567, 0.72540510), 
+                     '5nn_acc'=c(0.03200000, 0.02400000, 0.03333333, 0.02000000, 0.02406417), 
+                     '10nn_acc'=c(0.05200000, 0.04933333, 0.05600000, 0.04800000, 0.04278075), 
+                     '15nn_acc'=c(0.07466667, 0.08133333, 0.07733333, 0.07333333, 0.06818182), 
+                     '20nn_acc'=c(0.09733333, 0.10800000, 0.10000000, 0.09600000, 0.08957219), 
+                     '25nn_acc'=c(0.10933333, 0.13200000, 0.11600000, 0.12266667, 0.11497326), 
+                     '30nn_acc'=c(0.12933333, 0.14533333, 0.14133333, 0.14533333, 0.15240642), 
+                     '35nn_acc'=c(0.14400000, 0.17066667, 0.16666667, 0.16800000, 0.16042781), 
+                     '40nn_acc'=c(0.15600000, 0.19200000, 0.18800000, 0.18400000, 0.17780749), 
+                     '45nn_acc'=c(0.17600000, 0.21200000, 0.19866667, 0.19600000, 0.20855615), 
+                     '50nn_acc'=c(0.19466667, 0.24266667, 0.22133333, 0.21466667, 0.22860963),
+                     'supervision'=c(50, 50, 50, 50, 50),
+                     'shared_latent_space_ratio'=c(40, 40, 40, 40, 40))
+
+results_80_50 = data.frame('rna_recon_mae'=c(0.22392638, 0.16871472, 0.16868014, 0.17414888, 0.17722086), 
+                     'atac_recon_mae'=c(0.33427233, 0.33802258, 0.33329543, 0.32967215, 0.33000174), 
+                     'latent_mae'=c(0.74924171, 0.63371736, 0.72160763, 0.67589509, 0.68732470), 
+                     '5nn_acc'=c(0.01866667, 0.03866667, 0.02933333, 0.01333333, 0.02139037), 
+                     '10nn_acc'=c(0.04133333, 0.06800000, 0.04933333, 0.03866667, 0.03609626), 
+                     '15nn_acc'=c(0.05733333, 0.07733333, 0.06933333, 0.06800000, 0.05347594), 
+                     '20nn_acc'=c(0.07466667, 0.09333333, 0.08666667, 0.08533333, 0.07620321), 
+                     '25nn_acc'=c(0.10400000, 0.11333333, 0.10933333, 0.12000000, 0.09491979), 
+                     '30nn_acc'=c(0.12666667, 0.12933333, 0.12933333, 0.14800000, 0.11764706), 
+                     '35nn_acc'=c(0.15066667, 0.15200000, 0.14400000, 0.16933333, 0.13101604), 
+                     '40nn_acc'=c(0.18133333, 0.17733333, 0.15600000, 0.19200000, 0.14438503), 
+                     '45nn_acc'=c(0.20400000, 0.19866667, 0.178666677, 0.21600000, 0.17513369), 
+                     '50nn_acc'=c(0.22400000, 0.21600000, 0.19600000, 0.23200000, 0.19251337),
+                     'supervision'=c(50, 50, 50, 50, 50),
+                     'shared_latent_space_ratio'=c(80, 80, 80, 80, 80))
+
+results_100_50 = data.frame('rna_recon_mae'=c(0.22314556, 0.16861848, 0.16843641, 0.17579985, 0.17851277), 
+                     'atac_recon_mae'=c(0.33345143, 0.33854292, 0.33577931, 0.33451602, 0.33379208), 
+                     'latent_mae'=c(0.66082186, 0.59343076, 0.64258099, 0.66943133, 0.59806502), 
+                     '5nn_acc'=c(0.02133333, 0.03866667, 0.02666667, 0.01733333, 0.02272727), 
+                     '10nn_acc'=c(0.04666667, 0.07066667, 0.06666667, 0.04000000, 0.04010695), 
+                     '15nn_acc'=c(0.08266667, 0.10000000, 0.09066667, 0.08400000, 0.06417112), 
+                     '20nn_acc'=c(0.11333333, 0.11733333, 0.11333333, 0.10800000, 0.08556150), 
+                     '25nn_acc'=c(0.14133333, 0.14266667, 0.13066667, 0.12533333, 0.10427807), 
+                     '30nn_acc'=c(0.15333333, 0.16666667, 0.14666667, 0.14933333, 0.12834225), 
+                     '35nn_acc'=c(0.17333333, 0.18400000, 0.16000000, 0.18000000, 0.16042781), 
+                     '40nn_acc'=c(0.19200000, 0.20133333, 0.18133333, 0.20000000, 0.18850267), 
+                     '45nn_acc'=c(0.20266667, 0.21466667, 0.19466667, 0.22666667, 0.20320856), 
+                     '50nn_acc'=c(0.23066667, 0.23866667, 0.22000000, 0.24133333, 0.21657754),
+                     'supervision'=c(50, 50, 50, 50, 50),
+                     'shared_latent_space_ratio'=c(100, 100, 100, 100, 100))
+```
+
+```{r}
+results_40_100 = data.frame('rna_recon_mae'=c(0.22361685, 0.16862686, 0.16889898, 0.17865187, 0.17739863), 
+                     'atac_recon_mae'=c(0.33388258, 0.33855417,  0.33586541, 0.33060291, 0.33354260), 
+                     'latent_mae'=c(0.83906162, 0.78604120, 0.96523845, 0.85315061, 0.73234332), 
+                     '5nn_acc'=c(0.02666667, 0.02800000, 0.03466667, 0.01733333, 0.02406417), 
+                     '10nn_acc'=c(0.05333333, 0.05200000, 0.05733333, 0.03600000, 0.05347594), 
+                     '15nn_acc'=c(0.07600000, 0.07333333, 0.07733333, 0.06400000, 0.07620321), 
+                     '20nn_acc'=c(0.10133333, 0.09200000, 0.09733333, 0.09466667, 0.09358289), 
+                     '25nn_acc'=c(0.12800000, 0.11466667, 0.12000000, 0.12666667, 0.11631016), 
+                     '30nn_acc'=c(0.14266667, 0.14000000, 0.14133333, 0.15733333, 0.14438503), 
+                     '35nn_acc'=c(0.16800000, 0.15866667, 0.16133333, 0.18266667, 0.15508021), 
+                     '40nn_acc'=c(0.19066667, 0.17866667, 0.18266667, 0.20133333, 0.16711230), 
+                     '45nn_acc'=c(0.21200000, 0.20266667, 0.20666667, 0.22400000, 0.18048128), 
+                     '50nn_acc'=c(0.22933333, 0.22133333, 0.22400000, 0.24533333, 0.20454545),
+                     'supervision'=c(100, 100, 100, 100, 100),
+                     'shared_latent_space_ratio'=c(40, 40, 40, 40, 40))
+
+results_80_100 = data.frame('rna_recon_mae'=c(0.22283734, 0.16837567, 0.16865470, 0.17399445, 0.17738988), 
+                     'atac_recon_mae'=c(0.33372696, 0.33605615, 0.33431201, 0.33081540, 0.33030909), 
+                     'latent_mae'=c(0.70762837, 0.49184981, 0.81543636, 0.74546105, 0.69347143), 
+                     '5nn_acc'=c(0.02000000, 0.02933333, 0.03466667, 0.03200000, 0.03208556), 
+                     '10nn_acc'=c(0.04933333, 0.06000000, 0.04800000, 0.05600000, 0.06417112), 
+                     '15nn_acc'=c(0.06133333, 0.07866667, 0.07200000, 0.07733333, 0.07887701), 
+                     '20nn_acc'=c(0.08133333, 0.10266667, 0.10000000, 0.10933333, 0.10160428), 
+                     '25nn_acc'=c(0.11333333, 0.12800000, 0.11333333, 0.13866667, 0.12032086), 
+                     '30nn_acc'=c(0.13200000, 0.14800000, 0.14533333, 0.16000000, 0.13770053), 
+                     '35nn_acc'=c(0.16400000, 0.16800000, 0.17066667, 0.18800000, 0.14705882), 
+                     '40nn_acc'=c(0.19066667, 0.19333333, 0.18666667, 0.20533333, 0.16844920), 
+                     '45nn_acc'=c(0.21466667, 0.22266667, 0.19866667, 0.22000000, 0.18850267), 
+                     '50nn_acc'=c(0.23733333, 0.25200000, 0.21333333, 0.24000000, 0.20454545),
+                     'supervision'=c(100, 100, 100, 100, 100),
+                     'shared_latent_space_ratio'=c(80, 80, 80, 80, 80))
+
+results_100_100 = data.frame('rna_recon_mae'=c(0.22612834, 0.16959517, 0.16869249, 0.17445719, 0.17757769), 
+                     'atac_recon_mae'=c(0.33437451, 0.34819941, 0.33715484, 0.33638307, 0.33596016), 
+                     'latent_mae'=c(0.58526987, 0.61079466, 0.68481988, 0.56714654, 0.65266567), 
+                     '5nn_acc'=c(0.02133333, 0.02533333, 0.02000000, 0.02933333, 0.03074866), 
+                     '10nn_acc'=c(0.04533333, 0.04800000, 0.04000000, 0.05066667, 0.05080214), 
+                     '15nn_acc'=c(0.06533333, 0.06133333, 0.07200000, 0.07200000, 0.07085561), 
+                     '20nn_acc'=c(0.08533333, 0.08400000, 0.09866667, 0.09333333, 0.10160428), 
+                     '25nn_acc'=c(0.11333333, 0.10933333, 0.12800000, 0.12666667, 0.11497326), 
+                     '30nn_acc'=c(0.13600000, 0.12533333, 0.14933333, 0.14266667, 0.13502674), 
+                     '35nn_acc'=c(0.16400000, 0.13600000, 0.17066667, 0.17333333, 0.15909091), 
+                     '40nn_acc'=c(0.18133333, 0.14933333, 0.18666667, 0.19600000, 0.17245989), 
+                     '45nn_acc'=c(0.21066667, 0.16800000, 0.20800000, 0.22000000, 0.19117647), 
+                     '50nn_acc'=c(0.23333333, 0.18400000, 0.22400000, 0.24000000, 0.20721925),
+                     'supervision'=c(100, 100, 100, 100, 100),
+                     'shared_latent_space_ratio'=c(100, 100, 100, 100, 100))
+```
+
+
+
+```{r}
+#results_0_supervision <- rbind(results_40_0, results_80_0, results_100_0)
+results_0_supervision <- rbind(results_40_0, results_80_0, results_100_0, results_40_50, results_80_50, results_100_50, results_40_100, results_80_100, results_100_100)
+results_0_supervision$supervision <- factor(results_0_supervision$supervision)
+results_0_supervision$shared_latent_space_ratio <- factor(results_0_supervision$shared_latent_space_ratio)
+```
+
+
+# 1. Boxplots for reconstruction and latent distance.
+
+```{r}
+ggplot(results_0_supervision, aes(x=shared_latent_space_ratio, y=rna_recon_mae, color=supervision)) + geom_boxplot() + xlab("rel. shared latent dimensions") + ylab('MAE') + ggtitle('RNA reconstruction error')
+```
+```{r}
+ggplot(results_0_supervision, aes(x=shared_latent_space_ratio, y=atac_recon_mae, color=supervision)) + geom_boxplot()+ xlab("rel. shared latent dimensions") + ylab('MAE') + ggtitle('ATAC reconstruction error')
+```
+
+```{r}
+ggplot(results_0_supervision, aes(x=shared_latent_space_ratio, y=latent_mae, color=supervision)) + geom_boxplot()+ xlab("rel. shared latent dimensions") + ylab('MAE') + ggtitle('Latent distance of the paired samples')
+```
+
+
+```{r}
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+```
+
+
+```{r}
+results_100_0_vis <- data.frame('acc'=c(results_100_0[,4], results_100_0[,5], results_100_0[,6], results_100_0[,7],results_100_0[,8], results_100_0[,9],results_100_0[,10], results_100_0[,11],results_100_0[,12], results_100_0[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(100, 50), 'supervision'=rep(0, 50))
+
+results_40_0_vis <- data.frame('acc'=c(results_40_0[,4], results_40_0[,5], results_40_0[,6], results_40_0[,7],results_40_0[,8], results_40_0[,9],results_40_0[,10], results_40_0[,11],results_40_0[,12], results_40_0[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(40, 50), 'supervision'=rep(0,50))
+
+results_80_0_vis <- data.frame('acc'=c(results_80_0[,4], results_80_0[,5], results_80_0[,6], results_80_0[,7],results_80_0[,8], results_80_0[,9],results_80_0[,10], results_80_0[,11],results_80_0[,12], results_80_0[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(80, 50), 'supervision'=rep(0,50))
+
+results_40_50_vis <- data.frame('acc'=c(results_40_50[,4], results_40_50[,5], results_40_50[,6], results_40_50[,7],results_40_50[,8], results_40_50[,9],results_40_50[,10], results_40_50[,11],results_40_50[,12], results_40_50[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(40, 50), 'supervision'=rep(50,50))
+
+results_80_50_vis <- data.frame('acc'=c(results_80_50[,4], results_80_50[,5], results_80_50[,6], results_80_50[,7],results_80_50[,8], results_80_50[,9],results_80_50[,10], results_80_50[,11],results_80_50[,12], results_80_50[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(80, 50), 'supervision'=rep(50,50))
+
+results_100_50_vis <- data.frame('acc'=c(results_100_50[,4], results_100_50[,5], results_100_50[,6], results_100_50[,7],results_100_50[,8], results_100_50[,9],results_100_50[,10], results_100_50[,11],results_100_50[,12], results_100_50[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(100, 50), 'supervision'=rep(50,50))
+
+results_100_100_vis <- data.frame('acc'=c(results_100_100[,4], results_100_100[,5], results_100_100[,6], results_100_100[,7],results_100_100[,8], results_100_100[,9],results_100_100[,10], results_100_100[,11],results_100_100[,12], results_100_100[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(100, 50), 'supervision'=rep(100, 50))
+
+results_40_100_vis <- data.frame('acc'=c(results_40_100[,4], results_40_100[,5], results_40_100[,6], results_40_100[,7],results_40_100[,8], results_40_100[,9],results_40_100[,10], results_40_100[,11],results_40_100[,12], results_40_100[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(40, 50), 'supervision'=rep(100, 50))
+
+results_80_100_vis <- data.frame('acc'=c(results_80_100[,4], results_80_100[,5], results_80_100[,6], results_80_100[,7],results_80_100[,8], results_80_100[,9],results_80_100[,10], results_80_100[,11],results_80_100[,12], results_80_100[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(80, 50), 'supervision'=rep(100,50))
+
+
+
+#results_80_0_vis <- data.frame('acc'=c(results_80_0[,4], results_80_0[,5], results_80_0[,6], results_80_0[,7],results_80_0[,8], results_80_0[,9],results_80_0[,10], results_80_0[,11],results_80_0[,12], results_80_0[,13]), 'k'=c(rep(5,5), rep(10,5), rep(15,5), rep(20,5), rep(25,5), rep(30,5), rep(35,5), rep(40,5), rep(45,5), rep(50,5)), 'shared_ratio'=rep(80, 50))
+
+#results_0_supervision_vis <- rbind(results_40_0_vis, results_80_0_vis, results_100_0_vis)
+results_0_supervision_vis <- rbind(results_40_0_vis, results_80_0_vis, results_100_0_vis, results_40_50_vis, results_80_50_vis, results_100_50_vis, results_40_100_vis, results_80_100_vis, results_100_100_vis)
+results_0_supervision_vis$k <- as.factor(results_0_supervision_vis$k)
+results_0_supervision_vis$shared_ratio <- as.factor(results_0_supervision_vis$shared_ratio)
+results_0_supervision_vis$supervision <- as.factor(results_0_supervision_vis$supervision)
+
+
+results_0_supervision_vis_summary <- data_summary(results_0_supervision_vis, varname = 'acc', groupnames = c('k', 'shared_ratio', 'supervision'))
+
+
+
+```
+
+```{r}
+ggplot(results_0_supervision_vis_summary, aes(x=k, y=acc, group=interaction(shared_ratio,supervision), color=shared_ratio)) + 
+  geom_pointrange(aes(ymin=acc-sd, ymax=acc+sd))+ geom_line(aes(linetype=supervision)) +
+  scale_y_continuous(breaks = seq(0, 0.36, 0.02)) + xlab("number of nearest neighbors") + ylab('knn accuracy for the latent embeddings') + ggtitle('kNN accuracy of the learned latent space')
+```
+
+
