@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, Subset
 from torchvision import transforms
 from torchvision.transforms import Compose
 
-from src.utils.basic.io import get_data_list
+from src.utils.basic.io import get_file_list
 
 
 class LabeledDataset(Dataset):
@@ -34,7 +34,7 @@ class TorchNucleiImageDataset(LabeledDataset):
         labels = pd.read_csv(label_fname, index_col=0)
         labels = labels.sort_values(by="nucleus_id")
         self.labels = np.array(labels.loc[:, "binary_label"])
-        self.image_locs = get_data_list(self.image_dir)
+        self.image_locs = get_file_list(self.image_dir)
         self.transform_pipeline = transform_pipeline
         self.paired_training_idc = paired_training_idc
 

@@ -8,7 +8,7 @@ import pandas as pd
 from numpy import ndarray
 from skimage import io
 
-from src.utils.basic.io import get_data_list
+from src.utils.basic.io import get_file_list
 
 
 def min_max_scale_images(images: List[ndarray]) -> List[ndarray]:
@@ -42,8 +42,8 @@ def read_images_from_disk(
     image_dir: str, image_locs: List = None
 ) -> Tuple[List[str], List[ndarray]]:
     if image_locs is None:
-        image_locs = sorted(get_data_list(image_dir, absolute_path=True))
-    image_names = sorted(get_data_list(image_dir, absolute_path=False))
+        image_locs = sorted(get_file_list(image_dir, absolute_path=True))
+    image_names = sorted(get_file_list(image_dir, absolute_path=False))
     images = []
     for image_loc in image_locs:
         images.append(np.float32(io.imread(image_loc)))
@@ -66,10 +66,10 @@ def get_mean_and_std_of_images(images: List[ndarray]) -> dict:
 def get_only_images_with_labels(
     image_dir: str, label_fname: str, id_column: str = "nucleus_id"
 ):
-    image_ids = get_data_list(
+    image_ids = get_file_list(
         root_dir=image_dir, absolute_path=False, file_ending=False
     )
-    image_locs = get_data_list(root_dir=image_dir)
+    image_locs = get_file_list(root_dir=image_dir)
     image_df = pd.DataFrame.from_dict({id_column: image_ids, "image_loc": image_locs})
     label_ids = pd.read_csv(label_fname, index_col=0)
     image_df = image_df.merge(label_ids, on=id_column)
@@ -125,10 +125,10 @@ def copy_labeled_images(
     id_column: str = "nucleus_id",
     output_dir: str = "../../../data/cd4/nuclear_crops_all_experiments/labeled_images/",
 ):
-    image_ids = get_data_list(
+    image_ids = get_file_list(
         root_dir=image_dir, absolute_path=False, file_ending=False
     )
-    image_locs = get_data_list(root_dir=image_dir)
+    image_locs = get_file_list(root_dir=image_dir)
     image_df = pd.DataFrame.from_dict({id_column: image_ids, "image_loc": image_locs})
     label_ids = pd.read_csv(label_fname, index_col=0)
     image_df = image_df.merge(label_ids, on=id_column)

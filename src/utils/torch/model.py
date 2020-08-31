@@ -13,7 +13,11 @@ from torch.optim.rmsprop import RMSprop
 
 from src.helper.models import DomainConfig
 from src.models.ae import VanillaAE, TwoLatentSpaceAE
-from src.models.latent_models import LatentDiscriminator, LatentClassifier, LatentRegressor
+from src.models.latent_models import (
+    LatentDiscriminator,
+    LatentClassifier,
+    LatentRegressor,
+)
 from src.models.vae import VanillaConvVAE, VanillaVAE
 from src.utils.torch.general import get_device
 
@@ -122,5 +126,3 @@ def get_latent_model_configuration(
 
     latent_model_config = {"model": model, "optimizer": optimizer, "loss": latent_loss}
     return latent_model_config
-
-

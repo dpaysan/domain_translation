@@ -68,8 +68,8 @@ class ExperimentRunner:
 
         # pprint.PrettyPrinter(indent=4).pprint(self.config_dict)
         logging.debug(pformat(self.config_path))
-        logging.debug('###' * 20)
-        logging.debug('###' * 20)
+        logging.debug("###" * 20)
+        logging.debug("###" * 20)
 
     def _load_config(self, config_path):
         r""" Method to load a configuration defined in a *.yaml* file.
