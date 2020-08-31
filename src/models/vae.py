@@ -65,7 +65,7 @@ class VanillaConvVAE(BaseVAE, ABC):
                     padding=1,
                     bias=False,
                 ),
-                #nn.LeakyReLU(self.lrelu_slope, inplace=True),
+                # nn.LeakyReLU(self.lrelu_slope, inplace=True),
                 nn.PReLU(),
             )
         ]
@@ -82,7 +82,7 @@ class VanillaConvVAE(BaseVAE, ABC):
                         bias=False,
                     ),
                     nn.BatchNorm2d(self.hidden_dims[i]),
-                    #nn.LeakyReLU(self.lrelu_slope, inplace=True),
+                    # nn.LeakyReLU(self.lrelu_slope, inplace=True),
                     nn.PReLU(),
                 )
             )
@@ -118,7 +118,7 @@ class VanillaConvVAE(BaseVAE, ABC):
                         bias=False,
                     ),
                     nn.BatchNorm2d(hidden_dims[-2 - i]),
-                    #nn.LeakyReLU(self.lrelu_slope, inplace=True),
+                    # nn.LeakyReLU(self.lrelu_slope, inplace=True),
                     nn.PReLU(),
                 )
             )

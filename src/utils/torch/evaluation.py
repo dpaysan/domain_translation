@@ -6,6 +6,7 @@ from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader, Dataset
 
+from src.functions.loss_functions import max_discrepancy_loss
 from src.helper.models import DomainConfig
 from src.utils.basic.export import dict_to_csv
 from src.utils.basic.metric import knn_accuracy
@@ -18,7 +19,6 @@ def evaluate_latent_integration(
     data_loader_j: DataLoader,
     data_key_i: str = "seq_data",
     data_key_j: str = "seq_data",
-    # neighbors: int = 5,
     device: str = "cuda:0",
 ) -> dict:
     if model_i.model_type != model_j.model_type:
@@ -67,8 +67,10 @@ def evaluate_latent_integration(
         knn_accs[str(neighbors)] = knn_acc
 
     latent_l1_distance = nn.L1Loss()(
-        torch.from_numpy(latents_i), torch.from_numpy(latents_j)
+        torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device)
     ).item()
+
+    # latent_l1_distance = max_discrepancy_loss(torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device)).item()
 
     metrics = {"knn_accs": knn_accs, "latent_l1_distance": latent_l1_distance}
     return metrics
@@ -176,7 +178,48 @@ def save_latents_to_csv(
     )
 
 
-def get_latent_space_dict_for_multiple_domains(
+def get_full_latent_space_dict_for_multiple_domains(
+    domain_configs: List[DomainConfig],
+    dataset_type: str = "val",
+    device: str = "cuda:0",
+) -> Tuple[dict, dict]:
+    latents_dict = {}
+    label_dict = {}
+    for domain_config in domain_configs:
+        model = domain_config.domain_model_config.model
+        try:
+            dataset = domain_config.data_loader_dict[dataset_type].dataset
+        except KeyError:
+            raise RuntimeError(
+                "Unknown dataset_type: {}, expected one of the following: train, val,"
+                " test".format(dataset_type)
+            )
+        data = get_latent_representations_for_model(
+            model=model,
+            dataset=dataset,
+            data_key=domain_config.data_key,
+            label_key=domain_config.label_key,
+            device=device,
+        )
+
+        shared_latents = data["shared_latents"]
+        if "domain_specific_latents" in data:
+            domain_specific_latents = data["domain_specific_latents"]
+        else:
+            domain_specific_latents = None
+
+        latents_dict[domain_config.name] = shared_latents, domain_specific_latents
+
+        if "labels" in data:
+            label_dict[domain_config.name] = data["labels"]
+
+    if len(label_dict) == 0:
+        label_dict = None
+
+    return latents_dict, label_dict
+
+
+def get_shared_latent_space_dict_for_multiple_domains(
     domain_configs: List[DomainConfig],
     dataset_type: str = "val",
     device: str = "cuda:0",

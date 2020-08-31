@@ -6,7 +6,7 @@ from torchvision.transforms import (
     ToPILImage,
     ToTensor,
 )
-from torch.nn import Module, L1Loss, MSELoss
+from torch.nn import Module, L1Loss, MSELoss, Sigmoid, Softmax, ReLU
 
 
 def get_device():
@@ -51,3 +51,14 @@ def get_latent_distance_loss(loss_type: str = "mae") -> Module:
             "Unknown loss type given: {}, expected mse or mae.".format(loss_type)
         )
     return latent_distance_loss
+
+
+def get_activation_module(output_activation: str = "sigmoid"):
+    if output_activation == "sigmoid":
+        return Sigmoid()
+    elif output_activation == "softmax":
+        return Softmax()
+    elif output_activation == "relu":
+        return ReLU()
+    else:
+        raise RuntimeError("Unknown activation function {}".format(output_activation))

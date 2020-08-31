@@ -18,7 +18,7 @@ run_params:
                       'label_key':'label'}
 
   seq_model_config_2 : {'model_config':{'type':'VanillaAE',
-                                        'hidden_dims':[512, 256, 128, 64, 48],
+                                        'hidden_dims':[512, 256, 128, 64],
                                         'latent_dim': 50,
                                         'in_dims':815},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
@@ -42,7 +42,7 @@ run_params:
   random_state: 1001
   paired_data: True
   latent_distance_loss: 'mae'
-  latent_supervision_rate: 0.0
+  latent_supervision_rate: 0.5
 
 
 pipeline:
@@ -60,7 +60,7 @@ pipeline:
       alpha: 0.1
       beta: 1.0
       gamma: 0.001
-      delta: 0.0
+      delta: 0.001
       save_freq: 50
       use_dcm: True
       use_clf: True

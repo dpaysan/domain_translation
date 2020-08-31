@@ -14,7 +14,10 @@ from torch.optim.optimizer import Optimizer
 from src.functions.loss_functions import compute_KL_loss
 from src.functions.metric import accuracy
 from src.helper.models import DomainModelConfig, DomainConfig
-from src.utils.basic.visualization import visualize_shared_latent_space
+from src.utils.basic.visualization import (
+    visualize_shared_latent_space,
+    visualize_correlation_structure_latent_space,
+)
 from src.utils.torch.evaluation import evaluate_latent_integration
 from src.utils.torch.general import get_device
 from src.utils.torch.visualization import (
@@ -68,21 +71,21 @@ def train_autoencoders_two_domains(
     # Set VAE models to train if defined in respective configuration
     if phase == "train" and train_i:
         model_i.train()
-        model_i.zero_grad()
+        # model_i.zero_grad()
     else:
         model_i.eval()
 
     model_i.to(device)
-    model_i.zero_grad()
+    optimizer_i.zero_grad()
 
     if phase == "train" and train_j:
         model_j.train()
-#        model_j.zero_grad()
+        # model_j.zero_grad()
     else:
         model_j.eval()
 
     model_j.to(device)
-#    model_j.zero_grad()
+    optimizer_j.zero_grad()
 
     # The discriminator will not be trained but only used to compute the adversarial loss for the AE updates
     latent_dcm.eval()
@@ -95,7 +98,7 @@ def train_autoencoders_two_domains(
         else:
             latent_clf.eval()
         latent_clf.to(device)
-        latent_clf.zero_grad()
+        latent_clf_optimizer.zero_grad()
 
     # Forward pass of the AE/VAE
     inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
@@ -122,7 +125,7 @@ def train_autoencoders_two_domains(
         )
 
         # Add class label to latent representations to ensure that latent representations encode generic information
-        # independent from the used data modality (see Adversarial AutoEncoder paper)
+        # independent from the used group of the samples (see Adversarial AutoEncoder paper)
         dcm_input_i = torch.cat(
             (latents_i, labels_i.float().view(-1, 1).expand(-1, 1)), dim=1
         )
@@ -139,6 +142,12 @@ def train_autoencoders_two_domains(
 
     domain_labels_i = torch.zeros(dcm_output_i.size(0)).long().to(device)
     domain_labels_j = torch.ones(dcm_output_j.size(0)).long().to(device)
+    # domain_labels_i = (
+    #     torch.ones(dcm_output_i.size(0)).float().to(device).view(-1, 1) * 0.1
+    # )
+    # domain_labels_j = (
+    #     torch.ones(dcm_output_j.size(0)).float().to(device).view(-1, 1) * 0.9
+    # )
 
     # Forward pass latent classifier if it is supposed to be trained and used to assess the integration of the learned
     # latent spaces
@@ -183,9 +192,9 @@ def train_autoencoders_two_domains(
             paired_supervision_loss = latent_distance_loss(
                 latents_i[paired_training_mask], latents_j[paired_training_mask]
             )
+            total_loss += paired_supervision_loss * delta
         else:
             paired_supervision_loss = 0
-        total_loss += paired_supervision_loss * delta
 
     # Backpropagate loss and update parameters if we are in the training phase
     if phase == "train":
@@ -263,13 +272,13 @@ def train_latent_dcm_two_domains(
     model_i.to(device)
     model_j.to(device)
 
-    # Set latent discriminator to train and reset the parameters if in phase train
+    # Set latent discriminator to train
     if phase == "train":
         latent_dcm.train()
-        latent_dcm.zero_grad()
 
-    # Send the discriminator to the device
+    # Send the discriminator to the device and reset the parameters if in phase train
     latent_dcm.to(device)
+    latent_dcm_optimizer.zero_grad()
 
     # Forward pass
     latents_i = Variable(model_i(inputs_i)[1])
@@ -299,6 +308,12 @@ def train_latent_dcm_two_domains(
 
     domain_labels_i = torch.zeros(dcm_output_i.size(0)).long().to(device)
     domain_labels_j = torch.ones(dcm_output_j.size(0)).long().to(device)
+    # domain_labels_i = (
+    #     torch.ones(dcm_output_i.size(0)).long().to(device).view(-1, 1) * 0.1
+    # )
+    # domain_labels_j = (
+    #     torch.ones(dcm_output_j.size(0)).long().to(device).view(-1, 1) * 0.9
+    # )
 
     dcm_loss = 0.5 * (
         latent_dcm_loss(dcm_output_i, domain_labels_i)
@@ -438,7 +453,7 @@ def process_epoch_two_domains(
             paired_training_mask is not None
             and "latent_distance_loss" in ae_train_summary
         ):
-            distance_loss = ae_train_summary["latent_distance_loss"]
+            distance_loss += ae_train_summary["latent_distance_loss"]
             paired_distance_samples += ae_train_summary["paired_distance_samples"]
 
         if vae_mode:
@@ -786,7 +801,8 @@ def train_val_test_loop_two_domains(
                     )
                     visualize_shared_latent_space(
                         domain_configs=domain_configs,
-                        save_path=checkpoint_dir + "/shared_latent_space_umap_train.png",
+                        save_path=checkpoint_dir
+                        + "/shared_latent_space_umap_train.png",
                         dataset_type="train",
                         random_state=42,
                         reduction="umap",
@@ -803,10 +819,27 @@ def train_val_test_loop_two_domains(
                     )
                     visualize_shared_latent_space(
                         domain_configs=domain_configs,
-                        save_path=checkpoint_dir + "/shared_latent_space_tsne_train.png",
+                        save_path=checkpoint_dir
+                        + "/shared_latent_space_tsne_train.png",
                         dataset_type="train",
                         random_state=42,
                         reduction="tsne",
+                        device=device,
+                    )
+
+                    visualize_correlation_structure_latent_space(
+                        domain_configs=domain_configs,
+                        save_path=checkpoint_dir
+                        + "/latent_space_correlation_structure_train.png",
+                        dataset_type="train",
+                        device=device,
+                    )
+
+                    visualize_correlation_structure_latent_space(
+                        domain_configs=domain_configs,
+                        save_path=checkpoint_dir
+                        + "/latent_space_correlation_structure_val.png",
+                        dataset_type="val",
                         device=device,
                     )
 

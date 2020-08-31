@@ -8,6 +8,7 @@ import torch
 from src.utils.basic.visualization import (
     plot_train_val_hist,
     visualize_shared_latent_space,
+    visualize_correlation_structure_latent_space,
 )
 from src.utils.torch.evaluation import save_latents_to_csv
 from src.utils.torch.general import get_device, get_latent_distance_loss
@@ -110,6 +111,22 @@ class BaseTwoDomainExperiment(BaseExperiment):
             dataset_type=dataset_type,
             random_state=self.random_state,
             reduction=reduction,
+            device=self.device,
+        )
+
+    def visualize_latent_space_correlation_structure(
+        self, dataset_type: str = "val", save_path: str = None, posfix: str = ""
+    ):
+        if save_path is None:
+            save_path = os.path.join(
+                self.output_dir,
+                "latent_space_correlation_" + dataset_type + posfix + ".png",
+            )
+
+        visualize_correlation_structure_latent_space(
+            domain_configs=self.domain_configs,
+            save_path=save_path,
+            dataset_type=dataset_type,
             device=self.device,
         )
 

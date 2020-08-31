@@ -1,0 +1,6 @@
+from src.utils.basic.evaluation import PairedDomainLogAnalyzer
+
+
+log_file = '/home/paysan_d/PycharmProjects/domain_translation/data/a549_dex/experiments/20200829_190131/logs20200829_190129.log'
+analyzer = PairedDomainLogAnalyzer(log_file=log_file)
+print(analyzer.knn_acc_dicts)

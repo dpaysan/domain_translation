@@ -1,12 +1,19 @@
 import torch
-from torch.nn import Module, CrossEntropyLoss, L1Loss, MSELoss, BCELoss, BCEWithLogitsLoss
+from torch.nn import (
+    Module,
+    CrossEntropyLoss,
+    L1Loss,
+    MSELoss,
+    BCELoss,
+    BCEWithLogitsLoss,
+)
 from torch.optim.adam import Adam
 from torch.optim.optimizer import Optimizer
 from torch.optim.rmsprop import RMSprop
 
 from src.helper.models import DomainConfig
 from src.models.ae import VanillaAE, TwoLatentSpaceAE
-from src.models.latent_models import LatentDiscriminator, LatentClassifier
+from src.models.latent_models import LatentDiscriminator, LatentClassifier, LatentRegressor
 from src.models.vae import VanillaConvVAE, VanillaVAE
 from src.utils.torch.general import get_device
 
@@ -58,7 +65,7 @@ def get_domain_configuration(
         recon_loss_function = MSELoss()
     elif recon_loss_fct_type == "bce":
         recon_loss_function = BCELoss()
-    elif recon_loss_fct_type == 'bce_ll':
+    elif recon_loss_fct_type == "bce_ll":
         recon_loss_function = BCEWithLogitsLoss()
     else:
         raise NotImplementedError(
@@ -91,6 +98,8 @@ def get_latent_model_configuration(
         model = LatentDiscriminator(**model_dict)
     elif model_type == "LatentClassifier":
         model = LatentClassifier(**model_dict)
+    elif model_type == "LatentRegressor":
+        model = LatentRegressor(**model_dict)
     else:
         raise NotImplementedError('Unknown model type "{}"'.format(model_type))
 
@@ -104,12 +113,14 @@ def get_latent_model_configuration(
     loss_type = loss_dict.pop("type")
     if loss_type == "ce":
         latent_loss = CrossEntropyLoss(weight=weights)
-    elif loss_type == 'bce':
+    elif loss_type == "bce":
         latent_loss = BCELoss()
-    elif loss_type == 'bce_ll':
+    elif loss_type == "bce_ll":
         latent_loss = BCEWithLogitsLoss()
     else:
         raise NotImplementedError('Unknown loss type "{}"'.format(loss_type))
 
     latent_model_config = {"model": model, "optimizer": optimizer, "loss": latent_loss}
     return latent_model_config
+
+

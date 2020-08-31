@@ -42,3 +42,17 @@ def vae_loss(inputs: Tensor, outputs: Tensor, mu: Tensor, log_var: Tensor) -> Te
     kl_loss = torch.sum(kl_loss) * -0.5
     vae_loss = torch.mean(recon_loss + kl_loss)
     return vae_loss
+
+
+def max_discrepancy_loss(inputs: Tensor, outputs: Tensor) -> Tensor:
+    n_samples, _ = inputs.size()
+    loss = nn.L1Loss()(inputs, outputs) * (n_samples - 1) * n_samples
+    discrepancy = 0
+    for i in range(n_samples):
+        for j in range(n_samples):
+            if i != j:
+                discrepancy += torch.abs(torch.mean(inputs[i] - outputs[j]))
+    if discrepancy == 0:
+        return loss * discrepancy
+    else:
+        return loss / discrepancy

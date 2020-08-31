@@ -11,7 +11,10 @@ from sklearn.manifold import TSNE
 from umap import UMAP
 
 from src.helper.models import DomainConfig
-from src.utils.torch.evaluation import get_latent_space_dict_for_multiple_domains
+from src.utils.torch.evaluation import (
+    get_shared_latent_space_dict_for_multiple_domains,
+    get_full_latent_space_dict_for_multiple_domains,
+)
 
 
 def plot_train_val_hist(
@@ -135,7 +138,7 @@ def visualize_shared_latent_space(
     dataset_type: str = "val",
     device: str = "cuda:0",
 ):
-    latents_domain_dict, label_dict = get_latent_space_dict_for_multiple_domains(
+    latents_domain_dict, label_dict = get_shared_latent_space_dict_for_multiple_domains(
         domain_configs=domain_configs, dataset_type=dataset_type, device=device
     )
     plot_latent_representations(
@@ -144,4 +147,71 @@ def visualize_shared_latent_space(
         random_state=random_state,
         reduction=reduction,
         label_dict=label_dict,
+    )
+
+
+def plot_correlations_latent_space(latents_domain_dict, save_path):
+    shared_latents_in_domains = []
+    domain_specific_latents_in_domains = []
+    shared_colnames = []
+    specific_colnames = []
+    for domain_name, latents in latents_domain_dict.items():
+        shared_latents, domain_specific_latents = latents
+        shared_latents_in_domains.append(shared_latents)
+
+        shared_colnames.append(
+            np.array(
+                [
+                    "z_{}_{}".format(domain_name, i)
+                    for i in range(shared_latents.shape[1])
+                ]
+            )
+        )
+        if domain_specific_latents is not None:
+            domain_specific_latents_in_domains.append(domain_specific_latents)
+            specific_colnames.append(
+                np.array(
+                    [
+                        "n_{}_{}".format(domain_name, i)
+                        for i in range(domain_specific_latents.shape[1])
+                    ]
+                )
+            )
+
+    if len(domain_specific_latents_in_domains) == 0:
+        latent_reps = np.concatenate(shared_latents_in_domains, axis=1)
+        colnames = np.concatenate(shared_colnames)
+    else:
+        latent_reps = np.concatenate(
+            [
+                np.concatenate(shared_latents_in_domains, axis=1),
+                np.concatenate(domain_specific_latents_in_domains, axis=1),
+            ],
+            axis=1,
+        )
+        colnames = np.concatenate(
+            [np.concatenate(shared_colnames), np.concatenate(specific_colnames)]
+        )
+
+    latents = pd.DataFrame(data=latent_reps, columns=list(colnames))
+
+    # Plot latent space correlation
+    plt.figure(figsize=(20, 15))
+    ax = plt.axes()
+    sns.heatmap(latents.corr(), ax=ax, cmap="coolwarm")
+    plt.savefig(save_path)
+    plt.close()
+
+
+def visualize_correlation_structure_latent_space(
+    domain_configs: List[DomainConfig],
+    save_path: str,
+    dataset_type: str = "val",
+    device: str = "cuda:0",
+):
+    latents_domain_dict, _ = get_full_latent_space_dict_for_multiple_domains(
+        domain_configs=domain_configs, dataset_type=dataset_type, device=device
+    )
+    plot_correlations_latent_space(
+        latents_domain_dict=latents_domain_dict, save_path=save_path
     )

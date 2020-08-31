@@ -355,6 +355,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             )
         else:
             n_samples = len(self.seq_data_set_1)
+            np.random.seed(self.random_state)
             paired_training_idc = np.random.choice(
                 list(range(n_samples)),
                 size=int(n_samples * self.latent_supervision_rate),
