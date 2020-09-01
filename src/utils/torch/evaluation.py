@@ -2,7 +2,7 @@ from typing import Tuple, List
 
 import numpy as np
 import torch
-from torch import nn
+from sklearn.metrics import confusion_matrix
 from torch.nn import Module
 from torch.utils.data import DataLoader, Dataset
 
@@ -19,6 +19,7 @@ def evaluate_latent_integration(
     data_loader_j: DataLoader,
     data_key_i: str = "seq_data",
     data_key_j: str = "seq_data",
+
     device: str = "cuda:0",
 ) -> dict:
     if model_i.model_type != model_j.model_type:
@@ -66,11 +67,10 @@ def evaluate_latent_integration(
         )
         knn_accs[str(neighbors)] = knn_acc
 
-    #latent_l1_distance = nn.L1Loss()(
-    #    torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device)
-    #).item()
+    latent_l1_distance = max_discrepancy_loss(
+        torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device)
+    ).item()
 
-    latent_l1_distance = max_discrepancy_loss(torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device)).item()
 
     metrics = {"knn_accs": knn_accs, "latent_l1_distance": latent_l1_distance}
     return metrics
@@ -251,3 +251,73 @@ def get_shared_latent_space_dict_for_multiple_domains(
         label_dict = None
 
     return latents_dict, label_dict
+
+
+def evaluate_latent_clf(domain_configs:List[DomainConfig], latent_clf:torch.nn.Module, dataset_type:str='test', device:str='cuda:0'):
+    model_i = domain_configs[0].domain_model_config.model
+    model_j = domain_configs[1].domain_model_config.model
+
+    data_key_i = domain_configs[0].data_key
+    label_key_i = domain_configs[0].label_key
+
+    data_key_j = domain_configs[1].data_key
+    label_key_j = domain_configs[1].label_key
+
+
+    data_loader_i = domain_configs[0].data_loader_dict[dataset_type]
+    data_loader_j = domain_configs[0].data_loader_dict[dataset_type]
+
+    if model_i.model_type != model_j.model_type:
+        raise RuntimeError("Models must be of the same type, i.e. AE/AE or VAE/VAE.")
+    if len(data_loader_i.dataset) != len(data_loader_j.dataset):
+        raise RuntimeError(
+            "Paired input data is required where sample k in dataset i refers to sample"
+            " k in dataset j."
+        )
+
+    # Store batch size to reset it after obtaining the latent representations.
+    single_sample_loader_i = DataLoader(
+        dataset=data_loader_i.dataset, shuffle=False, batch_size=1
+    )
+    single_sample_loader_j = DataLoader(
+        dataset=data_loader_j.dataset, shuffle=False, batch_size=1
+    )
+
+    confusion_dict = {}
+    labels_i =[]
+    labels_j = []
+    preds_i = []
+    preds_j = []
+
+
+    for idx, (samples_i, samples_j) in enumerate(
+        zip(single_sample_loader_i, single_sample_loader_j)
+    ):
+        input_i, input_j = samples_i[data_key_i], samples_j[data_key_j]
+        label_i, label_j = samples_i[label_key_i], samples_j[label_key_j]
+
+        input_i, input_j = input_i.to(device), input_j.to(device)
+        latent_i = model_i(input_i)[1].detach().cpu().numpy()
+        latent_j = model_j(input_j)[1].detach().cpu().numpy()
+
+        pred_i = latent_clf(latent_i)
+        pred_j = latent_clf(latent_j)
+
+        labels_i.append(label_i)
+        labels_j.append(label_j)
+
+        preds_i.append(pred_i)
+        preds_j.append(pred_j)
+
+    # Compute metrices
+    labels_i = np.array(labels_i).squeeze()
+    labels_j = np.array(labels_j).squeeze()
+
+    preds_i = np.array(preds_i).squeeze()
+    preds_j = np.array(preds_j).squeeze()
+
+    confusion_dict[domain_configs[0].name] = confusion_matrix(labels_i, preds_i)
+    confusion_dict[domain_configs[0].name] = confusion_matrix(labels_j, preds_j)
+    confusion_dict['overall'] = confusion_matrix(np.concatenate([labels_i, labels_j]),
+                                             np.concatenate([preds_i, preds_j]))
+    return confusion_dict

@@ -13,6 +13,7 @@ class LatentDiscriminator(nn.Module, ABC):
         latent_dim: int = 128,
         hidden_dims: List = [1024, 1024, 1024],
         n_classes: int = 2,
+        train: bool = True,
     ):
         super().__init__()
         self.latent_dim = latent_dim
@@ -43,6 +44,7 @@ class LatentClassifier(nn.Module, ABC):
         n_classes: int = 2,
         hidden_dims: List = None,
         output_activation: str = None,
+        train: bool = False,
     ):
         super().__init__()
         self.latent_dim = latent_dim
@@ -75,7 +77,11 @@ class LatentClassifier(nn.Module, ABC):
 
 class LatentRegressor(nn.Module, ABC):
     def __init__(
-        self, latent_dim: int, hidden_dims: List = None, output_activation: str = None
+        self,
+        latent_dim: int,
+        hidden_dims: List = None,
+        output_activation: str = None,
+        train: bool = False,
     ):
         super().__init__()
         self.latent_dim = latent_dim

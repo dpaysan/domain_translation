@@ -5,15 +5,20 @@ from typing import List
 
 import torch
 import numpy as np
+from torch.utils.data import DataLoader
 
 from src.experiments.base import BaseTwoDomainExperiment, BaseTwoDomainExperimentCV
 from src.helper.data import DataHandler, DataHandlerCV
+from src.helper.models import DomainConfig
 from src.utils.torch.data import init_seq_dataset
+from src.utils.torch.evaluation import evaluate_latent_clf
 from src.utils.torch.exp import train_val_test_loop_two_domains
 from src.utils.torch.model import (
     get_domain_configuration,
     get_latent_model_configuration,
 )
+
+from sklearn.metrics import confusion_matrix
 
 
 class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
@@ -625,3 +630,91 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             save_path=save_path,
             posfix=posfix,
         )
+
+    def load_pretrained_models(self, seq_model_1_weights_loc:str, seq_model_2_weights_loc:str, latent_dcm_weights_loc:str,
+                          latent_clf_weights_loc:str=None):
+
+            self.domain_configs[0].domain_model_config.model.load_state_dict(
+                torch.load(seq_model_1_weights_loc)
+            )
+
+            self.domain_configs[1].domain_model_config.model.load_state_dict(
+                torch.load(seq_model_2_weights_loc)
+            )
+
+            self.latent_dcm_config["model"].load_state_dict(latent_dcm_weights_loc)
+
+            if latent_clf_weights_loc is not None:
+                self.latent_clf_config["model"].load_state_dict(
+                    latent_clf_weights_loc
+                )
+
+
+    # Todo refactor such that the function can be used to continue training and evaluate the models or only evaluate them
+    def evaluate_configuration_models(
+        self,
+        seq_model_1_weights_locs: List,
+        seq_model_2_weights_locs: List,
+        latent_dcm_weights_locs: List,
+        latent_clf_weights_locs: List = None,
+        alpha: float = 1.0,
+        beta: float = 1.0,
+        gamma: float = 1.0,
+        delta: float = 1.0,
+        lamb: float = 1.0,
+        use_dcm: bool = True,
+        use_clf: bool = False,
+    ):
+
+        if use_clf:
+            confusion_matrices = []
+
+        for i in range(self.n_folds):
+            output_dir = "{}/fold_{}".format(self.output_dir, i)
+            os.makedirs(output_dir)
+
+            self.domain_configs[0].data_loader_dict = self.seq_data_loader_dicts_1[i]
+            self.domain_configs[1].data_loader_dict = self.seq_data_loader_dicts_2[i]
+
+            if use_clf:
+                self.load_pretrained_models(seq_model_1_weights_loc=seq_model_1_weights_locs[i],
+                                            seq_model_2_weights_loc=seq_model_2_weights_locs[i],
+                                            latent_dcm_weights_loc=latent_dcm_weights_locs[i], latent_clf_weights_loc=latent_clf_weights_locs[i])
+                self.latent_clf_config["model"].train = False
+            else:
+                self.load_pretrained_models(seq_model_1_weights_loc=seq_model_1_weights_locs[i],
+                                            seq_model_2_weights_loc=seq_model_2_weights_locs[i],
+                                            latent_dcm_weights_loc=latent_dcm_weights_locs[i],
+                                            latent_clf_weights_loc=None)
+
+            self.domain_configs[0].domain_model_config.train = False
+            self.domain_configs[1].domain_model_config.train = False
+            self.latent_dcm_config["model"].train = False
+
+            self.trained_models, loss_dict = train_val_test_loop_two_domains(
+                output_dir=output_dir,
+                domain_configs=self.domain_configs,
+                latent_dcm_config=self.latent_dcm_config,
+                latent_clf_config=self.latent_clf_config,
+                alpha=alpha,
+                beta=beta,
+                gamma=gamma,
+                delta=delta,
+                lamb=lamb,
+                use_dcm=use_dcm,
+                use_clf=use_clf,
+                num_epochs=1,
+                save_freq=1000,
+                early_stopping=self.early_stopping,
+                device=self.device,
+                paired_mode=self.paired_data,
+                latent_distance_loss=self.latent_distance_loss,
+            )
+            if use_clf:
+                confusion_dict = evaluate_latent_clf(domain_configs=self.domain_configs,
+                                                       latent_clf=self.latent_clf_config['model'])
+                logging.debug('Confusion matrices for fold {}: %s'.format(str(i+1)), confusion_dict)
+
+
+
+

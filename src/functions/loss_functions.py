@@ -51,7 +51,7 @@ def max_discrepancy_loss(inputs: Tensor, outputs: Tensor) -> Tensor:
     for i in range(n_samples):
         for j in range(n_samples):
             if i != j:
-                discrepancy += torch.abs(torch.mean(inputs[i] - outputs[j]))
+                discrepancy += torch.mean(torch.abs(inputs[i] - outputs[j]))
     if discrepancy == 0:
         return loss * discrepancy
     else:

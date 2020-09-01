@@ -21,3 +21,4 @@ def get_file_list(
                 else:
                     list_of_data_locs.append(file)
     return sorted(list_of_data_locs)
+
