@@ -33,7 +33,6 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
         batch_size: int = 64,
         random_state: int = 42,
         paired_data: bool = False,
-        n_neighbors: int = 10,
         latent_distance_loss: str = None,
         latent_supervision_rate: float = 0.0,
     ):
@@ -47,7 +46,6 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             batch_size=batch_size,
             random_state=random_state,
             paired_data=paired_data,
-            n_neighbors=n_neighbors,
             latent_distance_loss=latent_distance_loss,
             latent_supervision_rate=latent_supervision_rate,
         )
@@ -268,3 +266,16 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
             save_path=save_path,
             posfix=posfix,
         )
+
+    def load_pretrained_models(
+        self,
+        domain_model_1_weights_loc: str,
+        domain_model_2_weights_loc: str,
+        latent_dcm_weights_loc: str,
+        latent_clf_weights_loc: str = None,
+    ):
+
+        super().load_pretrained_models(domain_model_1_weights_loc=domain_model_1_weights_loc,
+                                       domain_model_2_weights_loc=domain_model_2_weights_loc,
+                                       latent_dcm_weights_loc=latent_dcm_weights_loc,
+                                       latent_clf_weights_loc=latent_clf_weights_loc)

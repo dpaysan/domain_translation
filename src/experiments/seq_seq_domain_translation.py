@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from src.experiments.base import BaseTwoDomainExperiment, BaseTwoDomainExperimentCV
 from src.helper.data import DataHandler, DataHandlerCV
 from src.helper.models import DomainConfig
+from src.utils.basic.io import get_model_file_list_for_two_domain_experiment
 from src.utils.torch.data import init_seq_dataset
 from src.utils.torch.evaluation import evaluate_latent_clf
 from src.utils.torch.exp import train_val_test_loop_two_domains
@@ -572,6 +573,18 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             )
             self.loss_dicts.append(loss_dict)
 
+            if use_clf:
+                confusion_dict = evaluate_latent_clf(
+                    domain_configs=self.domain_configs,
+                    latent_clf=self.latent_clf_config["model"],
+                    device=self.device,
+                    dataset_type='test'
+                )
+                logging.debug(
+                    "Confusion matrices of the latent classifier for fold {}: %s".format(str(i + 1)),
+                    confusion_dict,
+                )
+
             if visualize_results:
                 save_path = output_dir + "/shared_latent_space_trainset_trained.png"
                 self.visualize_shared_latent_space(
@@ -631,32 +644,22 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             posfix=posfix,
         )
 
-    def load_pretrained_models(self, seq_model_1_weights_loc:str, seq_model_2_weights_loc:str, latent_dcm_weights_loc:str,
-                          latent_clf_weights_loc:str=None):
-
-            self.domain_configs[0].domain_model_config.model.load_state_dict(
-                torch.load(seq_model_1_weights_loc)
-            )
-
-            self.domain_configs[1].domain_model_config.model.load_state_dict(
-                torch.load(seq_model_2_weights_loc)
-            )
-
-            self.latent_dcm_config["model"].load_state_dict(latent_dcm_weights_loc)
-
-            if latent_clf_weights_loc is not None:
-                self.latent_clf_config["model"].load_state_dict(
-                    latent_clf_weights_loc
-                )
-
-
-    # Todo refactor such that the function can be used to continue training and evaluate the models or only evaluate them
-    def evaluate_configuration_models(
+    def load_pretrained_models(
         self,
-        seq_model_1_weights_locs: List,
-        seq_model_2_weights_locs: List,
-        latent_dcm_weights_locs: List,
-        latent_clf_weights_locs: List = None,
+        domain_model_1_weights_loc: str,
+        domain_model_2_weights_loc: str,
+        latent_dcm_weights_loc: str,
+        latent_clf_weights_loc: str = None,
+    ):
+
+        super().load_pretrained_models(domain_model_1_weights_loc=domain_model_1_weights_loc,
+                                       domain_model_2_weights_loc=domain_model_2_weights_loc,
+                                       latent_dcm_weights_loc=latent_dcm_weights_loc,
+                                       latent_clf_weights_loc=latent_clf_weights_loc)
+
+    def resume_training_models_cv(
+        self,
+        experiment_dir:str,
         alpha: float = 1.0,
         beta: float = 1.0,
         gamma: float = 1.0,
@@ -664,10 +667,23 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         lamb: float = 1.0,
         use_dcm: bool = True,
         use_clf: bool = False,
+        save_freq:int = 50,
     ):
+        domain_names = [self.domain_configs[0].name, self.domain_configs[1].name]
+        model_file_locs = get_model_file_list_for_two_domain_experiment(experiment_dir=experiment_dir,
+                                                                        domain_names=domain_names,
+                                                                        n_folds=self.n_folds,
+                                                                        use_clf=use_clf)
+        seq_model_1_weights_locs = model_file_locs['domain_models_i']
+        seq_model_2_weights_locs = model_file_locs['domain_models_j']
+        latent_dcm_weights_locs = model_file_locs['latent_dcm_models']
+        latent_clf_weights_locs = model_file_locs['latent_clf_models']
 
-        if use_clf:
-            confusion_matrices = []
+        if self.num_epochs <= 0:
+            train_models = False
+            self.num_epochs = 1
+        else:
+            train_models = True
 
         for i in range(self.n_folds):
             output_dir = "{}/fold_{}".format(self.output_dir, i)
@@ -677,19 +693,24 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             self.domain_configs[1].data_loader_dict = self.seq_data_loader_dicts_2[i]
 
             if use_clf:
-                self.load_pretrained_models(seq_model_1_weights_loc=seq_model_1_weights_locs[i],
-                                            seq_model_2_weights_loc=seq_model_2_weights_locs[i],
-                                            latent_dcm_weights_loc=latent_dcm_weights_locs[i], latent_clf_weights_loc=latent_clf_weights_locs[i])
-                self.latent_clf_config["model"].train = False
+                self.load_pretrained_models(
+                    domain_model_1_weights_loc=seq_model_1_weights_locs[i],
+                    domain_model_2_weights_loc=seq_model_2_weights_locs[i],
+                    latent_dcm_weights_loc=latent_dcm_weights_locs[i],
+                    latent_clf_weights_loc=latent_clf_weights_locs[i],
+                )
+                self.latent_clf_config["model"].trainable = train_models
             else:
-                self.load_pretrained_models(seq_model_1_weights_loc=seq_model_1_weights_locs[i],
-                                            seq_model_2_weights_loc=seq_model_2_weights_locs[i],
-                                            latent_dcm_weights_loc=latent_dcm_weights_locs[i],
-                                            latent_clf_weights_loc=None)
+                self.load_pretrained_models(
+                    domain_model_1_weights_loc=seq_model_1_weights_locs[i],
+                    domain_model_2_weights_loc=seq_model_2_weights_locs[i],
+                    latent_dcm_weights_loc=latent_dcm_weights_locs[i],
+                    latent_clf_weights_loc=None,
+                )
 
-            self.domain_configs[0].domain_model_config.train = False
-            self.domain_configs[1].domain_model_config.train = False
-            self.latent_dcm_config["model"].train = False
+            self.domain_configs[0].domain_model_config.trainable = train_models
+            self.domain_configs[1].domain_model_config.trainable = train_models
+            self.latent_dcm_config["model"].trainable = train_models
 
             self.trained_models, loss_dict = train_val_test_loop_two_domains(
                 output_dir=output_dir,
@@ -703,18 +724,21 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                 lamb=lamb,
                 use_dcm=use_dcm,
                 use_clf=use_clf,
-                num_epochs=1,
-                save_freq=1000,
+                num_epochs=self.num_epochs,
+                save_freq=save_freq,
                 early_stopping=self.early_stopping,
                 device=self.device,
                 paired_mode=self.paired_data,
                 latent_distance_loss=self.latent_distance_loss,
             )
             if use_clf:
-                confusion_dict = evaluate_latent_clf(domain_configs=self.domain_configs,
-                                                       latent_clf=self.latent_clf_config['model'])
-                logging.debug('Confusion matrices for fold {}: %s'.format(str(i+1)), confusion_dict)
-
-
-
-
+                confusion_dict = evaluate_latent_clf(
+                    domain_configs=self.domain_configs,
+                    latent_clf=self.latent_clf_config["model"],
+                    device=self.device,
+                    dataset_type='test'
+                )
+                logging.debug(
+                    "Confusion matrices of the latent classifier for fold {}: %s".format(str(i + 1)),
+                    confusion_dict,
+                )

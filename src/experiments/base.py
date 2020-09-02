@@ -150,6 +150,22 @@ class BaseTwoDomainExperiment(BaseExperiment):
             device=self.device,
         )
 
+    def load_pretrained_models(self, domain_model_1_weights_loc, domain_model_2_weights_loc, latent_dcm_weights_loc,
+                               latent_clf_weights_loc):
+        self.domain_configs[0].domain_model_config.model.load_state_dict(
+            torch.load(domain_model_1_weights_loc)
+        )
+
+        self.domain_configs[1].domain_model_config.model.load_state_dict(
+            torch.load(domain_model_2_weights_loc)
+        )
+
+        self.latent_dcm_config["model"].load_state_dict(latent_dcm_weights_loc)
+
+        if latent_clf_weights_loc is not None:
+            self.latent_clf_config["model"].load_state_dict(latent_clf_weights_loc)
+
+
 
 class BaseExperimentCV:
     def __init__(
@@ -163,6 +179,7 @@ class BaseExperimentCV:
         early_stopping: int = 20,
         random_state: int = 42,
     ):
+        self.domain_configs = None
         self.output_dir = output_dir
         self.latent_clf_config = latent_clf_config
         self.n_folds = n_folds
@@ -194,6 +211,7 @@ class BaseExperimentCV:
             title="Fitting history",
             posfix="_fold{}".format(fold_id + 1),
         )
+
 
 
 class BaseTwoDomainExperimentCV(BaseExperimentCV):
@@ -286,3 +304,18 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
             save_path=save_path,
             device=self.device,
         )
+
+    def load_pretrained_models(self, domain_model_1_weights_loc, domain_model_2_weights_loc, latent_dcm_weights_loc,
+                               latent_clf_weights_loc):
+        self.domain_configs[0].domain_model_config.model.load_state_dict(
+            torch.load(domain_model_1_weights_loc)
+        )
+
+        self.domain_configs[1].domain_model_config.model.load_state_dict(
+            torch.load(domain_model_2_weights_loc)
+        )
+
+        self.latent_dcm_config["model"].load_state_dict(torch.load(latent_dcm_weights_loc))
+
+        if latent_clf_weights_loc is not None:
+            self.latent_clf_config["model"].load_state_dict(torch.load(latent_clf_weights_loc))

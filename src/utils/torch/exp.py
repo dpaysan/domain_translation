@@ -27,25 +27,25 @@ from src.utils.torch.visualization import (
 
 
 def train_autoencoders_two_domains(
-        domain_model_configurations: List[DomainModelConfig],
-        latent_dcm: Module,
-        latent_dcm_loss: Module,
-        latent_clf: Module = None,
-        latent_clf_optimizer: Optimizer = None,
-        latent_clf_loss: Module = None,
-        alpha: float = 0.1,
-        beta: float = 1.0,
-        gamma: float = 1.0,
-        delta: float = 1.0,
-        lamb: float = 0.00000001,
-        device: str = "cuda:0",
-        use_dcm: bool = True,
-        use_clf: bool = True,
-        phase: str = "train",
-        vae_mode: bool = True,
-        partly_integrated_latent_space: bool = False,
-        latent_distance_loss: Module = None,
-        paired_training_mask: Tensor = None,
+    domain_model_configurations: List[DomainModelConfig],
+    latent_dcm: Module,
+    latent_dcm_loss: Module,
+    latent_clf: Module = None,
+    latent_clf_optimizer: Optimizer = None,
+    latent_clf_loss: Module = None,
+    alpha: float = 0.1,
+    beta: float = 1.0,
+    gamma: float = 1.0,
+    delta: float = 1.0,
+    lamb: float = 0.00000001,
+    device: str = "cuda:0",
+    use_dcm: bool = True,
+    use_clf: bool = True,
+    phase: str = "train",
+    vae_mode: bool = True,
+    partly_integrated_latent_space: bool = False,
+    latent_distance_loss: Module = None,
+    paired_training_mask: Tensor = None,
 ) -> dict:
     # Expects 2 model configurations (one for each domain)
     model_configuration_i = domain_model_configurations[0]
@@ -57,7 +57,7 @@ def train_autoencoders_two_domains(
     inputs_i = model_configuration_i.inputs
     labels_i = model_configuration_i.labels
     recon_loss_fct_i = model_configuration_i.recon_loss_function
-    train_i = model_configuration_i.train
+    train_i = model_configuration_i.trainable
 
     # Get all parameters of the configuration for domain j
     model_j = model_configuration_j.model
@@ -65,7 +65,7 @@ def train_autoencoders_two_domains(
     inputs_j = model_configuration_j.inputs
     labels_j = model_configuration_j.labels
     recon_loss_fct_j = model_configuration_j.recon_loss_function
-    train_j = model_configuration_j.train
+    train_j = model_configuration_j.trainable
 
     # Set VAE models to train if defined in respective configuration
     if phase == "train" and train_i:
@@ -92,7 +92,7 @@ def train_autoencoders_two_domains(
 
     if use_clf:
         assert latent_clf is not None
-        if phase == "train" and latent_clf.train:
+        if phase == "train" and latent_clf.trainable:
             latent_clf.train()
         else:
             latent_clf.eval()
@@ -178,8 +178,8 @@ def train_autoencoders_two_domains(
     # Add loss of latent classifier if this is trained
     if use_clf:
         clf_loss = 0.5 * (
-                latent_clf_loss(clf_output_i, labels_i)
-                + latent_clf_loss(clf_output_j, labels_j)
+            latent_clf_loss(clf_output_i, labels_i)
+            + latent_clf_loss(clf_output_j, labels_j)
         )
         total_loss += clf_loss * gamma
 
@@ -216,8 +216,8 @@ def train_autoencoders_two_domains(
         "dcm_loss": dcm_loss.item() * (batch_size_i + batch_size_j),
     }
     total_loss_item = (
-            alpha * (summary_stats["recon_loss_i"] + summary_stats["recon_loss_j"])
-            + summary_stats["dcm_loss"] * beta
+        alpha * (summary_stats["recon_loss_i"] + summary_stats["recon_loss_j"])
+        + summary_stats["dcm_loss"] * beta
     )
     if vae_mode:
         summary_stats["kl_loss"] = kl_loss.item()
@@ -229,7 +229,7 @@ def train_autoencoders_two_domains(
 
     if paired_training_mask is not None and paired_distance_samples > 0:
         summary_stats["latent_distance_loss"] = (
-                paired_supervision_loss.item() * paired_distance_samples
+            paired_supervision_loss.item() * paired_distance_samples
         )
         summary_stats["paired_distance_samples"] = paired_distance_samples
 
@@ -239,13 +239,13 @@ def train_autoencoders_two_domains(
 
 
 def train_latent_dcm_two_domains(
-        domain_model_configurations: List[DomainModelConfig],
-        latent_dcm: nn.Module,
-        latent_dcm_optimizer: Optimizer,
-        latent_dcm_loss: Module,
-        use_dcm: bool,
-        device: str = "cuda:0",
-        phase: str = "train",
+    domain_model_configurations: List[DomainModelConfig],
+    latent_dcm: nn.Module,
+    latent_dcm_optimizer: Optimizer,
+    latent_dcm_loss: Module,
+    use_dcm: bool,
+    device: str = "cuda:0",
+    phase: str = "train",
 ) -> dict:
     # Get the model configurations for the two domains
     model_configuration_i = domain_model_configurations[0]
@@ -317,8 +317,8 @@ def train_latent_dcm_two_domains(
     # )
 
     dcm_loss = 0.5 * (
-            latent_dcm_loss(dcm_output_i, domain_labels_i)
-            + latent_dcm_loss(dcm_output_j, domain_labels_j)
+        latent_dcm_loss(dcm_output_i, domain_labels_i)
+        + latent_dcm_loss(dcm_output_j, domain_labels_j)
     )
 
     # Backpropagate loss and update parameters if in phase 'train'
@@ -345,23 +345,23 @@ def train_latent_dcm_two_domains(
 
 
 def process_epoch_two_domains(
-        domain_configs: List[DomainConfig],
-        latent_dcm: Module,
-        latent_dcm_optimizer: Optimizer,
-        latent_dcm_loss: Module,
-        latent_clf: Module = None,
-        latent_clf_optimizer: Optimizer = None,
-        latent_clf_loss: Module = None,
-        latent_distance_loss: Module = None,
-        alpha: float = 0.1,
-        beta: float = 1.0,
-        gamma: float = 1.0,
-        delta: float = 1.0,
-        lamb: float = 0.00000001,
-        use_dcm: bool = True,
-        use_clf: bool = False,
-        phase: str = "train",
-        device: str = "cuda:0",
+    domain_configs: List[DomainConfig],
+    latent_dcm: Module,
+    latent_dcm_optimizer: Optimizer,
+    latent_dcm_loss: Module,
+    latent_clf: Module = None,
+    latent_clf_optimizer: Optimizer = None,
+    latent_clf_loss: Module = None,
+    latent_distance_loss: Module = None,
+    alpha: float = 0.1,
+    beta: float = 1.0,
+    gamma: float = 1.0,
+    delta: float = 1.0,
+    lamb: float = 0.00000001,
+    use_dcm: bool = True,
+    use_clf: bool = False,
+    phase: str = "train",
+    device: str = "cuda:0",
 ) -> dict:
     # Get domain configurations for the two domains
     domain_config_i = domain_configs[0]
@@ -451,8 +451,8 @@ def process_epoch_two_domains(
         total_loss += ae_train_summary["total_loss"]
 
         if (
-                paired_training_mask is not None
-                and "latent_distance_loss" in ae_train_summary
+            paired_training_mask is not None
+            and "latent_distance_loss" in ae_train_summary
         ):
             distance_loss += ae_train_summary["latent_distance_loss"]
             paired_distance_samples += ae_train_summary["paired_distance_samples"]
@@ -513,30 +513,30 @@ def process_epoch_two_domains(
 
     if paired_training_mask is not None and paired_distance_samples > 0:
         epoch_statistics["latent_distance_loss"] = (
-                distance_loss / paired_distance_samples
+            distance_loss / paired_distance_samples
         )
 
     return epoch_statistics
 
 
 def train_val_test_loop_two_domains(
-        output_dir: str,
-        domain_configs: List[DomainConfig],
-        latent_dcm_config: dict = None,
-        latent_clf_config: dict = None,
-        alpha: float = 0.1,
-        beta: float = 1.0,
-        gamma: float = 1.0,
-        delta: float = 1.0,
-        lamb: float = 0.0000001,
-        use_dcm: bool = True,
-        use_clf: bool = False,
-        num_epochs: int = 500,
-        save_freq: int = 10,
-        early_stopping: int = 20,
-        device: str = None,
-        paired_mode: bool = False,
-        latent_distance_loss: Module = None,
+    output_dir: str,
+    domain_configs: List[DomainConfig],
+    latent_dcm_config: dict = None,
+    latent_clf_config: dict = None,
+    alpha: float = 0.1,
+    beta: float = 1.0,
+    gamma: float = 1.0,
+    delta: float = 1.0,
+    lamb: float = 0.0000001,
+    use_dcm: bool = True,
+    use_clf: bool = False,
+    num_epochs: int = 500,
+    save_freq: int = 10,
+    early_stopping: int = 20,
+    device: str = None,
+    paired_mode: bool = False,
+    latent_distance_loss: Module = None,
 ) -> Tuple[dict, dict]:
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -804,7 +804,7 @@ def train_val_test_loop_two_domains(
                     visualize_shared_latent_space(
                         domain_configs=domain_configs,
                         save_path=checkpoint_dir
-                                  + "/shared_latent_space_umap_train.png",
+                        + "/shared_latent_space_umap_train.png",
                         dataset_type="train",
                         random_state=42,
                         reduction="umap",
@@ -822,7 +822,7 @@ def train_val_test_loop_two_domains(
                     visualize_shared_latent_space(
                         domain_configs=domain_configs,
                         save_path=checkpoint_dir
-                                  + "/shared_latent_space_tsne_train.png",
+                        + "/shared_latent_space_tsne_train.png",
                         dataset_type="train",
                         random_state=42,
                         reduction="tsne",
@@ -832,7 +832,7 @@ def train_val_test_loop_two_domains(
                     visualize_correlation_structure_latent_space(
                         domain_configs=domain_configs,
                         save_path=checkpoint_dir
-                                  + "/latent_space_correlation_structure_train.png",
+                        + "/latent_space_correlation_structure_train.png",
                         dataset_type="train",
                         device=device,
                     )
@@ -840,7 +840,7 @@ def train_val_test_loop_two_domains(
                     visualize_correlation_structure_latent_space(
                         domain_configs=domain_configs,
                         save_path=checkpoint_dir
-                                  + "/latent_space_correlation_structure_val.png",
+                        + "/latent_space_correlation_structure_val.png",
                         dataset_type="val",
                         device=device,
                     )
@@ -997,10 +997,14 @@ def train_val_test_loop_two_domains(
         "model_j": domain_configs[1].domain_model_config.model,
     }
 
-    torch.save(domain_configs[0].domain_model_config.model.state_dict(),
-               "{}/final_{}_model.pth".format(output_dir, domain_names[0]))
-    torch.save(domain_configs[1].domain_model_config.model.state_dict(),
-               "{}/final_{}_model.pth".format(output_dir, domain_names[1]))
+    torch.save(
+        domain_configs[0].domain_model_config.model.state_dict(),
+        "{}/final_{}_model.pth".format(output_dir, domain_names[0]),
+    )
+    torch.save(
+        domain_configs[1].domain_model_config.model.state_dict(),
+        "{}/final_{}_model.pth".format(output_dir, domain_names[1]),
+    )
 
     if latent_dcm is not None:
         trained_models["dcm"] = latent_dcm
@@ -1014,16 +1018,16 @@ def train_val_test_loop_two_domains(
 
 
 def train_autoencoder(
-        domain_model_config: DomainModelConfig,
-        latent_clf: Module,
-        latent_clf_optimizer: Optimizer,
-        latent_clf_loss: Module,
-        gamma: float = 0.001,
-        lamb: float = 1e-8,
-        phase: str = "train",
-        use_clf: bool = True,
-        device: str = "cuda:0",
-        vae_mode: bool = True,
+    domain_model_config: DomainModelConfig,
+    latent_clf: Module,
+    latent_clf_optimizer: Optimizer,
+    latent_clf_loss: Module,
+    gamma: float = 0.001,
+    lamb: float = 1e-8,
+    phase: str = "train",
+    use_clf: bool = True,
+    device: str = "cuda:0",
+    vae_mode: bool = True,
 ) -> dict:
     # Get all parameters of the configuration for domain i
     model = domain_model_config.model
@@ -1031,7 +1035,7 @@ def train_autoencoder(
     inputs = domain_model_config.inputs
     labels = domain_model_config.labels
     recon_loss_fct = domain_model_config.recon_loss_function
-    train = domain_model_config.train
+    train = domain_model_config.trainable
 
     # Set V/AE model to train if defined in respective configuration
     model.to(device)
@@ -1109,15 +1113,15 @@ def train_autoencoder(
 
 
 def process_epoch_single_domain(
-        domain_config: DomainConfig,
-        latent_clf: Module = None,
-        latent_clf_optimizer: Optimizer = None,
-        latent_clf_loss: Module = None,
-        gamma: float = 0.001,
-        lamb: float = 1e-8,
-        use_clf: bool = True,
-        phase: str = "train",
-        device: str = "cuda:0",
+    domain_config: DomainConfig,
+    latent_clf: Module = None,
+    latent_clf_optimizer: Optimizer = None,
+    latent_clf_loss: Module = None,
+    gamma: float = 0.001,
+    lamb: float = 1e-8,
+    use_clf: bool = True,
+    phase: str = "train",
+    device: str = "cuda:0",
 ) -> dict:
     # Get domain configurations for the domain
     domain_model_config = domain_config.domain_model_config
@@ -1190,16 +1194,16 @@ def process_epoch_single_domain(
 
 
 def train_val_test_loop_vae(
-        output_dir: str,
-        domain_config: DomainConfig,
-        latent_clf_config: dict = None,
-        gamma: float = 0.001,
-        lamb: float = 0.0000001,
-        use_clf: bool = False,
-        num_epochs: int = 500,
-        save_freq: int = 10,
-        early_stopping: int = 20,
-        device: str = None,
+    output_dir: str,
+    domain_config: DomainConfig,
+    latent_clf_config: dict = None,
+    gamma: float = 0.001,
+    lamb: float = 0.0000001,
+    use_clf: bool = False,
+    num_epochs: int = 500,
+    save_freq: int = 10,
+    early_stopping: int = 20,
+    device: str = None,
 ) -> Tuple[dict, dict]:
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)

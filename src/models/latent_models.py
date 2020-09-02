@@ -13,12 +13,13 @@ class LatentDiscriminator(nn.Module, ABC):
         latent_dim: int = 128,
         hidden_dims: List = [1024, 1024, 1024],
         n_classes: int = 2,
-        train: bool = True,
+        trainable: bool = True,
     ):
         super().__init__()
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
         self.n_classes = n_classes
+        self.trainable = trainable
 
         model_modules = [
             nn.Sequential(nn.Linear(self.latent_dim + 1, hidden_dims[0]), nn.PReLU())
@@ -44,12 +45,14 @@ class LatentClassifier(nn.Module, ABC):
         n_classes: int = 2,
         hidden_dims: List = None,
         output_activation: str = None,
-        train: bool = False,
+        trainable: bool = False,
     ):
         super().__init__()
         self.latent_dim = latent_dim
         self.n_classes = n_classes
         self.output_activation = output_activation
+        self.trainable=trainable
+
         if hidden_dims is not None and len(hidden_dims) > 0:
             self.hidden_dims = hidden_dims
             model_components = [
@@ -81,11 +84,12 @@ class LatentRegressor(nn.Module, ABC):
         latent_dim: int,
         hidden_dims: List = None,
         output_activation: str = None,
-        train: bool = False,
+        trainable: bool = False,
     ):
         super().__init__()
         self.latent_dim = latent_dim
         self.output_activation = output_activation
+        self.trainable = trainable
 
         if hidden_dims is not None and len(hidden_dims) > 0:
             self.hidden_dims = hidden_dims

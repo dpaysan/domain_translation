@@ -19,7 +19,6 @@ def evaluate_latent_integration(
     data_loader_j: DataLoader,
     data_key_i: str = "seq_data",
     data_key_j: str = "seq_data",
-
     device: str = "cuda:0",
 ) -> dict:
     if model_i.model_type != model_j.model_type:
@@ -70,7 +69,6 @@ def evaluate_latent_integration(
     latent_l1_distance = max_discrepancy_loss(
         torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device)
     ).item()
-
 
     metrics = {"knn_accs": knn_accs, "latent_l1_distance": latent_l1_distance}
     return metrics
@@ -253,9 +251,15 @@ def get_shared_latent_space_dict_for_multiple_domains(
     return latents_dict, label_dict
 
 
-def evaluate_latent_clf(domain_configs:List[DomainConfig], latent_clf:torch.nn.Module, dataset_type:str='test', device:str='cuda:0'):
-    model_i = domain_configs[0].domain_model_config.model
-    model_j = domain_configs[1].domain_model_config.model
+def evaluate_latent_clf(
+    domain_configs: List[DomainConfig],
+    latent_clf: torch.nn.Module,
+    dataset_type: str = "test",
+    device: str = "cuda:0",
+):
+    model_i = domain_configs[0].domain_model_config.model.to(device)
+    model_j = domain_configs[1].domain_model_config.model.to(device)
+    latent_clf.to(device)
 
     data_key_i = domain_configs[0].data_key
     label_key_i = domain_configs[0].label_key
@@ -263,9 +267,8 @@ def evaluate_latent_clf(domain_configs:List[DomainConfig], latent_clf:torch.nn.M
     data_key_j = domain_configs[1].data_key
     label_key_j = domain_configs[1].label_key
 
-
     data_loader_i = domain_configs[0].data_loader_dict[dataset_type]
-    data_loader_j = domain_configs[0].data_loader_dict[dataset_type]
+    data_loader_j = domain_configs[1].data_loader_dict[dataset_type]
 
     if model_i.model_type != model_j.model_type:
         raise RuntimeError("Models must be of the same type, i.e. AE/AE or VAE/VAE.")
@@ -284,11 +287,10 @@ def evaluate_latent_clf(domain_configs:List[DomainConfig], latent_clf:torch.nn.M
     )
 
     confusion_dict = {}
-    labels_i =[]
+    labels_i = []
     labels_j = []
     preds_i = []
     preds_j = []
-
 
     for idx, (samples_i, samples_j) in enumerate(
         zip(single_sample_loader_i, single_sample_loader_j)
@@ -297,17 +299,17 @@ def evaluate_latent_clf(domain_configs:List[DomainConfig], latent_clf:torch.nn.M
         label_i, label_j = samples_i[label_key_i], samples_j[label_key_j]
 
         input_i, input_j = input_i.to(device), input_j.to(device)
-        latent_i = model_i(input_i)[1].detach().cpu().numpy()
-        latent_j = model_j(input_j)[1].detach().cpu().numpy()
+        latent_i = model_i(input_i)[1]
+        latent_j = model_j(input_j)[1]
 
-        pred_i = latent_clf(latent_i)
-        pred_j = latent_clf(latent_j)
+        _, pred_i = torch.max(latent_clf(latent_i), dim=1)
+        _, pred_j = torch.max(latent_clf(latent_j), dim=1)
 
-        labels_i.append(label_i)
-        labels_j.append(label_j)
+        labels_i.append(label_i.cpu().detach().numpy())
+        labels_j.append(label_j.cpu().numpy())
 
-        preds_i.append(pred_i)
-        preds_j.append(pred_j)
+        preds_i.append(pred_i.cpu().detach().numpy())
+        preds_j.append(pred_j.cpu().detach().numpy())
 
     # Compute metrices
     labels_i = np.array(labels_i).squeeze()
@@ -317,7 +319,8 @@ def evaluate_latent_clf(domain_configs:List[DomainConfig], latent_clf:torch.nn.M
     preds_j = np.array(preds_j).squeeze()
 
     confusion_dict[domain_configs[0].name] = confusion_matrix(labels_i, preds_i)
-    confusion_dict[domain_configs[0].name] = confusion_matrix(labels_j, preds_j)
-    confusion_dict['overall'] = confusion_matrix(np.concatenate([labels_i, labels_j]),
-                                             np.concatenate([preds_i, preds_j]))
+    confusion_dict[domain_configs[1].name] = confusion_matrix(labels_j, preds_j)
+    confusion_dict["overall"] = confusion_matrix(
+        np.concatenate([labels_i, labels_j]), np.concatenate([preds_i, preds_j])
+    )
     return confusion_dict

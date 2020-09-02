@@ -11,14 +11,14 @@ class DomainModelConfig(object):
         recon_loss_function: Module,
         inputs: Tensor = None,
         labels: Tensor = None,
-        train: bool = True,
+        trainable: bool = True,
     ):
         self.model = model
         self.optimizer = optimizer
         self.recon_loss_function = recon_loss_function
         self.inputs = inputs
         self.labels = labels
-        self.train = train
+        self.trainable = trainable
 
     def reset_model(self):
         self.model.load_state_dict(self.initial_weights)
@@ -41,7 +41,7 @@ class DomainConfig(object):
             model=model,
             optimizer=optimizer,
             recon_loss_function=recon_loss_function,
-            train=train_model,
+            trainable=train_model,
         )
         self.data_loader_dict = data_loader_dict
         self.data_key = data_key
