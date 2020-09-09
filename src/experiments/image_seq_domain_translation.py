@@ -26,7 +26,7 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
         seq_data_config: dict,
         seq_model_config: dict,
         latent_dcm_config: dict = None,
-        latent_clf_config: dict = None,
+        latent_structure_model_config: dict = None,
         num_epochs: int = 500,
         early_stopping: int = 20,
         train_val_test_split: List[float] = [0.7, 0.2, 0.1],
@@ -39,7 +39,7 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
         super().__init__(
             output_dir=output_dir,
             latent_dcm_config=latent_dcm_config,
-            latent_clf_config=latent_clf_config,
+            latent_structure_model_config=latent_structure_model_config,
             num_epochs=num_epochs,
             early_stopping=early_stopping,
             train_val_test_split=train_val_test_split,
@@ -185,10 +185,10 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
         )
 
     def initialize_clf_model(self):
-        model_config = self.latent_clf_config["model_config"]
-        optimizer_config = self.latent_clf_config["optimizer_config"]
-        loss_config = self.latent_clf_config["loss_config"]
-        self.latent_clf_config = get_latent_model_configuration(
+        model_config = self.latent_structure_model_config["model_config"]
+        optimizer_config = self.latent_structure_model_config["optimizer_config"]
+        loss_config = self.latent_structure_model_config["loss_config"]
+        self.latent_structure_model_config = get_latent_model_configuration(
             model_dict=model_config,
             optimizer_dict=optimizer_config,
             loss_dict=loss_config,
@@ -213,22 +213,22 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
         gamma: float = 1.0,
         delta: float = 1.0,
         lamb: float = 0.00000001,
-        use_dcm: bool = True,
-        use_clf: bool = False,
+        use_latent_discriminator: bool = True,
+        use_latent_structure_model: bool = False,
         save_freq: int = 50,
     ):
         self.trained_models, self.loss_dict = train_val_test_loop_two_domains(
             output_dir=self.output_dir,
             domain_configs=self.domain_configs,
             latent_dcm_config=self.latent_dcm_config,
-            latent_clf_config=self.latent_clf_config,
+            latent_structure_model_config=self.latent_structure_model_config,
             alpha=alpha,
             beta=beta,
             gamma=gamma,
             delta=delta,
             lamb=lamb,
-            use_dcm=use_dcm,
-            use_clf=use_clf,
+            use_latent_discriminator=use_latent_discriminator,
+            use_latent_structure_model=use_latent_structure_model,
             num_epochs=self.num_epochs,
             save_freq=save_freq,
             early_stopping=self.early_stopping,
@@ -272,12 +272,12 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
         domain_model_1_weights_loc: str,
         domain_model_2_weights_loc: str,
         latent_dcm_weights_loc: str,
-        latent_clf_weights_loc: str = None,
+        latent_structure_model_weights_loc: str = None,
     ):
 
         super().load_pretrained_models(
             domain_model_1_weights_loc=domain_model_1_weights_loc,
             domain_model_2_weights_loc=domain_model_2_weights_loc,
             latent_dcm_weights_loc=latent_dcm_weights_loc,
-            latent_clf_weights_loc=latent_clf_weights_loc,
+            latent_structure_model_weights_loc=latent_structure_model_weights_loc,
         )

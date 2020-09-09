@@ -30,17 +30,17 @@ def train_autoencoders_two_domains(
     domain_model_configurations: List[DomainModelConfig],
     latent_dcm: Module,
     latent_dcm_loss: Module,
-    latent_clf: Module = None,
-    latent_clf_optimizer: Optimizer = None,
-    latent_clf_loss: Module = None,
+    latent_structure_model: Module = None,
+    latent_structure_model_optimizer: Optimizer = None,
+    latent_structure_model_loss: Module = None,
     alpha: float = 0.1,
     beta: float = 1.0,
     gamma: float = 1.0,
     delta: float = 1.0,
     lamb: float = 0.00000001,
     device: str = "cuda:0",
-    use_dcm: bool = True,
-    use_clf: bool = True,
+    use_latent_discriminator: bool = True,
+    use_latent_structure_model: bool = True,
     phase: str = "train",
     vae_mode: bool = True,
     partly_integrated_latent_space: bool = False,
@@ -90,14 +90,14 @@ def train_autoencoders_two_domains(
     latent_dcm.eval()
     latent_dcm.to(device)
 
-    if use_clf:
-        assert latent_clf is not None
-        if phase == "train" and latent_clf.trainable:
-            latent_clf.train()
+    if use_latent_structure_model:
+        assert latent_structure_model is not None
+        if phase == "train" and latent_structure_model.trainable:
+            latent_structure_model.train()
         else:
-            latent_clf.eval()
-        latent_clf.to(device)
-        latent_clf_optimizer.zero_grad()
+            latent_structure_model.eval()
+        latent_structure_model.to(device)
+        latent_structure_model_optimizer.zero_grad()
 
     # Forward pass of the AE/VAE
     inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
@@ -117,7 +117,7 @@ def train_autoencoders_two_domains(
             recons_i, latents_i = model_i(inputs_i)
             recons_j, latents_j = model_j(inputs_j)
 
-    if use_dcm:
+    if use_latent_discriminator:
         labels_i, labels_j = (
             Variable(labels_i).to(device),
             Variable(labels_j).to(device),
@@ -126,10 +126,10 @@ def train_autoencoders_two_domains(
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used group of the samples (see Adversarial AutoEncoder paper)
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 1)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 5)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 1)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 5)), dim=1
         )
 
     else:
@@ -148,11 +148,11 @@ def train_autoencoders_two_domains(
     #     torch.ones(dcm_output_j.size(0)).float().to(device).view(-1, 1) * 0.9
     # )
 
-    # Forward pass latent classifier if it is supposed to be trained and used to assess the integration of the learned
+    # Forward pass latent structure model if it is supposed to be trained and used to assess the integration of the learned
     # latent spaces
-    if use_clf:
-        clf_output_i = latent_clf(latents_i)
-        clf_output_j = latent_clf(latents_j)
+    if use_latent_structure_model:
+        latent_structure_model_output_i = latent_structure_model(latents_i)
+        latent_structure_model_output_j = latent_structure_model(latents_j)
 
     # Compute losses
 
@@ -175,13 +175,13 @@ def train_autoencoders_two_domains(
 
     total_loss += dcm_loss * beta
 
-    # Add loss of latent classifier if this is trained
-    if use_clf:
-        clf_loss = 0.5 * (
-            latent_clf_loss(clf_output_i, labels_i)
-            + latent_clf_loss(clf_output_j, labels_j)
+    # Add loss of latent structure model if this is trained
+    if use_latent_structure_model:
+        latent_sm_loss = 0.5 * (
+            latent_structure_model_loss(latent_structure_model_output_i, labels_i)
+            + latent_structure_model_loss(latent_structure_model_output_j, labels_j)
         )
-        total_loss += clf_loss * gamma
+        total_loss += latent_sm_loss * gamma
 
     # Add loss measuring the distance between a pair of samples in the latent space if this is desired
     # Be careful using this option as it is important that the samples in the batch are actually paired
@@ -204,8 +204,8 @@ def train_autoencoders_two_domains(
         if train_j:
             optimizer_j.step()
             model_j.updated = True
-        if use_clf:
-            latent_clf_optimizer.step()
+        if use_latent_structure_model:
+            latent_structure_model_optimizer.step()
 
     # Get summary statistics
     batch_size_i = inputs_i.size(0)
@@ -223,9 +223,9 @@ def train_autoencoders_two_domains(
         summary_stats["kl_loss"] = kl_loss.item()
         total_loss_item += kl_loss.item() * lamb
 
-    if use_clf:
-        summary_stats["clf_loss"] = clf_loss.item() * (batch_size_i + batch_size_j)
-        total_loss_item += summary_stats["clf_loss"] * gamma
+    if use_latent_structure_model:
+        summary_stats["latent_structure_model_loss"] = latent_sm_loss.item() * (batch_size_i + batch_size_j)
+        total_loss_item += summary_stats["latent_structure_model_loss"] * gamma
 
     if paired_training_mask is not None and paired_distance_samples > 0:
         summary_stats["latent_distance_loss"] = (
@@ -243,7 +243,7 @@ def train_latent_dcm_two_domains(
     latent_dcm: nn.Module,
     latent_dcm_optimizer: Optimizer,
     latent_dcm_loss: Module,
-    use_dcm: bool,
+    use_latent_discriminator: bool,
     device: str = "cuda:0",
     phase: str = "train",
 ) -> dict:
@@ -285,7 +285,7 @@ def train_latent_dcm_two_domains(
     latents_i = Variable(model_i(inputs_i)[1])
     latents_j = Variable(model_j(inputs_j)[1])
 
-    if use_dcm:
+    if use_latent_discriminator:
         labels_i, labels_j = (
             Variable(labels_i).to(device),
             Variable(labels_j).to(device),
@@ -294,10 +294,10 @@ def train_latent_dcm_two_domains(
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used data modality (see Adversarial AutoEncoder paper)
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 1)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 5)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 1)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 5)), dim=1
         )
 
     else:
@@ -349,17 +349,17 @@ def process_epoch_two_domains(
     latent_dcm: Module,
     latent_dcm_optimizer: Optimizer,
     latent_dcm_loss: Module,
-    latent_clf: Module = None,
-    latent_clf_optimizer: Optimizer = None,
-    latent_clf_loss: Module = None,
+    latent_structure_model: Module = None,
+    latent_structure_model_optimizer: Optimizer = None,
+    latent_structure_model_loss: Module = None,
     latent_distance_loss: Module = None,
     alpha: float = 0.1,
     beta: float = 1.0,
     gamma: float = 1.0,
     delta: float = 1.0,
     lamb: float = 0.00000001,
-    use_dcm: bool = True,
-    use_clf: bool = False,
+    use_latent_discriminator: bool = True,
+    use_latent_structure_model: bool = False,
     phase: str = "train",
     device: str = "cuda:0",
 ) -> dict:
@@ -382,7 +382,7 @@ def process_epoch_two_domains(
     recon_loss_i = 0
     recon_loss_j = 0
     dcm_loss = 0
-    clf_loss = 0
+    latent_sm_loss = 0
     ae_dcm_loss = 0
     kl_loss = 0
     distance_loss = 0
@@ -427,16 +427,16 @@ def process_epoch_two_domains(
             domain_model_configurations=domain_model_configs,
             latent_dcm=latent_dcm,
             latent_dcm_loss=latent_dcm_loss,
-            latent_clf=latent_clf,
-            latent_clf_loss=latent_clf_loss,
-            latent_clf_optimizer=latent_clf_optimizer,
+            latent_structure_model=latent_structure_model,
+            latent_structure_model_loss=latent_structure_model_loss,
+            latent_structure_model_optimizer=latent_structure_model_optimizer,
             alpha=alpha,
             beta=beta,
             gamma=gamma,
             delta=delta,
             lamb=lamb,
-            use_dcm=use_dcm,
-            use_clf=use_clf,
+            use_latent_discriminator=use_latent_discriminator,
+            use_latent_structure_model=use_latent_structure_model,
             phase=phase,
             device=device,
             vae_mode=vae_mode,
@@ -460,15 +460,15 @@ def process_epoch_two_domains(
         if vae_mode:
             kl_loss += ae_train_summary["kl_loss"]
 
-        if use_clf:
-            clf_loss += ae_train_summary["clf_loss"]
+        if use_latent_structure_model:
+            latent_sm_loss += ae_train_summary["latent_structure_model_loss"]
 
         dcm_train_summary = train_latent_dcm_two_domains(
             domain_model_configurations=domain_model_configs,
             latent_dcm=latent_dcm,
             latent_dcm_loss=latent_dcm_loss,
             latent_dcm_optimizer=latent_dcm_optimizer,
-            use_dcm=use_dcm,
+            use_latent_discriminator=use_latent_discriminator,
             phase=phase,
             device=device,
         )
@@ -507,9 +507,9 @@ def process_epoch_two_domains(
     if vae_mode:
         epoch_statistics["kl_loss"] = kl_loss
 
-    if use_clf:
-        clf_loss /= n_preds_i + n_preds_j
-        epoch_statistics["clf_loss"] = clf_loss
+    if use_latent_structure_model:
+        latent_sm_loss /= n_preds_i + n_preds_j
+        epoch_statistics["latent_structure_model_loss"] = latent_sm_loss
 
     if paired_training_mask is not None and paired_distance_samples > 0:
         epoch_statistics["latent_distance_loss"] = (
@@ -523,14 +523,14 @@ def train_val_test_loop_two_domains(
     output_dir: str,
     domain_configs: List[DomainConfig],
     latent_dcm_config: dict = None,
-    latent_clf_config: dict = None,
+    latent_structure_model_config: dict = None,
     alpha: float = 0.1,
     beta: float = 1.0,
     gamma: float = 1.0,
     delta: float = 1.0,
     lamb: float = 0.0000001,
-    use_dcm: bool = True,
-    use_clf: bool = False,
+    use_latent_discriminator: bool = True,
+    use_latent_structure_model: bool = False,
     num_epochs: int = 500,
     save_freq: int = 10,
     early_stopping: int = 20,
@@ -586,24 +586,24 @@ def train_val_test_loop_two_domains(
         latent_dcm_optimizer = None
         latent_dcm_loss = None
 
-    if latent_clf_config is not None:
-        latent_clf = latent_clf_config["model"]
-        logging.debug("Latent classifier")
-        logging.debug(latent_clf)
-        latent_clf_optimizer = latent_clf_config["optimizer"]
-        latent_clf_loss = latent_clf_config["loss"]
+    if latent_structure_model_config is not None:
+        latent_structure_model = latent_structure_model_config["model"]
+        logging.debug("Latent structure model")
+        logging.debug(latent_structure_model)
+        latent_structure_model_optimizer = latent_structure_model_config["optimizer"]
+        latent_structure_model_loss = latent_structure_model_config["loss"]
     else:
-        latent_clf = None
-        latent_clf_optimizer = None
-        latent_clf_loss = None
+        latent_structure_model = None
+        latent_structure_model_optimizer = None
+        latent_structure_model_loss = None
 
     if latent_dcm is not None:
         best_latent_dcm_weights = latent_dcm.state_dict()
         best_model_configs["dcm_weights"] = best_latent_dcm_weights
 
-    if latent_clf is not None:
-        best_latent_clf_weights = latent_clf.state_dict()
-        best_model_configs["clf_weights"] = best_latent_clf_weights
+    if latent_structure_model is not None:
+        best_latent_structure_model_weights = latent_structure_model.state_dict()
+        best_model_configs["latent_structure_model_weights"] = best_latent_structure_model_weights
 
     # Initialize current best loss
     best_total_loss = np.infty
@@ -631,16 +631,16 @@ def train_val_test_loop_two_domains(
                 latent_dcm=latent_dcm,
                 latent_dcm_optimizer=latent_dcm_optimizer,
                 latent_dcm_loss=latent_dcm_loss,
-                latent_clf=latent_clf,
-                latent_clf_optimizer=latent_clf_optimizer,
-                latent_clf_loss=latent_clf_loss,
+                latent_structure_model=latent_structure_model,
+                latent_structure_model_optimizer=latent_structure_model_optimizer,
+                latent_structure_model_loss=latent_structure_model_loss,
                 alpha=alpha,
                 beta=beta,
                 gamma=gamma,
                 delta=delta,
                 lamb=lamb,
-                use_dcm=use_dcm,
-                use_clf=use_clf,
+                use_latent_discriminator=use_latent_discriminator,
+                use_latent_structure_model=use_latent_structure_model,
                 phase=phase,
                 device=device,
                 latent_distance_loss=latent_distance_loss,
@@ -687,10 +687,10 @@ def train_val_test_loop_two_domains(
                     )
                 )
 
-            if "clf_loss" in epoch_statistics:
+            if "latent_structure_model_loss" in epoch_statistics:
                 logging.debug(
-                    "Latent classifier loss: {:.8f}".format(
-                        epoch_statistics["clf_loss"]
+                    "Latent structure model loss: {:.8f}".format(
+                        epoch_statistics["latent_structure_model_loss"]
                     )
                 )
 
@@ -763,14 +763,14 @@ def train_val_test_loop_two_domains(
                 #             best_latent_dcm_weights,
                 #             "{}/best_dcm.pth".format(output_dir),
                 #         )
-                #     if latent_clf is not None:
-                #         best_latent_clf_weights = copy.deepcopy(
-                #             latent_clf.cpu().state_dict()
+                #     if latent_structure_model is not None:
+                #         best_latent_structure_model_weights = copy.deepcopy(
+                #             latent_structure_model.cpu().state_dict()
                 #         )
-                #         best_model_configs["clf_weights"] = best_latent_clf_weights
+                #         best_model_configs["latent_structure_model_weights"] = best_latent_structure_model_weights
                 #         torch.save(
-                #             best_latent_clf_weights,
-                #             "{}/best_clf.pth".format(output_dir),
+                #             best_latent_structure_model_weights,
+                #             "{}/best_latent_structure_model.pth".format(output_dir),
                 #         )
                 # else:
                 #     es_counter += 1
@@ -829,6 +829,23 @@ def train_val_test_loop_two_domains(
                         device=device,
                     )
 
+                    visualize_shared_latent_space(
+                        domain_configs=domain_configs,
+                        save_path=checkpoint_dir + "/shared_latent_space_pca_val.png",
+                        dataset_type="val",
+                        random_state=42,
+                        reduction="pca",
+                        device=device,
+                    )
+                    visualize_shared_latent_space(
+                        domain_configs=domain_configs,
+                        save_path=checkpoint_dir + "/shared_latent_space_pca_train.png",
+                        dataset_type="train",
+                        random_state=42,
+                        reduction="pca",
+                        device=device,
+                    )
+
                     visualize_correlation_structure_latent_space(
                         domain_configs=domain_configs,
                         save_path=checkpoint_dir
@@ -865,10 +882,10 @@ def train_val_test_loop_two_domains(
                         torch.save(
                             latent_dcm_weights, "{}/dcm.pth".format(checkpoint_dir)
                         )
-                    if latent_clf is not None:
-                        latent_clf_weights = latent_clf.cpu().state_dict()
+                    if latent_structure_model is not None:
+                        latent_structure_model_weights = latent_structure_model.cpu().state_dict()
                         torch.save(
-                            latent_clf_weights, "{}/clf.pth".format(checkpoint_dir)
+                            latent_structure_model_weights, "{}/latent_structure_model.pth".format(checkpoint_dir)
                         )
 
     # Training complete
@@ -895,8 +912,8 @@ def train_val_test_loop_two_domains(
     #
     # if latent_dcm is not None:
     #     latent_dcm.load_state_dict(best_latent_dcm_weights)
-    # if latent_clf is not None:
-    #     latent_clf.load_state_dict(best_latent_clf_weights)
+    # if latent_structure_model is not None:
+    #     latent_structure_model.load_state_dict(best_latent_structure_model_weights)
 
     if "test" in domain_configs[0].data_loader_dict:
         epoch_statistics = process_epoch_two_domains(
@@ -904,15 +921,15 @@ def train_val_test_loop_two_domains(
             latent_dcm=latent_dcm,
             latent_dcm_optimizer=latent_dcm_optimizer,
             latent_dcm_loss=latent_dcm_loss,
-            latent_clf=latent_clf,
-            latent_clf_optimizer=latent_clf_optimizer,
-            latent_clf_loss=latent_clf_loss,
+            latent_structure_model=latent_structure_model,
+            latent_structure_model_optimizer=latent_structure_model_optimizer,
+            latent_structure_model_loss=latent_structure_model_loss,
             alpha=alpha,
             beta=beta,
             gamma=gamma,
             lamb=lamb,
-            use_dcm=use_dcm,
-            use_clf=use_clf,
+            use_latent_discriminator=use_latent_discriminator,
+            use_latent_structure_model=use_latent_structure_model,
             phase="test",
             device=device,
             latent_distance_loss=latent_distance_loss,
@@ -957,9 +974,9 @@ def train_val_test_loop_two_domains(
                     epoch_statistics["kl_loss"]
                 )
             )
-        if "clf_loss" in epoch_statistics:
+        if "latent_structure_model_loss" in epoch_statistics:
             logging.debug(
-                "Latent classifier loss: {:.8f}".format(epoch_statistics["clf_loss"])
+                "Latent structure model loss: {:.8f}".format(epoch_statistics["latent_structure_model_loss"])
             )
 
         if "latent_distance_loss" in epoch_statistics:
@@ -1010,22 +1027,22 @@ def train_val_test_loop_two_domains(
         trained_models["dcm"] = latent_dcm
         torch.save(latent_dcm.state_dict(), "{}/final_dcm.pth".format(output_dir))
 
-    if latent_clf is not None:
-        trained_models["clf"] = latent_clf
-        torch.save(latent_clf.state_dict(), "{}/final_clf.pth".format(output_dir))
+    if latent_structure_model is not None:
+        trained_models["latent_structure_model"] = latent_structure_model
+        torch.save(latent_structure_model.state_dict(), "{}/final_latent_structure_model.pth".format(output_dir))
 
     return trained_models, total_loss_dict
 
 
 def train_autoencoder(
     domain_model_config: DomainModelConfig,
-    latent_clf: Module,
-    latent_clf_optimizer: Optimizer,
-    latent_clf_loss: Module,
+    latent_structure_model: Module,
+    latent_structure_model_optimizer: Optimizer,
+    latent_structure_model_loss: Module,
     gamma: float = 0.001,
     lamb: float = 1e-8,
     phase: str = "train",
-    use_clf: bool = True,
+    use_latent_structure_model: bool = True,
     device: str = "cuda:0",
     vae_mode: bool = True,
 ) -> dict:
@@ -1046,14 +1063,14 @@ def train_autoencoder(
     else:
         model.eval()
 
-    if use_clf:
-        assert latent_clf is not None
+    if use_latent_structure_model:
+        assert latent_structure_model is not None
         if phase == "train":
-            latent_clf.train()
+            latent_structure_model.train()
         else:
-            latent_clf.eval()
-        latent_clf.to(device)
-        latent_clf_optimizer.zero_grad()
+            latent_structure_model.eval()
+        latent_structure_model.to(device)
+        latent_structure_model_optimizer.zero_grad()
 
     # Forward pass of the VAE
     inputs = Variable(inputs).to(device)
@@ -1063,10 +1080,10 @@ def train_autoencoder(
     else:
         recons, latents = model(inputs)
 
-    # Forward pass latent classifier if it is supposed to be trained and used to assess the integration of the learned
+    # Forward pass latent structure model if it is supposed to be trained and used to assess the integration of the learned
     # latent spaces
-    if use_clf:
-        clf_output = latent_clf(latents)
+    if use_latent_structure_model:
+        latent_structure_model_output = latent_structure_model(latents)
 
     # Compute losses
 
@@ -1078,10 +1095,10 @@ def train_autoencoder(
         kl_loss *= lamb
         total_loss += kl_loss
 
-    # Add loss of latent classifier if this is trained
-    if use_clf:
-        clf_loss = latent_clf_loss(clf_output, labels.view(-1).long())
-        total_loss += clf_loss * gamma
+    # Add loss of latent structure model if this is trained
+    if use_latent_structure_model:
+        latent_structure_model_loss = latent_structure_model_loss(latent_structure_model_output, labels.view(-1).long())
+        total_loss += latent_structure_model_loss * gamma
 
     # Backpropagate loss and update parameters if we are in the training phase
     if phase == "train":
@@ -1089,8 +1106,8 @@ def train_autoencoder(
         if train:
             optimizer.step()
             model.updated = True
-        if use_clf:
-            latent_clf_optimizer.step()
+        if use_latent_structure_model:
+            latent_structure_model_optimizer.step()
 
     # Get summary statistics
     batch_size = inputs.size(0)
@@ -1102,10 +1119,10 @@ def train_autoencoder(
         batch_statistics["kl_loss"] = kl_loss.item()
         total_loss_item += kl_loss.item()
 
-    if use_clf:
-        batch_statistics["clf_loss"] = clf_loss.item() * batch_size
-        batch_statistics["accuracy"] = accuracy(clf_output, labels)
-        total_loss_item += clf_loss.item() * batch_size
+    if use_latent_structure_model:
+        batch_statistics["latent_structure_model_loss"] = latent_structure_model_loss.item() * batch_size
+        batch_statistics["accuracy"] = accuracy(latent_structure_model_output, labels)
+        total_loss_item += latent_structure_model_loss.item() * batch_size
 
     batch_statistics["total_loss"] = total_loss_item
 
@@ -1114,12 +1131,12 @@ def train_autoencoder(
 
 def process_epoch_single_domain(
     domain_config: DomainConfig,
-    latent_clf: Module = None,
-    latent_clf_optimizer: Optimizer = None,
-    latent_clf_loss: Module = None,
+    latent_structure_model: Module = None,
+    latent_structure_model_optimizer: Optimizer = None,
+    latent_structure_model_loss: Module = None,
     gamma: float = 0.001,
     lamb: float = 1e-8,
-    use_clf: bool = True,
+    use_latent_structure_model: bool = True,
     phase: str = "train",
     device: str = "cuda:0",
 ) -> dict:
@@ -1132,7 +1149,7 @@ def process_epoch_single_domain(
 
     # Initialize epoch statistics
     recon_loss = 0
-    clf_loss = 0
+    latent_structure_model_loss = 0
     kl_loss = 0
     total_loss = 0
 
@@ -1149,20 +1166,20 @@ def process_epoch_single_domain(
 
         batch_statistics = train_autoencoder(
             domain_model_config=domain_model_config,
-            latent_clf=latent_clf,
-            latent_clf_optimizer=latent_clf_optimizer,
-            latent_clf_loss=latent_clf_loss,
-            beta=gamma,
+            latent_structure_model=latent_structure_model,
+            latent_structure_model_optimizer=latent_structure_model_optimizer,
+            latent_structure_model_loss=latent_structure_model_loss,
+            gamma=gamma,
             lamb=lamb,
             phase=phase,
             device=device,
-            use_clf=use_clf,
+            use_latent_structure_model=use_latent_structure_model,
             vae_mode=vae_mode,
         )
 
         recon_loss += batch_statistics["recon_loss"]
-        if use_clf:
-            clf_loss += batch_statistics["clf_loss"]
+        if use_latent_structure_model:
+            latent_structure_model_loss += batch_statistics["latent_structure_model_loss"]
             correct_preds += batch_statistics["accuracy"][0]
             n_preds += batch_statistics["accuracy"][1]
         if vae_mode:
@@ -1173,7 +1190,7 @@ def process_epoch_single_domain(
     recon_loss /= len(data_loader.dataset)
     kl_loss /= len(data_loader.dataset)
     total_loss /= len(data_loader.dataset)
-    if use_clf:
+    if use_latent_structure_model:
         accuracy = correct_preds / len(data_loader.dataset)
     else:
         accuracy = 0
@@ -1186,9 +1203,9 @@ def process_epoch_single_domain(
     if vae_mode:
         epoch_statistics["kl_loss"] = kl_loss
 
-    if use_clf:
-        clf_loss /= n_preds
-        epoch_statistics["clf_loss"] = clf_loss
+    if use_latent_structure_model:
+        latent_structure_model_loss /= n_preds
+        epoch_statistics["latent_structure_model_loss"] = latent_structure_model_loss
 
     return epoch_statistics
 
@@ -1196,10 +1213,10 @@ def process_epoch_single_domain(
 def train_val_test_loop_vae(
     output_dir: str,
     domain_config: DomainConfig,
-    latent_clf_config: dict = None,
+    latent_structure_model_config: dict = None,
     gamma: float = 0.001,
     lamb: float = 0.0000001,
-    use_clf: bool = False,
+    use_latent_structure_model: bool = False,
     num_epochs: int = 500,
     save_freq: int = 10,
     early_stopping: int = 20,
@@ -1225,24 +1242,24 @@ def train_val_test_loop_vae(
     # Reserve space for best model weights
     best_model_weights = domain_config.domain_model_config.model.cpu().state_dict()
 
-    if use_clf:
-        latent_clf = latent_clf_config["model"]
-        latent_clf_optimizer = latent_clf_config["optimizer"]
-        latent_clf_loss = latent_clf_config["loss"]
+    if use_latent_structure_model:
+        latent_structure_model = latent_structure_model_config["model"]
+        latent_structure_model_optimizer = latent_structure_model_config["optimizer"]
+        latent_structure_model_loss = latent_structure_model_config["loss"]
     else:
-        latent_clf = None
-        latent_clf_optimizer = None
-        latent_clf_loss = None
+        latent_structure_model = None
+        latent_structure_model_optimizer = None
+        latent_structure_model_loss = None
 
-    # Reserve space for best latent clf weights
-    if latent_clf is not None:
-        best_clf_weights = latent_clf.cpu().state_dict()
+    # Reserve space for best latent latent_structure_model weights
+    if latent_structure_model is not None:
+        best_latent_structure_model_weights = latent_structure_model.cpu().state_dict()
     else:
-        best_clf_weights = None
+        best_latent_structure_model_weights = None
 
     best_model_configs = {
         "best_model": best_model_weights,
-        "best_clf_weights": best_clf_weights,
+        "best_latent_structure_model_weights": best_latent_structure_model_weights,
     }
 
     best_total_loss = np.infty
@@ -1266,12 +1283,12 @@ def train_val_test_loop_vae(
         for phase in ["train", "val"]:
             epoch_statistics = process_epoch_single_domain(
                 domain_config=domain_config,
-                latent_clf=latent_clf,
-                latent_clf_optimizer=latent_clf_optimizer,
-                latent_clf_loss=latent_clf_loss,
+                latent_structure_model=latent_structure_model,
+                latent_structure_model_optimizer=latent_structure_model_optimizer,
+                latent_structure_model_loss=latent_structure_model_loss,
                 gamma=gamma,
                 lamb=lamb,
-                use_clf=use_clf,
+                use_latent_structure_model=use_latent_structure_model,
                 phase=phase,
                 device=device,
             )
@@ -1292,15 +1309,15 @@ def train_val_test_loop_vae(
                     )
                 )
 
-            if use_clf:
+            if use_latent_structure_model:
                 logging.debug(
-                    "Latent classifier loss for {} domain: {:.8f}".format(
-                        domain_config.name, epoch_statistics["clf_loss"]
+                    "Latent structure model loss for {} domain: {:.8f}".format(
+                        domain_config.name, epoch_statistics["latent_structure_model_loss"]
                     )
                 )
 
                 logging.debug(
-                    "Latent classifier accuracy for {} domain: {:.8f}".format(
+                    "Latent structure model accuracy for {} domain: {:.8f}".format(
                         domain_config.name, epoch_statistics["accuracy"]
                     )
                 )
@@ -1330,14 +1347,14 @@ def train_val_test_loop_vae(
                         best_model_weights, "{}/best_model.pth".format(output_dir),
                     )
 
-                    if latent_clf is not None:
-                        best_latent_clf_weights = copy.deepcopy(
-                            latent_clf.cpu().state_dict()
+                    if latent_structure_model is not None:
+                        best_latent_structure_model_weights = copy.deepcopy(
+                            latent_structure_model.cpu().state_dict()
                         )
-                        best_model_configs["clf_weights"] = best_latent_clf_weights
+                        best_model_configs["latent_structure_model_weights"] = best_latent_structure_model_weights
                         torch.save(
-                            best_latent_clf_weights,
-                            "{}/best_clf.pth".format(output_dir),
+                            best_latent_structure_model_weights,
+                            "{}/best_latent_structure_model.pth".format(output_dir),
                         )
                 else:
                     es_counter += 1
@@ -1359,10 +1376,10 @@ def train_val_test_loop_vae(
                         domain_config.domain_model_config.model.state_dict(),
                         "{}/model.pth".format(checkpoint_dir),
                     )
-                    if use_clf:
+                    if use_latent_structure_model:
                         torch.save(
-                            latent_clf.state_dict(),
-                            "{}/latent_clf.pth".format(checkpoint_dir),
+                            latent_structure_model.state_dict(),
+                            "{}/latent_structure_model.pth".format(checkpoint_dir),
                         )
 
     # Training complete
@@ -1377,18 +1394,18 @@ def train_val_test_loop_vae(
 
     # Load best model
     domain_config.domain_model_config.model.load_state_dict(best_model_weights)
-    if latent_clf is not None:
-        latent_clf.load_state_dict(best_clf_weights)
+    if latent_structure_model is not None:
+        latent_structure_model.load_state_dict(best_latent_structure_model_weights)
 
     if "test" in domain_config.data_loader_dict:
         epoch_statistics = process_epoch_single_domain(
             domain_config=domain_config,
-            latent_clf=latent_clf,
-            latent_clf_optimizer=latent_clf_optimizer,
-            latent_clf_loss=latent_clf_loss,
+            latent_structure_model=latent_structure_model,
+            latent_structure_model_optimizer=latent_structure_model_optimizer,
+            latent_structure_model_loss=latent_structure_model_loss,
             gamma=gamma,
             lamb=lamb,
-            use_clf=use_clf,
+            use_latent_structure_model=use_latent_structure_model,
             phase="test",
             device=device,
         )
@@ -1408,10 +1425,10 @@ def train_val_test_loop_vae(
                 )
             )
 
-        if use_clf:
+        if use_latent_structure_model:
             logging.debug(
-                "Latent classifier loss for {} domain: {:.8f}".format(
-                    domain_config.name, epoch_statistics["clf_loss"]
+                "Latent structure model loss for {} domain: {:.8f}".format(
+                    domain_config.name, epoch_statistics["latent_structure_model_loss"]
                 )
             )
         logging.debug("***" * 20)
@@ -1424,7 +1441,7 @@ def train_val_test_loop_vae(
 
     # Summarize return parameters
     fitted_models = {"model": domain_config.domain_model_config.model}
-    if latent_clf is not None:
-        fitted_models["latent_clf"] = latent_clf
+    if latent_structure_model is not None:
+        fitted_models["latent_structure_model"] = latent_structure_model
 
     return fitted_models, total_loss_dict

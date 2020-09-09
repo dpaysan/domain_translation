@@ -1,11 +1,19 @@
 import torch
 from torch.nn import (
     Module,
-    CrossEntropyLoss,
+    #CrossEntropyLoss,
     L1Loss,
     MSELoss,
     BCELoss,
     BCEWithLogitsLoss,
+)
+
+from src.helper.custom_losses import (
+    RobustMSELoss,
+    RobustL1Loss,
+    RobustBCELoss,
+    RobustCrossEntropyLoss,
+    RobustBCEWithLogitsLoss,
 )
 from torch.optim.adam import Adam
 from torch.optim.optimizer import Optimizer
@@ -109,18 +117,23 @@ def get_latent_model_configuration(
 
     optimizer = get_optimizer_for_model(optimizer_dict=optimizer_dict, model=model)
 
-    try:
-        weights = torch.FloatTensor(loss_dict.pop("weights")).to(device)
-    except KeyError:
-        weights = torch.ones(model_dict["n_classes"]).float().to(device)
+    if model_type != 'LatentRegressor':
+        try:
+            weights = torch.FloatTensor(loss_dict.pop("weights")).to(device)
+        except KeyError:
+            weights = torch.ones(model_dict["n_classes"]).float().to(device)
 
     loss_type = loss_dict.pop("type")
     if loss_type == "ce":
-        latent_loss = CrossEntropyLoss(weight=weights)
+        latent_loss = RobustCrossEntropyLoss(weight=weights)
     elif loss_type == "bce":
-        latent_loss = BCELoss()
+        latent_loss = RobustBCELoss(weight=weights)
     elif loss_type == "bce_ll":
-        latent_loss = BCEWithLogitsLoss()
+        latent_loss = RobustBCEWithLogitsLoss(weight=weights)
+    elif loss_type == "mse":
+        latent_loss = RobustMSELoss()
+    elif loss_type == "mae":
+        latent_loss = RobustL1Loss()
     else:
         raise NotImplementedError('Unknown loss type "{}"'.format(loss_type))
 

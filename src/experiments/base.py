@@ -18,7 +18,7 @@ class BaseExperiment:
     def __init__(
         self,
         output_dir: str,
-        latent_clf_config: dict = None,
+        latent_structure_model_config: dict = None,
         train_val_test_split: List = [0.7, 0.2, 0.1],
         batch_size: int = 64,
         num_epochs: int = 500,
@@ -35,7 +35,7 @@ class BaseExperiment:
         self.train_val_test_split = train_val_test_split
 
         # Other attributes
-        self.latent_clf_config = latent_clf_config
+        self.latent_structure_model_config = latent_structure_model_config
         self.random_state = random_state
         self.loss_dict = None
         self.device = get_device()
@@ -61,7 +61,7 @@ class BaseTwoDomainExperiment(BaseExperiment):
     def __init__(
         self,
         output_dir: str,
-        latent_clf_config: dict = None,
+        latent_structure_model_config: dict = None,
         latent_dcm_config: dict = None,
         train_val_test_split: List = [0.7, 0.2, 0.1],
         batch_size: int = 64,
@@ -74,7 +74,7 @@ class BaseTwoDomainExperiment(BaseExperiment):
     ):
         super().__init__(
             output_dir=output_dir,
-            latent_clf_config=latent_clf_config,
+            latent_structure_model_config=latent_structure_model_config,
             train_val_test_split=train_val_test_split,
             batch_size=batch_size,
             num_epochs=num_epochs,
@@ -155,7 +155,7 @@ class BaseTwoDomainExperiment(BaseExperiment):
         domain_model_1_weights_loc,
         domain_model_2_weights_loc,
         latent_dcm_weights_loc,
-        latent_clf_weights_loc,
+        latent_structure_model_weights_loc,
     ):
         self.domain_configs[0].domain_model_config.model.load_state_dict(
             torch.load(domain_model_1_weights_loc)
@@ -167,8 +167,8 @@ class BaseTwoDomainExperiment(BaseExperiment):
 
         self.latent_dcm_config["model"].load_state_dict(latent_dcm_weights_loc)
 
-        if latent_clf_weights_loc is not None:
-            self.latent_clf_config["model"].load_state_dict(latent_clf_weights_loc)
+        if latent_structure_model_weights_loc is not None:
+            self.latent_structure_model_config["model"].load_state_dict(latent_structure_model_weights_loc)
 
 
 class BaseExperimentCV:
@@ -176,7 +176,7 @@ class BaseExperimentCV:
         self,
         output_dir: str,
         n_folds: int = 4,
-        latent_clf_config: dict = None,
+        latent_structure_model_config: dict = None,
         train_val_split: List = [0.8, 0.2],
         batch_size: int = 32,
         num_epochs: int = 500,
@@ -185,7 +185,7 @@ class BaseExperimentCV:
     ):
         self.domain_configs = None
         self.output_dir = output_dir
-        self.latent_clf_config = latent_clf_config
+        self.latent_structure_model_config = latent_structure_model_config
         self.n_folds = n_folds
         self.train_val_split = train_val_split
         self.batch_size = batch_size
@@ -222,7 +222,7 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
         self,
         output_dir,
         n_folds: int = 4,
-        latent_clf_config: dict = None,
+        latent_structure_model_config: dict = None,
         latent_dcm_config: dict = None,
         train_val_split: List = [0.8, 0.2],
         batch_size: int = 32,
@@ -236,7 +236,7 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
         super().__init__(
             output_dir=output_dir,
             n_folds=n_folds,
-            latent_clf_config=latent_clf_config,
+            latent_structure_model_config=latent_structure_model_config,
             train_val_split=train_val_split,
             batch_size=batch_size,
             num_epochs=num_epochs,
@@ -313,7 +313,7 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
         domain_model_1_weights_loc,
         domain_model_2_weights_loc,
         latent_dcm_weights_loc,
-        latent_clf_weights_loc,
+        latent_structure_model_weights_loc,
     ):
         self.domain_configs[0].domain_model_config.model.load_state_dict(
             torch.load(domain_model_1_weights_loc)
@@ -327,7 +327,7 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
             torch.load(latent_dcm_weights_loc)
         )
 
-        if latent_clf_weights_loc is not None:
-            self.latent_clf_config["model"].load_state_dict(
-                torch.load(latent_clf_weights_loc)
+        if latent_structure_model_weights_loc is not None:
+            self.latent_structure_model_config["model"].load_state_dict(
+                torch.load(latent_structure_model_weights_loc)
             )

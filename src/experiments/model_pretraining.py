@@ -23,7 +23,7 @@ class PretrainAeExperiment(BaseExperiment):
         data_config: dict,
         model_config: dict,
         domain_name: str,
-        latent_clf_config: dict = None,
+        latent_structure_model_config: dict = None,
         train_val_test_split: List[float] = [0.7, 0.2, 0.1],
         batch_size: int = 64,
         num_epochs: int = 64,
@@ -42,7 +42,7 @@ class PretrainAeExperiment(BaseExperiment):
         self.data_config = data_config
         self.model_config = model_config
         self.domain_name = domain_name
-        self.latent_clf_config = latent_clf_config
+        self.latent_structure_model_config = latent_structure_model_config
 
         self.data_set = None
         self.data_transform_pipeline_dict = None
@@ -102,10 +102,10 @@ class PretrainAeExperiment(BaseExperiment):
         )
 
     def initialize_clf_model(self):
-        model_config = self.latent_clf_config["model_config"]
-        optimizer_config = self.latent_clf_config["optimizer_config"]
-        loss_config = self.latent_clf_config["loss_config"]
-        self.latent_clf_config = get_latent_model_configuration(
+        model_config = self.latent_structure_model_config["model_config"]
+        optimizer_config = self.latent_structure_model_config["optimizer_config"]
+        loss_config = self.latent_structure_model_config["loss_config"]
+        self.latent_structure_model_config = get_latent_model_configuration(
             model_dict=model_config,
             optimizer_dict=optimizer_config,
             loss_dict=loss_config,
@@ -116,19 +116,19 @@ class PretrainAeExperiment(BaseExperiment):
         self,
         beta: float = 1.0,
         lamb: float = 0.00000001,
-        use_clf: bool = False,
+        use_latent_structure_model: bool = False,
         save_freq: int = 50,
     ):
         self.trained_models, self.loss_dict = train_val_test_loop_vae(
             output_dir=self.output_dir,
             domain_config=self.domain_config,
-            latent_clf_config=self.latent_clf_config,
+            latent_structure_model_config=self.latent_structure_model_config,
             num_epochs=self.num_epochs,
             early_stopping=self.early_stopping,
             device=self.device,
             gamma=beta,
             lamb=lamb,
-            use_clf=use_clf,
+            use_latent_structure_model=use_latent_structure_model,
             save_freq=save_freq,
         )
 

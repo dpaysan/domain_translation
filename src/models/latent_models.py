@@ -22,7 +22,7 @@ class LatentDiscriminator(nn.Module, ABC):
         self.trainable = trainable
 
         model_modules = [
-            nn.Sequential(nn.Linear(self.latent_dim + 1, hidden_dims[0]), nn.PReLU())
+            nn.Sequential(nn.Linear(self.latent_dim + 5, hidden_dims[0]), nn.PReLU())
         ]
         for i in range(0, len(self.hidden_dims) - 1):
             model_modules.append(
@@ -51,7 +51,7 @@ class LatentClassifier(nn.Module, ABC):
         self.latent_dim = latent_dim
         self.n_classes = n_classes
         self.output_activation = output_activation
-        self.trainable=trainable
+        self.trainable = trainable
 
         if hidden_dims is not None and len(hidden_dims) > 0:
             self.hidden_dims = hidden_dims
@@ -106,7 +106,7 @@ class LatentRegressor(nn.Module, ABC):
             model_components.append(nn.Linear(self.hidden_dims[-1], self.n_classes))
             self.model = nn.Sequential(*model_components)
         else:
-            self.model = nn.Linear(self.latent_dim, self.n_classes)
+            self.model = nn.Linear(self.latent_dim, 1)
 
         if self.output_activation is not None:
             output_activation_module = get_activation_module(self.output_activation)

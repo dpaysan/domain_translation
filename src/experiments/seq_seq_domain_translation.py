@@ -5,11 +5,9 @@ from typing import List
 
 import torch
 import numpy as np
-from torch.utils.data import DataLoader
 
 from src.experiments.base import BaseTwoDomainExperiment, BaseTwoDomainExperimentCV
 from src.helper.data import DataHandler, DataHandlerCV
-from src.helper.models import DomainConfig
 from src.utils.basic.io import get_model_file_list_for_two_domain_experiment
 from src.utils.torch.data import init_seq_dataset
 from src.utils.torch.evaluation import evaluate_latent_clf
@@ -18,8 +16,6 @@ from src.utils.torch.model import (
     get_domain_configuration,
     get_latent_model_configuration,
 )
-
-from sklearn.metrics import confusion_matrix
 
 
 class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
@@ -31,7 +27,7 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
         seq_data_config_2: dict,
         seq_model_config_2: dict,
         latent_dcm_config: dict = None,
-        latent_clf_config: dict = None,
+        latent_structure_model_config: dict = None,
         num_epochs: int = 500,
         early_stopping: int = 20,
         train_val_test_split: List[float] = [0.7, 0.2, 0.1],
@@ -43,7 +39,7 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
     ):
         super().__init__(
             output_dir=output_dir,
-            latent_clf_config=latent_clf_config,
+            latent_structure_model_config=latent_structure_model_config,
             latent_dcm_config=latent_dcm_config,
             num_epochs=num_epochs,
             early_stopping=early_stopping,
@@ -192,10 +188,10 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
         )
 
     def initialize_clf_model(self):
-        model_config = self.latent_clf_config["model_config"]
-        optimizer_config = self.latent_clf_config["optimizer_config"]
-        loss_config = self.latent_clf_config["loss_config"]
-        self.latent_clf_config = get_latent_model_configuration(
+        model_config = self.latent_structure_model_config["model_config"]
+        optimizer_config = self.latent_structure_model_config["optimizer_config"]
+        loss_config = self.latent_structure_model_config["loss_config"]
+        self.latent_structure_model_config = get_latent_model_configuration(
             model_dict=model_config,
             optimizer_dict=optimizer_config,
             loss_dict=loss_config,
@@ -220,22 +216,22 @@ class SeqSeqTranslationExperiment(BaseTwoDomainExperiment):
         gamma: float = 1.0,
         delta: float = 1.0,
         lamb: float = 0.00000001,
-        use_dcm: bool = True,
-        use_clf: bool = False,
+        use_latent_discriminator: bool = True,
+        use_latent_structure_model: bool = False,
         save_freq: int = 50,
     ):
         self.trained_models, self.loss_dict = train_val_test_loop_two_domains(
             output_dir=self.output_dir,
             domain_configs=self.domain_configs,
             latent_dcm_config=self.latent_dcm_config,
-            latent_clf_config=self.latent_clf_config,
+            latent_structure_model_config=self.latent_structure_model_config,
             alpha=alpha,
             beta=beta,
             gamma=gamma,
             delta=delta,
             lamb=lamb,
-            use_dcm=use_dcm,
-            use_clf=use_clf,
+            use_latent_discriminator=use_latent_discriminator,
+            use_latent_structure_model=use_latent_structure_model,
             num_epochs=self.num_epochs,
             save_freq=save_freq,
             early_stopping=self.early_stopping,
@@ -285,7 +281,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         seq_data_config_2: dict,
         seq_model_config_2: dict,
         latent_dcm_config: dict = None,
-        latent_clf_config: dict = None,
+        latent_structure_model_config: dict = None,
         n_folds: int = 4,
         num_epochs: int = 500,
         early_stopping: int = 20,
@@ -298,7 +294,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
     ):
         super().__init__(
             output_dir=output_dir,
-            latent_clf_config=latent_clf_config,
+            latent_structure_model_config=latent_structure_model_config,
             latent_dcm_config=latent_dcm_config,
             n_folds=n_folds,
             num_epochs=num_epochs,
@@ -465,17 +461,17 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         )
 
     def initialize_clf_model(self):
-        model_config = self.latent_clf_config["model_config"]
-        optimizer_config = self.latent_clf_config["optimizer_config"]
-        loss_config = self.latent_clf_config["loss_config"]
-        self.latent_clf_config = get_latent_model_configuration(
+        model_config = self.latent_structure_model_config["model_config"]
+        optimizer_config = self.latent_structure_model_config["optimizer_config"]
+        loss_config = self.latent_structure_model_config["loss_config"]
+        self.latent_structure_model_config = get_latent_model_configuration(
             model_dict=model_config,
             optimizer_dict=optimizer_config,
             loss_dict=loss_config,
             device=self.device,
         )
         self.initial_clf_weights = copy.deepcopy(
-            self.latent_clf_config["model"].state_dict()
+            self.latent_structure_model_config["model"].state_dict()
         )
 
     def load_model_for_domain_config(self, weights_fname: str, id: int = 0):
@@ -496,8 +492,8 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         gamma: float = 1.0,
         delta: float = 1.0,
         lamb: float = 0.00000001,
-        use_dcm: bool = True,
-        use_clf: bool = True,
+        use_latent_discriminator: bool = True,
+        use_latent_structure_model: bool = True,
         save_freq: int = 100,
         visualize_results: bool = True,
         visualization_latents_reduction: str = "umap",
@@ -525,8 +521,8 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             )
 
             self.latent_dcm_config["model"].load_state_dict(self.initial_dcm_weights)
-            if use_clf:
-                self.latent_clf_config["model"].load_state_dict(
+            if use_latent_structure_model:
+                self.latent_structure_model_config["model"].load_state_dict(
                     self.initial_clf_weights
                 )
 
@@ -556,14 +552,14 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                 output_dir=output_dir,
                 domain_configs=self.domain_configs,
                 latent_dcm_config=self.latent_dcm_config,
-                latent_clf_config=self.latent_clf_config,
+                latent_structure_model_config=self.latent_structure_model_config,
                 alpha=alpha,
                 beta=beta,
                 gamma=gamma,
                 delta=delta,
                 lamb=lamb,
-                use_dcm=use_dcm,
-                use_clf=use_clf,
+                use_latent_discriminator=use_latent_discriminator,
+                use_latent_structure_model=use_latent_structure_model,
                 num_epochs=self.num_epochs,
                 save_freq=save_freq,
                 early_stopping=self.early_stopping,
@@ -573,10 +569,10 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             )
             self.loss_dicts.append(loss_dict)
 
-            if use_clf:
+            if use_latent_structure_model:
                 confusion_dict = evaluate_latent_clf(
                     domain_configs=self.domain_configs,
-                    latent_clf=self.latent_clf_config["model"],
+                    latent_clf=self.latent_structure_model_config["model"],
                     device=self.device,
                     dataset_type="test",
                 )
@@ -668,8 +664,8 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         gamma: float = 1.0,
         delta: float = 1.0,
         lamb: float = 1.0,
-        use_dcm: bool = True,
-        use_clf: bool = False,
+        use_latent_discriminator: bool = True,
+        use_latent_structure_model: bool = False,
         save_freq: int = 50,
     ):
         domain_names = [self.domain_configs[0].name, self.domain_configs[1].name]
@@ -677,7 +673,7 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             experiment_dir=experiment_dir,
             domain_names=domain_names,
             n_folds=self.n_folds,
-            use_clf=use_clf,
+            use_latent_structure_model=use_latent_structure_model,
         )
         seq_model_1_weights_locs = model_file_locs["domain_models_i"]
         seq_model_2_weights_locs = model_file_locs["domain_models_j"]
@@ -697,14 +693,14 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             self.domain_configs[0].data_loader_dict = self.seq_data_loader_dicts_1[i]
             self.domain_configs[1].data_loader_dict = self.seq_data_loader_dicts_2[i]
 
-            if use_clf:
+            if use_latent_structure_model:
                 self.load_pretrained_models(
                     domain_model_1_weights_loc=seq_model_1_weights_locs[i],
                     domain_model_2_weights_loc=seq_model_2_weights_locs[i],
                     latent_dcm_weights_loc=latent_dcm_weights_locs[i],
                     latent_clf_weights_loc=latent_clf_weights_locs[i],
                 )
-                self.latent_clf_config["model"].trainable = train_models
+                self.latent_structure_model_config["model"].trainable = train_models
             else:
                 self.load_pretrained_models(
                     domain_model_1_weights_loc=seq_model_1_weights_locs[i],
@@ -721,14 +717,14 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                 output_dir=output_dir,
                 domain_configs=self.domain_configs,
                 latent_dcm_config=self.latent_dcm_config,
-                latent_clf_config=self.latent_clf_config,
+                latent_structure_model_config=self.latent_structure_model_config,
                 alpha=alpha,
                 beta=beta,
                 gamma=gamma,
                 delta=delta,
                 lamb=lamb,
-                use_dcm=use_dcm,
-                use_clf=use_clf,
+                use_latent_discriminator=use_latent_discriminator,
+                use_latent_structure_model=use_latent_structure_model,
                 num_epochs=self.num_epochs,
                 save_freq=save_freq,
                 early_stopping=self.early_stopping,
@@ -736,10 +732,10 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                 paired_mode=self.paired_data,
                 latent_distance_loss=self.latent_distance_loss,
             )
-            if use_clf:
+            if use_latent_structure_model:
                 confusion_dict = evaluate_latent_clf(
                     domain_configs=self.domain_configs,
-                    latent_clf=self.latent_clf_config["model"],
+                    latent_clf=self.latent_structure_model_config["model"],
                     device=self.device,
                     dataset_type="test",
                 )
