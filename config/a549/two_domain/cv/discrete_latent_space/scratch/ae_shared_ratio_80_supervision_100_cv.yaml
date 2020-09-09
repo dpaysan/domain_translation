@@ -31,7 +31,7 @@ run_params:
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
-  latent_clf_config: {'model_config':{'type':'LatentClassifier',
+  latent_structure_model_config: {'model_config':{'type':'LatentClassifier',
                                       'latent_dim':40, 'n_classes':3},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
@@ -64,8 +64,8 @@ pipeline:
       gamma: 0.001
       delta: 0.001
       save_freq: 50
-      use_dcm: True
-      use_clf: True
+      use_latent_discriminator: True
+      use_latent_structure_model: True
 
 
 

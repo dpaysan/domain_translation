@@ -1,15 +1,14 @@
 output_dir: '../../data/a549_dex/experiments'
 module: src.experiments.seq_seq_domain_translation
-class: SeqSeqTranslationExperimentCV
+class: SeqSeqTranslationExperiment
 run_params:
   seq_data_config_1: {'data_fname':'../../data/a549_dex/processed/rna_data.csv',
                       'data_key':'seq_data',
                       'label_key':'label'}
 
-  seq_model_config_1 : {'model_config':{'type':'TwoLatentSpaceAE',
+  seq_model_config_1 : {'model_config':{'type':'VanillaAE',
                                         'hidden_dims':[1024, 512, 256, 128],
-                                        'latent_dim_1': 40,
-                                        'latent_dim_2': 5,
+                                        'latent_dim': 50,
                                         'in_dims':2613},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
@@ -18,33 +17,31 @@ run_params:
                       'data_key':'seq_data',
                       'label_key':'label'}
 
-  seq_model_config_2 : {'model_config':{'type':'TwoLatentSpaceAE',
+  seq_model_config_2 : {'model_config':{'type':'VanillaAE',
                                         'hidden_dims':[512, 256, 128, 64],
-                                        'latent_dim_1': 40,
-                                        'latent_dim_2': 5,
+                                        'latent_dim': 50,
                                         'in_dims':815},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
 
   latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
-                      'latent_dim': 40, 'hidden_dims':[128, 128, 128,]},
+                      'latent_dim': 50, 'hidden_dims':[128, 128, 128,]},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier',
-                                      'latent_dim':40, 'n_classes':3},
+                                      'latent_dim':50, 'n_classes':3},
                       'optimizer_config':{'type':'rmsprop', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
   num_epochs: 1000
   early_stopping: -1
-  n_folds: 5
-  train_val_split: [0.8, 0.2]
+  train_val_test_split: [0.7, 0.2, 0.1]
   batch_size: 32
   random_state: 1001
   paired_data: True
   latent_distance_loss: 'mae'
-  latent_supervision_rate: 0.5
+  latent_supervision_rate: 0.0
 
 
 pipeline:
@@ -62,11 +59,10 @@ pipeline:
       alpha: 0.1
       beta: 1.0
       gamma: 0.001
-      delta: 0.001
+      delta: 0.0
       save_freq: 50
       use_latent_discriminator: True
       use_latent_structure_model: True
-
 
 
 
