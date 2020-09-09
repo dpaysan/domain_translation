@@ -7,7 +7,9 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from numpy import ndarray
+from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from sklearn.preprocessing import StandardScaler
 from umap import UMAP
 
 from src.helper.models import DomainConfig
@@ -85,6 +87,9 @@ def plot_latent_representations(
     else:
         labels = None
 
+    # Scale the data (sub-optimal should use same scaling for different datasets)
+    latent_representations = StandardScaler().fit_transform(latent_representations)
+
     if reduction == "umap":
         mapper = UMAP(random_state=random_state)
         transformed = mapper.fit_transform(latent_representations)
@@ -94,6 +99,10 @@ def plot_latent_representations(
     elif reduction == "tsne":
         mapper = TSNE(random_state=random_state)
         transformed = mapper.fit_transform(latent_representations)
+    elif reduction == "pca":
+        mapper = PCA(n_components=2, random_state=random_state)
+        transformed = mapper.fit_transform(latent_representations)
+        # print(mapper.explained_variance_ratio_)
     else:
         raise RuntimeError("Unknown reduction mode encountered {}".format(reduction))
 

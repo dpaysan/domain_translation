@@ -150,8 +150,13 @@ class BaseTwoDomainExperiment(BaseExperiment):
             device=self.device,
         )
 
-    def load_pretrained_models(self, domain_model_1_weights_loc, domain_model_2_weights_loc, latent_dcm_weights_loc,
-                               latent_clf_weights_loc):
+    def load_pretrained_models(
+        self,
+        domain_model_1_weights_loc,
+        domain_model_2_weights_loc,
+        latent_dcm_weights_loc,
+        latent_clf_weights_loc,
+    ):
         self.domain_configs[0].domain_model_config.model.load_state_dict(
             torch.load(domain_model_1_weights_loc)
         )
@@ -164,7 +169,6 @@ class BaseTwoDomainExperiment(BaseExperiment):
 
         if latent_clf_weights_loc is not None:
             self.latent_clf_config["model"].load_state_dict(latent_clf_weights_loc)
-
 
 
 class BaseExperimentCV:
@@ -211,7 +215,6 @@ class BaseExperimentCV:
             title="Fitting history",
             posfix="_fold{}".format(fold_id + 1),
         )
-
 
 
 class BaseTwoDomainExperimentCV(BaseExperimentCV):
@@ -305,8 +308,13 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
             device=self.device,
         )
 
-    def load_pretrained_models(self, domain_model_1_weights_loc, domain_model_2_weights_loc, latent_dcm_weights_loc,
-                               latent_clf_weights_loc):
+    def load_pretrained_models(
+        self,
+        domain_model_1_weights_loc,
+        domain_model_2_weights_loc,
+        latent_dcm_weights_loc,
+        latent_clf_weights_loc,
+    ):
         self.domain_configs[0].domain_model_config.model.load_state_dict(
             torch.load(domain_model_1_weights_loc)
         )
@@ -315,7 +323,11 @@ class BaseTwoDomainExperimentCV(BaseExperimentCV):
             torch.load(domain_model_2_weights_loc)
         )
 
-        self.latent_dcm_config["model"].load_state_dict(torch.load(latent_dcm_weights_loc))
+        self.latent_dcm_config["model"].load_state_dict(
+            torch.load(latent_dcm_weights_loc)
+        )
 
         if latent_clf_weights_loc is not None:
-            self.latent_clf_config["model"].load_state_dict(torch.load(latent_clf_weights_loc))
+            self.latent_clf_config["model"].load_state_dict(
+                torch.load(latent_clf_weights_loc)
+            )

@@ -275,7 +275,9 @@ class ImageSeqTranslationExperiment(BaseTwoDomainExperiment):
         latent_clf_weights_loc: str = None,
     ):
 
-        super().load_pretrained_models(domain_model_1_weights_loc=domain_model_1_weights_loc,
-                                       domain_model_2_weights_loc=domain_model_2_weights_loc,
-                                       latent_dcm_weights_loc=latent_dcm_weights_loc,
-                                       latent_clf_weights_loc=latent_clf_weights_loc)
+        super().load_pretrained_models(
+            domain_model_1_weights_loc=domain_model_1_weights_loc,
+            domain_model_2_weights_loc=domain_model_2_weights_loc,
+            latent_dcm_weights_loc=latent_dcm_weights_loc,
+            latent_clf_weights_loc=latent_clf_weights_loc,
+        )

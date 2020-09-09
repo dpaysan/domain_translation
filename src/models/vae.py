@@ -19,6 +19,9 @@ class BaseVAE(nn.Module):
     def decode(self, input: Tensor) -> Any:
         raise NotImplementedError
 
+    def reparameterize(self, **kwargs) -> Tensor:
+        raise NotImplementedError
+
     def sample(self, num_samples: int, device: int, **kwargs) -> Tensor:
         raise RuntimeWarning()
 
@@ -37,15 +40,14 @@ class BaseVAE(nn.Module):
 class VanillaConvVAE(BaseVAE, ABC):
     def __init__(
         self,
-        in_channels: int = 1,
+        input_channels: int = 1,
         latent_dim: int = 128,
         hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
         lrelu_slope: int = 0.2,
         batchnorm: bool = True,
-        **kwargs
     ) -> None:
         super(BaseVAE, self).__init__()
-        self.in_channels = in_channels
+        self.in_channels = input_channels
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
         self.lrelu_slope = lrelu_slope
@@ -183,15 +185,14 @@ class VanillaConvVAE(BaseVAE, ABC):
 class VanillaVAE(BaseVAE, ABC):
     def __init__(
         self,
-        in_dims: int = 7633,
+        input_dim: int = 7633,
         latent_dim: int = 128,
         hidden_dims: List = None,
         batchnorm: bool = False,
         lrelu_slope: float = 0.2,
-        **kwargs
     ) -> None:
         super(BaseVAE, self).__init__()
-        self.in_dims = in_dims
+        self.in_dims = input_dim
         self.latent_dim = latent_dim
         if hidden_dims is None:
             self.hidden_dims = [1024, 1024, 1024, 1024, 1024, 1024]
@@ -208,14 +209,16 @@ class VanillaVAE(BaseVAE, ABC):
                 nn.Linear(self.in_dims, self.hidden_dims[0]),
                 nn.BatchNorm1d(self.hidden_dims[0]),
             ),
-            nn.LeakyReLU(self.lrelu_slope),
+            # nn.LeakyReLU(self.lrelu_slope),
+            nn.PReLU(),
         ]
         for i in range(1, len(self.hidden_dims)):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
                     nn.BatchNorm1d(self.hidden_dims[i]),
-                    nn.LeakyReLU(self.lrelu_slope),
+                    # nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
                 )
             )
 
@@ -238,7 +241,8 @@ class VanillaVAE(BaseVAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
-                    nn.LeakyReLU(self.lrelu_slope),
+                    # nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
                 )
             )
 
@@ -282,3 +286,38 @@ class VanillaVAE(BaseVAE, ABC):
         z = z.to(device)
         samples = self.decode(z)
         return samples
+
+
+class GaussianMixtureBaseVAE(BaseVAE, ABC):
+    def __init__(
+        self,
+        input_dim: int = 7633,
+        latent_dim: int = 128,
+        hidden_dims: List = None,
+        batchnorm: bool = False,
+        lrelu_slope: float = 0.2,
+        reconstruction_distribution: str = "gaussian",
+        n_mixture_components: int = 1,
+    ):
+        super(BaseVAE, self).__init__()
+
+        # self.encoder = GaussianMixtureEncoder(input_dim=input_dim, latent_dim=latent_dim, hidden_dims=hidden_dims, batchnorm=batchnorm, lrelu_slope=lrelu_slope, n_mixture_components=n_mixture_components)
+        # self.decoder = GaussianMixtureDecoder(input_dim=input_dim, latent_dim=latent_dim, hidden_dims=hidden_dims, batchnorm=batchnorm, lrelu_slope=lrelu_slope, n_mixture_components=n_mixture_components)
+
+    def encode(self, input: Tensor) -> List[Tensor]:
+        pass
+
+    def decode(self, input: Tensor) -> Any:
+        pass
+
+    def reparameterize(self):
+        pass
+
+    def forward(self, *inputs: Tensor) -> Tensor:
+        pass
+
+    def generate(self, x: Tensor, **kwargs) -> Tensor:
+        pass
+
+    def loss_function(self, *inputs: Any, **kwargs) -> Tensor:
+        pass

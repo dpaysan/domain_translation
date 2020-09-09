@@ -69,6 +69,7 @@ def evaluate_latent_integration(
     latent_l1_distance = max_discrepancy_loss(
         torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device)
     ).item()
+    # latent_l1_distance = torch.nn.L1Loss()(torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device))
 
     metrics = {"knn_accs": knn_accs, "latent_l1_distance": latent_l1_distance}
     return metrics

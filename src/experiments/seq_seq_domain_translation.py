@@ -578,10 +578,11 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                     domain_configs=self.domain_configs,
                     latent_clf=self.latent_clf_config["model"],
                     device=self.device,
-                    dataset_type='test'
+                    dataset_type="test",
                 )
                 logging.debug(
-                    "Confusion matrices of the latent classifier for fold {}: %s".format(str(i + 1)),
+                    "Confusion matrices of the latent classifier for fold {}: %s"
+                    .format(str(i + 1)),
                     confusion_dict,
                 )
 
@@ -652,14 +653,16 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         latent_clf_weights_loc: str = None,
     ):
 
-        super().load_pretrained_models(domain_model_1_weights_loc=domain_model_1_weights_loc,
-                                       domain_model_2_weights_loc=domain_model_2_weights_loc,
-                                       latent_dcm_weights_loc=latent_dcm_weights_loc,
-                                       latent_clf_weights_loc=latent_clf_weights_loc)
+        super().load_pretrained_models(
+            domain_model_1_weights_loc=domain_model_1_weights_loc,
+            domain_model_2_weights_loc=domain_model_2_weights_loc,
+            latent_dcm_weights_loc=latent_dcm_weights_loc,
+            latent_clf_weights_loc=latent_clf_weights_loc,
+        )
 
     def resume_training_models_cv(
         self,
-        experiment_dir:str,
+        experiment_dir: str,
         alpha: float = 1.0,
         beta: float = 1.0,
         gamma: float = 1.0,
@@ -667,17 +670,19 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
         lamb: float = 1.0,
         use_dcm: bool = True,
         use_clf: bool = False,
-        save_freq:int = 50,
+        save_freq: int = 50,
     ):
         domain_names = [self.domain_configs[0].name, self.domain_configs[1].name]
-        model_file_locs = get_model_file_list_for_two_domain_experiment(experiment_dir=experiment_dir,
-                                                                        domain_names=domain_names,
-                                                                        n_folds=self.n_folds,
-                                                                        use_clf=use_clf)
-        seq_model_1_weights_locs = model_file_locs['domain_models_i']
-        seq_model_2_weights_locs = model_file_locs['domain_models_j']
-        latent_dcm_weights_locs = model_file_locs['latent_dcm_models']
-        latent_clf_weights_locs = model_file_locs['latent_clf_models']
+        model_file_locs = get_model_file_list_for_two_domain_experiment(
+            experiment_dir=experiment_dir,
+            domain_names=domain_names,
+            n_folds=self.n_folds,
+            use_clf=use_clf,
+        )
+        seq_model_1_weights_locs = model_file_locs["domain_models_i"]
+        seq_model_2_weights_locs = model_file_locs["domain_models_j"]
+        latent_dcm_weights_locs = model_file_locs["latent_dcm_models"]
+        latent_clf_weights_locs = model_file_locs["latent_clf_models"]
 
         if self.num_epochs <= 0:
             train_models = False
@@ -736,9 +741,10 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                     domain_configs=self.domain_configs,
                     latent_clf=self.latent_clf_config["model"],
                     device=self.device,
-                    dataset_type='test'
+                    dataset_type="test",
                 )
                 logging.debug(
-                    "Confusion matrices of the latent classifier for fold {}: %s".format(str(i + 1)),
+                    "Confusion matrices of the latent classifier for fold {}: %s"
+                    .format(str(i + 1)),
                     confusion_dict,
                 )

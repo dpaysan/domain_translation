@@ -23,7 +23,9 @@ def get_file_list(
     return sorted(list_of_data_locs)
 
 
-def get_model_file_list_for_two_domain_experiment(experiment_dir:str, domain_names:List[str], n_folds:int, use_clf:bool)->dict:
+def get_model_file_list_for_two_domain_experiment(
+    experiment_dir: str, domain_names: List[str], n_folds: int, use_clf: bool
+) -> dict:
     domain_models_i = []
     domain_models_j = []
     latent_dcm_models = []
@@ -35,16 +37,29 @@ def get_model_file_list_for_two_domain_experiment(experiment_dir:str, domain_nam
         # if use_clf:
         #     latent_clf_models.append(experiment_dir + '/fold_{}/final_clf.pth'.format(i))
 
-        domain_models_i.append(experiment_dir + '/fold_{}/epoch_950/model_{}.pth'.format(i, domain_names[0]))
-        domain_models_j.append(experiment_dir + '/fold_{}/epoch_950/model_{}.pth'.format(i, domain_names[1]))
-        latent_dcm_models.append(experiment_dir + '/fold_{}/epoch_950/dcm.pth'.format(i))
+        domain_models_i.append(
+            experiment_dir
+            + "/fold_{}/epoch_950/model_{}.pth".format(i, domain_names[0])
+        )
+        domain_models_j.append(
+            experiment_dir
+            + "/fold_{}/epoch_950/model_{}.pth".format(i, domain_names[1])
+        )
+        latent_dcm_models.append(
+            experiment_dir + "/fold_{}/epoch_950/dcm.pth".format(i)
+        )
         if use_clf:
-            latent_clf_models.append(experiment_dir + '/fold_{}/epoch_950/clf.pth'.format(i))
+            latent_clf_models.append(
+                experiment_dir + "/fold_{}/epoch_950/clf.pth".format(i)
+            )
     if len(latent_clf_models) == 0:
         latent_clf_models = None
 
-    model_locations_dict = {'domain_models_i':domain_models_i, 'domain_models_j':domain_models_j,
-                 'latent_dcm_models':latent_dcm_models, "latent_clf_models":latent_clf_models}
+    model_locations_dict = {
+        "domain_models_i": domain_models_i,
+        "domain_models_j": domain_models_j,
+        "latent_dcm_models": latent_dcm_models,
+        "latent_clf_models": latent_clf_models,
+    }
 
     return model_locations_dict
-
