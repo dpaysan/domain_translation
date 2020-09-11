@@ -224,7 +224,9 @@ def train_autoencoders_two_domains(
         total_loss_item += kl_loss.item() * lamb
 
     if use_latent_structure_model:
-        summary_stats["latent_structure_model_loss"] = latent_sm_loss.item() * (batch_size_i + batch_size_j)
+        summary_stats["latent_structure_model_loss"] = latent_sm_loss.item() * (
+            batch_size_i + batch_size_j
+        )
         total_loss_item += summary_stats["latent_structure_model_loss"] * gamma
 
     if paired_training_mask is not None and paired_distance_samples > 0:
@@ -603,7 +605,9 @@ def train_val_test_loop_two_domains(
 
     if latent_structure_model is not None:
         best_latent_structure_model_weights = latent_structure_model.state_dict()
-        best_model_configs["latent_structure_model_weights"] = best_latent_structure_model_weights
+        best_model_configs[
+            "latent_structure_model_weights"
+        ] = best_latent_structure_model_weights
 
     # Initialize current best loss
     best_total_loss = np.infty
@@ -883,9 +887,12 @@ def train_val_test_loop_two_domains(
                             latent_dcm_weights, "{}/dcm.pth".format(checkpoint_dir)
                         )
                     if latent_structure_model is not None:
-                        latent_structure_model_weights = latent_structure_model.cpu().state_dict()
+                        latent_structure_model_weights = (
+                            latent_structure_model.cpu().state_dict()
+                        )
                         torch.save(
-                            latent_structure_model_weights, "{}/latent_structure_model.pth".format(checkpoint_dir)
+                            latent_structure_model_weights,
+                            "{}/latent_structure_model.pth".format(checkpoint_dir),
                         )
 
     # Training complete
@@ -976,7 +983,9 @@ def train_val_test_loop_two_domains(
             )
         if "latent_structure_model_loss" in epoch_statistics:
             logging.debug(
-                "Latent structure model loss: {:.8f}".format(epoch_statistics["latent_structure_model_loss"])
+                "Latent structure model loss: {:.8f}".format(
+                    epoch_statistics["latent_structure_model_loss"]
+                )
             )
 
         if "latent_distance_loss" in epoch_statistics:
@@ -1029,7 +1038,10 @@ def train_val_test_loop_two_domains(
 
     if latent_structure_model is not None:
         trained_models["latent_structure_model"] = latent_structure_model
-        torch.save(latent_structure_model.state_dict(), "{}/final_latent_structure_model.pth".format(output_dir))
+        torch.save(
+            latent_structure_model.state_dict(),
+            "{}/final_latent_structure_model.pth".format(output_dir),
+        )
 
     return trained_models, total_loss_dict
 
@@ -1097,7 +1109,9 @@ def train_autoencoder(
 
     # Add loss of latent structure model if this is trained
     if use_latent_structure_model:
-        latent_structure_model_loss = latent_structure_model_loss(latent_structure_model_output, labels.view(-1).long())
+        latent_structure_model_loss = latent_structure_model_loss(
+            latent_structure_model_output, labels.view(-1).long()
+        )
         total_loss += latent_structure_model_loss * gamma
 
     # Backpropagate loss and update parameters if we are in the training phase
@@ -1120,7 +1134,9 @@ def train_autoencoder(
         total_loss_item += kl_loss.item()
 
     if use_latent_structure_model:
-        batch_statistics["latent_structure_model_loss"] = latent_structure_model_loss.item() * batch_size
+        batch_statistics["latent_structure_model_loss"] = (
+            latent_structure_model_loss.item() * batch_size
+        )
         batch_statistics["accuracy"] = accuracy(latent_structure_model_output, labels)
         total_loss_item += latent_structure_model_loss.item() * batch_size
 
@@ -1179,7 +1195,9 @@ def process_epoch_single_domain(
 
         recon_loss += batch_statistics["recon_loss"]
         if use_latent_structure_model:
-            latent_structure_model_loss += batch_statistics["latent_structure_model_loss"]
+            latent_structure_model_loss += batch_statistics[
+                "latent_structure_model_loss"
+            ]
             correct_preds += batch_statistics["accuracy"][0]
             n_preds += batch_statistics["accuracy"][1]
         if vae_mode:
@@ -1312,7 +1330,8 @@ def train_val_test_loop_vae(
             if use_latent_structure_model:
                 logging.debug(
                     "Latent structure model loss for {} domain: {:.8f}".format(
-                        domain_config.name, epoch_statistics["latent_structure_model_loss"]
+                        domain_config.name,
+                        epoch_statistics["latent_structure_model_loss"],
                     )
                 )
 
@@ -1351,7 +1370,9 @@ def train_val_test_loop_vae(
                         best_latent_structure_model_weights = copy.deepcopy(
                             latent_structure_model.cpu().state_dict()
                         )
-                        best_model_configs["latent_structure_model_weights"] = best_latent_structure_model_weights
+                        best_model_configs[
+                            "latent_structure_model_weights"
+                        ] = best_latent_structure_model_weights
                         torch.save(
                             best_latent_structure_model_weights,
                             "{}/best_latent_structure_model.pth".format(output_dir),

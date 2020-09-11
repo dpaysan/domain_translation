@@ -1,7 +1,7 @@
 import torch
 from torch.nn import (
     Module,
-    #CrossEntropyLoss,
+    # CrossEntropyLoss,
     L1Loss,
     MSELoss,
     BCELoss,
@@ -117,7 +117,7 @@ def get_latent_model_configuration(
 
     optimizer = get_optimizer_for_model(optimizer_dict=optimizer_dict, model=model)
 
-    if model_type != 'LatentRegressor':
+    if model_type != "LatentRegressor":
         try:
             weights = torch.FloatTensor(loss_dict.pop("weights")).to(device)
         except KeyError:

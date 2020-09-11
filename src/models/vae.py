@@ -5,7 +5,9 @@ import torch
 from torch import Tensor
 from torch import nn
 from torch.autograd import Variable
+from torch.nn import Module
 
+# from src.models.custom_networks import MixtureComponentInferenceNetwork
 from src.utils.torch.general import get_device
 
 
@@ -288,36 +290,112 @@ class VanillaVAE(BaseVAE, ABC):
         return samples
 
 
-class GaussianMixtureBaseVAE(BaseVAE, ABC):
-    def __init__(
-        self,
-        input_dim: int = 7633,
-        latent_dim: int = 128,
-        hidden_dims: List = None,
-        batchnorm: bool = False,
-        lrelu_slope: float = 0.2,
-        reconstruction_distribution: str = "gaussian",
-        n_mixture_components: int = 1,
-    ):
-        super(BaseVAE, self).__init__()
-
-        # self.encoder = GaussianMixtureEncoder(input_dim=input_dim, latent_dim=latent_dim, hidden_dims=hidden_dims, batchnorm=batchnorm, lrelu_slope=lrelu_slope, n_mixture_components=n_mixture_components)
-        # self.decoder = GaussianMixtureDecoder(input_dim=input_dim, latent_dim=latent_dim, hidden_dims=hidden_dims, batchnorm=batchnorm, lrelu_slope=lrelu_slope, n_mixture_components=n_mixture_components)
-
-    def encode(self, input: Tensor) -> List[Tensor]:
-        pass
-
-    def decode(self, input: Tensor) -> Any:
-        pass
-
-    def reparameterize(self):
-        pass
-
-    def forward(self, *inputs: Tensor) -> Tensor:
-        pass
-
-    def generate(self, x: Tensor, **kwargs) -> Tensor:
-        pass
-
-    def loss_function(self, *inputs: Any, **kwargs) -> Tensor:
-        pass
+# class GaussianMixtureBaseVAE(BaseVAE, ABC):
+#     def __init__(
+#             self,
+#             input_dim: int = 7633,
+#             latent_dim: int = 128,
+#             hidden_dims: List = None,
+#             batchnorm: bool = False,
+#             lrelu_slope: float = 0.2,
+#             reconstruction_distribution: str = "gaussian",
+#             n_mixture_components: int = 1,
+#     ):
+#         super(BaseVAE, self).__init__()
+#         self.input_dim = input_dim
+#         self.latent_dim = latent_dim
+#         self.hidden_dims = hidden_dims
+#         self.batchnorm = batchnorm
+#         self.lrelu_slope = lrelu_slope
+#         self.reconstruction_distribution = reconstruction_distribution
+#         self.n_mixture_components = n_mixture_components
+#
+#         self.encoder = None
+#         self.decoder = None
+#
+#     def encode(self, input: Tensor) -> List[Tensor]:
+#         raise NotImplementedError
+#
+#     def decode(self, input: Tensor) -> Any:
+#         raise NotImplementedError
+#
+#     def reparameterize(self):
+#         raise NotImplementedError
+#
+#     def forward(self, *inputs: Tensor) -> Tensor:
+#         raise NotImplementedError
+#
+#     def generate(self, x: Tensor, **kwargs) -> Tensor:
+#         raise NotImplementedError
+#
+#     def loss_function(self, *inputs: Any, **kwargs) -> Tensor:
+#         raise NotImplementedError
+#
+#
+# class GaussianMixtureEncoder(Module, ABC):
+#     def __init__(
+#             self,
+#             input_dim: int = 7633,
+#             latent_dim: int = 128,
+#             hidden_dims_qyx: List = None,
+#             hidden_dims_qzyx: List = None,
+#             batchnorm: bool = False,
+#             n_mixture_components: int = 1,
+#     ):
+#         super().__init__()
+#         self.input_dim = input_dim
+#         self.latent_dim = latent_dim
+#         self.hidden_dims_qyx = hidden_dims_qyx
+#         self.hidden_dims_qzyx = hidden_dims_qzyx
+#         self.batchnorm = batchnorm
+#         self.n_mixture_components = n_mixture_components
+#
+#         # q(y|x)
+#         qyx_modules = [
+#             nn.Sequential(
+#                 nn.Linear(self.in_dims, self.hidden_dims_qyx[0]),
+#                 nn.BatchNorm1d(self.hidden_dims_qyx[0]),
+#             ),
+#             nn.PReLU(),
+#         ]
+#         for i in range(1, len(self.hidden_dims_qyx)):
+#             qyx_modules.append(
+#                 nn.Sequential(
+#                     nn.Linear(self.hidden_dims_qyx[i - 1], self.hidden_dims_qyx[i]),
+#                     nn.BatchNorm1d(self.hidden_dims_qyx[i]),
+#                     nn.PReLU(),
+#                 )
+#             )
+#
+#         self.qyx_network = MixtureComponentInferenceNetwork(nn.Sequential(*qyx_modules),
+#                                                             GumbelSoftMax(self.hidden_dims_qyx[-1],
+#                                                                           self.n_mixture_components))
+#
+#         qzyx_modules = [
+#             nn.Sequential(
+#                 nn.Linear(self.in_dims + self.n_mixture_components, self.hidden_dims_qzyx[0]),
+#                 nn.BatchNorm1d(self.hidden_dims_qzyx[0]),
+#             ),
+#             nn.PReLU(),
+#         ]
+#         for i in range(1, len(self.hidden_dims_qzyx)):
+#             qzyx_modules.append(
+#                 nn.Sequential(
+#                     nn.Linear(self.hidden_dims_qzyx[i - 1], self.hidden_dims_qzyx[i]),
+#                     nn.BatchNorm1d(self.hidden_dims_qzyx[i]),
+#                     nn.PReLU(),
+#                 )
+#             )
+#         qzyx_modules.append(Gaussian(self.hidden_dims_qzyx[-1], self.latent_dim))
+#
+#         self.qzyx_network = nn.Sequential(*qzyx_modules)
+#
+#     def forward(self, *inputs: Tensor, temperature: float = 1.0, hard: float = 0) -> dict:
+#         logits, prob, y = self.qyx_network(inputs, temperature, hard)
+#
+#         xy = torch.cat([inputs, y], dim=1)
+#         mu, var, z = self.qzyx_network(xy)
+#
+#         output = {'mu': mu, 'var': var, 'latents': z, 'logits': logits, 'responsibility': prob, 'component_label': y}
+#
+#         return output

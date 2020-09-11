@@ -168,7 +168,9 @@ class BaseTwoDomainExperiment(BaseExperiment):
         self.latent_dcm_config["model"].load_state_dict(latent_dcm_weights_loc)
 
         if latent_structure_model_weights_loc is not None:
-            self.latent_structure_model_config["model"].load_state_dict(latent_structure_model_weights_loc)
+            self.latent_structure_model_config["model"].load_state_dict(
+                latent_structure_model_weights_loc
+            )
 
 
 class BaseExperimentCV:
