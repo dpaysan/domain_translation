@@ -45,8 +45,8 @@ def evaluate_latent_integration(
     ):
         input_i, input_j = samples_i[data_key_i], samples_j[data_key_j]
         input_i, input_j = input_i.to(device), input_j.to(device)
-        latent_i = model_i(input_i)[1].detach().cpu().numpy()
-        latent_j = model_j(input_j)[1].detach().cpu().numpy()
+        latent_i = model_i(input_i)['latents'].detach().cpu().numpy()
+        latent_j = model_j(input_j)['latents'].detach().cpu().numpy()
 
         latents_i.append(latent_i)
         latents_j.append(latent_j)
@@ -96,12 +96,13 @@ def get_latent_representations_for_model(
             labels.append(sample[label_key].item())
 
         output = model(input)
-        shared_latent_representation = output[1]
+        shared_latent_representation = output['latents']
         shared_latent_representations.append(
             shared_latent_representation.detach().cpu().numpy()
         )
-        if hasattr(model, "n_latent_spaces") and model.n_latent_spaces == 2:
-            domain_specific_latent_representation = output[2]
+        #if hasattr(model, "n_latent_spaces") and model.n_latent_spaces == 2:
+        if 'unshared_latents' in output:
+            domain_specific_latent_representation = output['unshared_latents']
             domain_specific_latent_representations.append(
                 domain_specific_latent_representation.detach().cpu().numpy()
             )
@@ -300,8 +301,8 @@ def evaluate_latent_clf(
         label_i, label_j = samples_i[label_key_i], samples_j[label_key_j]
 
         input_i, input_j = input_i.to(device), input_j.to(device)
-        latent_i = model_i(input_i)[1]
-        latent_j = model_j(input_j)[1]
+        latent_i = model_i(input_i)['latents']
+        latent_j = model_j(input_j)['latents']
 
         _, pred_i = torch.max(latent_clf(latent_i), dim=1)
         _, pred_j = torch.max(latent_clf(latent_j), dim=1)

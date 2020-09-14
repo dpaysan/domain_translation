@@ -8,6 +8,8 @@ from torch import nn, Tensor
 class BaseAE(nn.Module):
     def __init__(self) -> None:
         super(BaseAE, self).__init__()
+        self.recon_loss_module = None
+        self.model_base_type='ae'
 
     def encode(self, input: Tensor) -> Tensor:
         raise NotImplementedError
@@ -19,19 +21,20 @@ class BaseAE(nn.Module):
     def forward(self, inputs: Tensor) -> Tensor:
         pass
 
-    @abstractmethod
-    def loss_function(self, *inputs: Any, **kwargs) -> Tensor:
-        pass
+    def loss_function(self, inputs: Tensor, recons: Tensor) -> dict:
+        recon_loss = self.recon_loss_module(inputs, recons)
+        loss_dict = {'recon_loss': recon_loss}
+        return loss_dict
 
 
 class VanillaAE(BaseAE, ABC):
     def __init__(
-        self,
-        in_dims: int = 2613,
-        latent_dim: int = 128,
-        hidden_dims: List = None,
-        batchnorm_latent: bool = False,
-        lrelu_slope: float = 0.2,
+            self,
+            in_dims: int = 2613,
+            latent_dim: int = 128,
+            hidden_dims: List = None,
+            batchnorm_latent: bool = False,
+            lrelu_slope: float = 0.2,
     ):
         super(VanillaAE, self).__init__()
         self.in_dims = in_dims
@@ -39,7 +42,7 @@ class VanillaAE(BaseAE, ABC):
         self.hidden_dims = hidden_dims
         self.batchnorm_latent = batchnorm_latent
         self.lrelu_slope = lrelu_slope
-        self.model_type = "AE"
+        #self.model_type = "AE"
         self.n_latent_spaces = 1
 
         # Build encoder model
@@ -47,7 +50,6 @@ class VanillaAE(BaseAE, ABC):
             encoder_modules = [
                 nn.Sequential(
                     nn.Linear(self.in_dims, self.hidden_dims[0]),
-                    # nn.BatchNorm1d(self.hidden_dims[0]),
                     # nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
@@ -58,7 +60,6 @@ class VanillaAE(BaseAE, ABC):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                    # nn.BatchNorm1d(self.hidden_dims[i]),
                     # nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[i]),
@@ -80,7 +81,6 @@ class VanillaAE(BaseAE, ABC):
         decoder_modules = [
             nn.Sequential(
                 nn.Linear(self.latent_dim, self.hidden_dims[-1]),
-                # nn.BatchNorm1d(self.hidden_dims[-1]),
                 # nn.LeakyReLU(self.lrelu_slope),
                 nn.PReLU(),
                 nn.BatchNorm1d(self.hidden_dims[-1]),
@@ -90,7 +90,6 @@ class VanillaAE(BaseAE, ABC):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                    # nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                     # nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
@@ -109,21 +108,22 @@ class VanillaAE(BaseAE, ABC):
         output = self.decoder(input=input)
         return output
 
-    def forward(self, inputs: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(self, inputs: Tensor) -> dict:
         latents = self.encode(input=inputs)
-        output = self.decode(latents)
-        return output, latents
+        recons = self.decode(latents)
+        output = {'recons': recons, 'latents': latents}
+        return output
 
 
 class TwoLatentSpaceAE(BaseAE, ABC):
     def __init__(
-        self,
-        in_dims: int = 2613,
-        latent_dim_1: int = 128,
-        latent_dim_2: int = 64,
-        hidden_dims: List = None,
-        batchnorm_latent: bool = False,
-        lrelu_slope: float = 0.2,
+            self,
+            in_dims: int = 2613,
+            latent_dim_1: int = 128,
+            latent_dim_2: int = 64,
+            hidden_dims: List = None,
+            batchnorm_latent: bool = False,
+            lrelu_slope: float = 0.2,
     ):
         super(TwoLatentSpaceAE, self).__init__()
         self.in_dims = in_dims
@@ -132,7 +132,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
         self.hidden_dims = hidden_dims
         self.batchnorm_latent = batchnorm_latent
         self.lrelu_slope = lrelu_slope
-        self.model_type = "AE"
+        #self.model_type = "AE"
         self.n_latent_spaces = 2
 
         # Build encoder model
@@ -151,7 +151,6 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                    # nn.BatchNorm1d(self.hidden_dims[i]),
                     # nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[i]),
@@ -167,7 +166,6 @@ class TwoLatentSpaceAE(BaseAE, ABC):
         decoder_modules = [
             nn.Sequential(
                 nn.Linear(self.latent_dim_1 + latent_dim_2, self.hidden_dims[-1]),
-                # nn.BatchNorm1d(self.hidden_dims[-1]),
                 # nn.LeakyReLU(self.lrelu_slope),
                 nn.PReLU(),
                 nn.BatchNorm1d(self.hidden_dims[-1]),
@@ -177,7 +175,6 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                    # nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                     # nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
@@ -198,8 +195,12 @@ class TwoLatentSpaceAE(BaseAE, ABC):
         output = self.decoder(input=input)
         return output
 
-    def forward(self, inputs: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+    def forward(self, inputs: Tensor) -> dict:
         latents_1, latents_2 = self.encode(input=inputs)
         latents = torch.cat([latents_1, latents_2], dim=1)
-        output = self.decode(latents)
-        return output, latents_1, latents_2
+        recons = self.decode(latents)
+        output = {'recons': recons, 'latents': latents_1, 'unshared_latents': latents_2}
+        return output
+
+    def loss_function(self, inputs: Tensor, recons: Tensor) -> dict:
+        return super().loss_function(inputs=inputs, recons=recons)

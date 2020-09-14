@@ -8,12 +8,15 @@ from torch.autograd import Variable
 from torch.nn import Module
 
 # from src.models.custom_networks import MixtureComponentInferenceNetwork
+from src.functions.loss_functions import compute_kld_multivariate_gaussians
 from src.utils.torch.general import get_device
 
 
 class BaseVAE(nn.Module):
     def __init__(self) -> None:
         super(BaseVAE, self).__init__()
+        self.recon_loss_module = None
+        self.model_base_type = 'vae'
 
     def encode(self, input: Tensor) -> List[Tensor]:
         raise NotImplementedError
@@ -34,9 +37,11 @@ class BaseVAE(nn.Module):
     def forward(self, *inputs: Tensor) -> Tensor:
         pass
 
-    @abstractmethod
-    def loss_function(self, *inputs: Any, **kwargs) -> Tensor:
-        pass
+    def loss_function(self, inputs: Tensor, recons:Tensor, mu:Tensor, logvar:Tensor) -> dict:
+        recon_loss = self.recon_loss_module(inputs, recons)
+        kld_loss = compute_kld_multivariate_gaussians(mu=mu, logvar=logvar)
+        loss_dict = {'recon_loss':recon_loss, 'kld_loss':kld_loss}
+        return loss_dict
 
 
 class VanillaConvVAE(BaseVAE, ABC):
@@ -55,7 +60,7 @@ class VanillaConvVAE(BaseVAE, ABC):
         self.lrelu_slope = lrelu_slope
         self.batchnorm = batchnorm
         self.updated = False
-        self.model_type = "VAE"
+        #self.model_type = "VAE"
         self.n_latent_spaces = 1
 
         # encoder
@@ -162,11 +167,12 @@ class VanillaConvVAE(BaseVAE, ABC):
         z = eps.mul(std).add_(mu)
         return z
 
-    def forward(self, input: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-        mu, logsigma = self.encode(input)
-        z = self.reparameterize(mu, logsigma)
-        output = self.decode(z)
-        return output, z, mu, logsigma
+    def forward(self, input: Tensor) -> dict:
+        mu, logvar = self.encode(input)
+        z = self.reparameterize(mu, logvar)
+        recons = self.decode(z)
+        output = {'recons':recons, 'latents':z, 'mu':mu, 'logvar':logvar}
+        return output
 
     def get_latent_representation(self, input: Tensor) -> Tensor:
         mu, logvar = self.encode(input)
@@ -182,6 +188,9 @@ class VanillaConvVAE(BaseVAE, ABC):
         z = z.to(device)
         samples = self.decode(z)
         return samples
+
+    def loss_function(self, inputs: Tensor, recons:Tensor, mu:Tensor, logvar:Tensor) -> dict:
+        return super().loss_function(inputs=inputs, recons=recons, mu=mu, logvar=logvar)
 
 
 class VanillaVAE(BaseVAE, ABC):
@@ -203,7 +212,7 @@ class VanillaVAE(BaseVAE, ABC):
         self.batchnorm = batchnorm
         self.updated = False
         self.lrelu_slope = lrelu_slope
-        self.model_type = "VAE"
+        #self.model_type = "VAE"
 
         # encoder
         encoder_modules = [
@@ -255,7 +264,6 @@ class VanillaVAE(BaseVAE, ABC):
         h = self.encoder(input)
         mu = self.mu_fc(h)
         logvar = self.logvar_fc(h)
-
         return mu, logvar
 
     def decode(self, input: Tensor) -> Tensor:
@@ -268,11 +276,12 @@ class VanillaVAE(BaseVAE, ABC):
         z = eps * std + mu
         return z
 
-    def forward(self, input: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+    def forward(self, input: Tensor) -> dict:
         mu, logvar = self.encode(input)
         z = self.reparameterize(mu, logvar)
-        output = self.decode(z)
-        return output, z, mu, logvar
+        recons = self.decode(z)
+        output = {'recons':recons, 'latents':z, 'mu':mu, 'logvar':logvar}
+        return output
 
     def get_latent_representation(self, input: Tensor) -> Tensor:
         mu, logvar = self.encode(input)
@@ -288,6 +297,9 @@ class VanillaVAE(BaseVAE, ABC):
         z = z.to(device)
         samples = self.decode(z)
         return samples
+
+    def loss_function(self, inputs: Tensor, recons:Tensor, mu:Tensor, logvar:Tensor) -> dict:
+        return super().loss_function(inputs=inputs, recons=recons, mu=mu, logvar=logvar)
 
 
 # class GaussianMixtureBaseVAE(BaseVAE, ABC):

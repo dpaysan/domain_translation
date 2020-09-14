@@ -13,7 +13,6 @@ from sklearn.preprocessing import StandardScaler
 from umap import UMAP
 
 from src.helper.models import DomainConfig
-from src.utils.basic.evaluation import PairedDomainLogAnalyzer
 from src.utils.torch.evaluation import (
     get_shared_latent_space_dict_for_multiple_domains,
     get_full_latent_space_dict_for_multiple_domains,

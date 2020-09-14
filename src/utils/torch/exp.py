@@ -11,7 +11,7 @@ from torch.autograd import Variable
 from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 
-from src.functions.loss_functions import compute_KL_loss
+from src.functions.loss_functions import compute_kld_multivariate_gaussians
 from src.functions.metric import accuracy
 from src.helper.models import DomainModelConfig, DomainConfig
 from src.utils.basic.visualization import (
@@ -102,20 +102,36 @@ def train_autoencoders_two_domains(
     # Forward pass of the AE/VAE
     inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
 
-    if partly_integrated_latent_space:
-        if vae_mode:
-            recons_i, latents_i, _, mu_i, logvar_i = model_i(inputs_i)
-            recons_j, latents_j, _, mu_j, logvar_j = model_j(inputs_j)
-        else:
-            recons_i, latents_i, _ = model_i(inputs_i)
-            recons_j, latents_j, _ = model_j(inputs_j)
-    else:
-        if vae_mode:
-            recons_i, latents_i, mu_i, logvar_i = model_i(inputs_i)
-            recons_j, latents_j, mu_j, logvar_j = model_j(inputs_j)
-        else:
-            recons_i, latents_i = model_i(inputs_i)
-            recons_j, latents_j = model_j(inputs_j)
+    outputs_i = model_i(inputs_i)
+    outputs_j = model_j(inputs_j)
+
+    recons_i = outputs_i['recons']
+    recons_j = outputs_j['recons']
+
+    latents_i = outputs_i['latents']
+    latents_j = outputs_j['latents']
+
+    if 'mu' in outputs_i and 'mu' in outputs_j:
+        mu_i = outputs_i['mu']
+        mu_j = outputs_j['mu']
+
+        logvar_i = outputs_i['logvar']
+        logvar_j = outputs_j['logvar']
+
+    # if partly_integrated_latent_space:
+    #     if vae_mode:
+    #         recons_i, latents_i, _, mu_i, logvar_i = model_i(inputs_i)
+    #         recons_j, latents_j, _, mu_j, logvar_j = model_j(inputs_j)
+    #     else:
+    #         recons_i, latents_i, _ = model_i(inputs_i)
+    #         recons_j, latents_j, _ = model_j(inputs_j)
+    # else:
+    #     if vae_mode:
+    #         recons_i, latents_i, mu_i, logvar_i = model_i(inputs_i)
+    #         recons_j, latents_j, mu_j, logvar_j = model_j(inputs_j)
+    #     else:
+    #         recons_i, latents_i = model_i(inputs_i)
+    #         recons_j, latents_j = model_j(inputs_j)
 
     if use_latent_discriminator:
         labels_i, labels_j = (
@@ -156,14 +172,28 @@ def train_autoencoders_two_domains(
 
     # Compute losses
 
-    recon_loss_i = recon_loss_fct_i(recons_i, inputs_i)
-    recon_loss_j = recon_loss_fct_j(recons_j, inputs_j)
+    #recon_loss_i = recon_loss_fct_i(recons_i, inputs_i)
+    #recon_loss_j = recon_loss_fct_j(recons_j, inputs_j)
+
+    if vae_mode:
+        loss_dict_i = model_i.loss_function(inputs=inputs_i, recons=recons_i, mu=mu_i, logvar = logvar_i)
+        loss_dict_j = model_j.loss_function(inputs=inputs_j, recons=recons_j, mu=mu_j, logvar=logvar_j)
+
+        recon_loss_i = loss_dict_i['recon_loss']
+        kld_loss_i = loss_dict_i['kld_loss']
+
+        recon_loss_j = loss_dict_j['recon_loss']
+        kld_loss_j = loss_dict_j['kld_loss']
+    else:
+        recon_loss_i = model_i.loss_function(inputs=inputs_i, recons=recons_i)['recon_loss']
+        recon_loss_j = model_j.loss_function(inputs=inputs_j, recons=recons_j)['recon_loss']
 
     total_loss = alpha * (recon_loss_i + recon_loss_j)
 
     if vae_mode:
-        kl_loss = compute_KL_loss(mu_i, logvar_i) + compute_KL_loss(mu_j, logvar_j)
-        total_loss += kl_loss * lamb
+        #kl_loss = compute_kld_multivariate_gaussians(mu_i, logvar_i) + compute_kld_multivariate_gaussians(mu_j, logvar_j)
+        #total_loss += kl_loss * lamb
+        kl_loss = (kld_loss_i + kld_loss_j) * lamb
 
     # Calculate adversarial loss - by mixing labels indicating domain with output predictions to "confuse" the
     # discriminator and encourage learning autoencoder that make the distinction between the modalities in the latent
@@ -284,8 +314,8 @@ def train_latent_dcm_two_domains(
     latent_dcm_optimizer.zero_grad()
 
     # Forward pass
-    latents_i = Variable(model_i(inputs_i)[1])
-    latents_j = Variable(model_j(inputs_j)[1])
+    latents_i = Variable(model_i(inputs_i)['latents'])
+    latents_j = Variable(model_j(inputs_j)['latents'])
 
     if use_latent_discriminator:
         labels_i, labels_j = (
@@ -403,8 +433,10 @@ def process_epoch_two_domains(
                 domain_model_config_j.model.model_type.upper(),
             )
         )
+    # Todo - continue case separation implementation for loss functions based on model base type
+    base_model_type = domain_model_config_i.model.model_base_type.lower()
+    vae_mode = domain_model_config_i.model.model_base_type.lower() == "VAE"
 
-    vae_mode = domain_model_config_i.model.model_type.upper() == "VAE"
     partly_integrated_latent_space = domain_model_config_i.model.n_latent_spaces == 2
 
     # Iterate over batches
@@ -1087,10 +1119,19 @@ def train_autoencoder(
     # Forward pass of the VAE
     inputs = Variable(inputs).to(device)
     labels = Variable(labels).to(device)
+
+    outputs = model(inputs)
+    recons = outputs['recons']
+    latents = outputs['latents']
+
     if vae_mode:
-        recons, latents, mu, logvar = model(inputs)
-    else:
-        recons, latents = model(inputs)
+        mu = outputs['mu']
+        logvar = outputs['logvar']
+
+    # if vae_mode:
+    #     recons, latents, mu, logvar = model(inputs)
+    # else:
+    #     recons, latents = model(inputs)
 
     # Forward pass latent structure model if it is supposed to be trained and used to assess the integration of the learned
     # latent spaces
@@ -1099,20 +1140,23 @@ def train_autoencoder(
 
     # Compute losses
 
-    recon_loss = recon_loss_fct(recons, inputs)
+    #recon_loss = recon_loss_fct(recons, inputs)
+    loss_dict = model.loss_function(inputs=inputs, recons=recons)
+    recon_loss = loss_dict['recon_loss']
     total_loss = recon_loss
 
     if vae_mode:
-        kl_loss = compute_KL_loss(mu, logvar)
-        kl_loss *= lamb
-        total_loss += kl_loss
+        #kl_loss = compute_kld_multivariate_gaussians(mu, logvar)
+        kl_loss = loss_dict['kld_loss']
+        #kl_loss *= lamb
+        total_loss += kl_loss * lamb
 
     # Add loss of latent structure model if this is trained
     if use_latent_structure_model:
-        latent_structure_model_loss = latent_structure_model_loss(
+        latent_sm_loss = latent_structure_model_loss(
             latent_structure_model_output, labels.view(-1).long()
         )
-        total_loss += latent_structure_model_loss * gamma
+        total_loss += latent_sm_loss * gamma
 
     # Backpropagate loss and update parameters if we are in the training phase
     if phase == "train":
@@ -1135,10 +1179,10 @@ def train_autoencoder(
 
     if use_latent_structure_model:
         batch_statistics["latent_structure_model_loss"] = (
-            latent_structure_model_loss.item() * batch_size
+            latent_sm_loss.item() * batch_size
         )
         batch_statistics["accuracy"] = accuracy(latent_structure_model_output, labels)
-        total_loss_item += latent_structure_model_loss.item() * batch_size
+        total_loss_item += latent_sm_loss.item() * batch_size
 
     batch_statistics["total_loss"] = total_loss_item
 
@@ -1165,7 +1209,7 @@ def process_epoch_single_domain(
 
     # Initialize epoch statistics
     recon_loss = 0
-    latent_structure_model_loss = 0
+    latent_sm_loss = 0
     kl_loss = 0
     total_loss = 0
 
@@ -1195,7 +1239,7 @@ def process_epoch_single_domain(
 
         recon_loss += batch_statistics["recon_loss"]
         if use_latent_structure_model:
-            latent_structure_model_loss += batch_statistics[
+            latent_sm_loss += batch_statistics[
                 "latent_structure_model_loss"
             ]
             correct_preds += batch_statistics["accuracy"][0]
@@ -1222,8 +1266,8 @@ def process_epoch_single_domain(
         epoch_statistics["kl_loss"] = kl_loss
 
     if use_latent_structure_model:
-        latent_structure_model_loss /= n_preds
-        epoch_statistics["latent_structure_model_loss"] = latent_structure_model_loss
+        latent_sm_loss /= n_preds
+        epoch_statistics["latent_structure_model_loss"] = latent_sm_loss
 
     return epoch_statistics
 

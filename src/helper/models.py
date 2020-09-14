@@ -20,6 +20,8 @@ class DomainModelConfig(object):
         self.labels = labels
         self.trainable = trainable
 
+        self.model.recon_loss_module = recon_loss_function
+
     def reset_model(self):
         self.model.load_state_dict(self.initial_weights)
 
