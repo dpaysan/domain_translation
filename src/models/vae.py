@@ -14,7 +14,7 @@ from src.utils.torch.general import get_device
 
 class BaseVAE(nn.Module):
     def __init__(self) -> None:
-        super(BaseVAE, self).__init__()
+        super().__init__()
         self.recon_loss_module = None
         self.model_base_type = 'vae'
 
@@ -53,7 +53,7 @@ class VanillaConvVAE(BaseVAE, ABC):
         lrelu_slope: int = 0.2,
         batchnorm: bool = True,
     ) -> None:
-        super(BaseVAE, self).__init__()
+        super().__init__()
         self.in_channels = input_channels
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
@@ -196,14 +196,14 @@ class VanillaConvVAE(BaseVAE, ABC):
 class VanillaVAE(BaseVAE, ABC):
     def __init__(
         self,
-        input_dim: int = 7633,
+        in_dims: int = 7633,
         latent_dim: int = 128,
         hidden_dims: List = None,
         batchnorm: bool = False,
         lrelu_slope: float = 0.2,
     ) -> None:
-        super(BaseVAE, self).__init__()
-        self.in_dims = input_dim
+        super().__init__()
+        self.in_dims = in_dims
         self.latent_dim = latent_dim
         if hidden_dims is None:
             self.hidden_dims = [1024, 1024, 1024, 1024, 1024, 1024]

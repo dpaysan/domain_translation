@@ -7,7 +7,7 @@ from torch import nn, Tensor
 
 class BaseAE(nn.Module):
     def __init__(self) -> None:
-        super(BaseAE, self).__init__()
+        super().__init__()
         self.recon_loss_module = None
         self.model_base_type='ae'
 
@@ -36,7 +36,7 @@ class VanillaAE(BaseAE, ABC):
             batchnorm_latent: bool = False,
             lrelu_slope: float = 0.2,
     ):
-        super(VanillaAE, self).__init__()
+        super().__init__()
         self.in_dims = in_dims
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
@@ -125,7 +125,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             batchnorm_latent: bool = False,
             lrelu_slope: float = 0.2,
     ):
-        super(TwoLatentSpaceAE, self).__init__()
+        super().__init__()
         self.in_dims = in_dims
         self.latent_dim_1 = latent_dim_1
         self.latent_dim_2 = latent_dim_2

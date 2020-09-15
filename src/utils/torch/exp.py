@@ -42,8 +42,7 @@ def train_autoencoders_two_domains(
     use_latent_discriminator: bool = True,
     use_latent_structure_model: bool = True,
     phase: str = "train",
-    vae_mode: bool = True,
-    partly_integrated_latent_space: bool = False,
+    model_base_type: str = 'ae',
     latent_distance_loss: Module = None,
     paired_training_mask: Tensor = None,
 ) -> dict:
@@ -175,7 +174,7 @@ def train_autoencoders_two_domains(
     #recon_loss_i = recon_loss_fct_i(recons_i, inputs_i)
     #recon_loss_j = recon_loss_fct_j(recons_j, inputs_j)
 
-    if vae_mode:
+    if model_base_type == 'vae':
         loss_dict_i = model_i.loss_function(inputs=inputs_i, recons=recons_i, mu=mu_i, logvar = logvar_i)
         loss_dict_j = model_j.loss_function(inputs=inputs_j, recons=recons_j, mu=mu_j, logvar=logvar_j)
 
@@ -190,7 +189,7 @@ def train_autoencoders_two_domains(
 
     total_loss = alpha * (recon_loss_i + recon_loss_j)
 
-    if vae_mode:
+    if model_base_type == 'vae':
         #kl_loss = compute_kld_multivariate_gaussians(mu_i, logvar_i) + compute_kld_multivariate_gaussians(mu_j, logvar_j)
         #total_loss += kl_loss * lamb
         kl_loss = (kld_loss_i + kld_loss_j) * lamb
@@ -249,7 +248,7 @@ def train_autoencoders_two_domains(
         alpha * (summary_stats["recon_loss_i"] + summary_stats["recon_loss_j"])
         + summary_stats["dcm_loss"] * beta
     )
-    if vae_mode:
+    if model_base_type == 'vae':
         summary_stats["kl_loss"] = kl_loss.item()
         total_loss_item += kl_loss.item() * lamb
 
@@ -426,18 +425,18 @@ def process_epoch_two_domains(
     n_preds_j = 0
     paired_distance_samples = 0
 
-    if domain_model_config_i.model.model_type != domain_model_config_i.model.model_type:
+    if domain_model_config_i.model.model_base_type != domain_model_config_i.model.model_base_type:
         raise RuntimeError(
-            "Model type mismatch: Got ({}, {}), Expected: AE, AE or (VAE, VAE)".format(
-                domain_model_config_i.model.model_type.upper(),
-                domain_model_config_j.model.model_type.upper(),
+            "Model type mismatch: Got ({}, {}), Expected: matching model types".format(
+                domain_model_config_i.model.model_base_type.upper(),
+                domain_model_config_j.model.model_base_type.upper(),
             )
         )
     # Todo - continue case separation implementation for loss functions based on model base type
-    base_model_type = domain_model_config_i.model.model_base_type.lower()
-    vae_mode = domain_model_config_i.model.model_base_type.lower() == "VAE"
+    model_base_type = domain_model_config_i.model.model_base_type.lower()
+    #vae_mode = domain_model_config_i.model.model_base_type.lower() == "VAE"
 
-    partly_integrated_latent_space = domain_model_config_i.model.n_latent_spaces == 2
+    #partly_integrated_latent_space = domain_model_config_i.model.n_latent_spaces == 2
 
     # Iterate over batches
     for index, (samples_i, samples_j) in enumerate(zip(train_loader_i, train_loader_j)):
@@ -473,8 +472,7 @@ def process_epoch_two_domains(
             use_latent_structure_model=use_latent_structure_model,
             phase=phase,
             device=device,
-            vae_mode=vae_mode,
-            partly_integrated_latent_space=partly_integrated_latent_space,
+            model_base_type=model_base_type,
             latent_distance_loss=latent_distance_loss,
             paired_training_mask=paired_training_mask,
         )
@@ -491,7 +489,7 @@ def process_epoch_two_domains(
             distance_loss += ae_train_summary["latent_distance_loss"]
             paired_distance_samples += ae_train_summary["paired_distance_samples"]
 
-        if vae_mode:
+        if model_base_type == 'vae':
             kl_loss += ae_train_summary["kl_loss"]
 
         if use_latent_structure_model:
@@ -538,7 +536,7 @@ def process_epoch_two_domains(
         "total_loss": total_loss,
     }
 
-    if vae_mode:
+    if model_base_type:
         epoch_statistics["kl_loss"] = kl_loss
 
     if use_latent_structure_model:
@@ -1088,7 +1086,7 @@ def train_autoencoder(
     phase: str = "train",
     use_latent_structure_model: bool = True,
     device: str = "cuda:0",
-    vae_mode: bool = True,
+    model_base_type: str = 'ae',
 ) -> dict:
     # Get all parameters of the configuration for domain i
     model = domain_model_config.model
@@ -1124,7 +1122,7 @@ def train_autoencoder(
     recons = outputs['recons']
     latents = outputs['latents']
 
-    if vae_mode:
+    if model_base_type == 'vae':
         mu = outputs['mu']
         logvar = outputs['logvar']
 
@@ -1145,7 +1143,7 @@ def train_autoencoder(
     recon_loss = loss_dict['recon_loss']
     total_loss = recon_loss
 
-    if vae_mode:
+    if model_base_type == 'vae':
         #kl_loss = compute_kld_multivariate_gaussians(mu, logvar)
         kl_loss = loss_dict['kld_loss']
         #kl_loss *= lamb
@@ -1173,7 +1171,7 @@ def train_autoencoder(
 
     batch_statistics = {"recon_loss": recon_loss.item() * batch_size}
 
-    if vae_mode:
+    if model_base_type == 'vae':
         batch_statistics["kl_loss"] = kl_loss.item()
         total_loss_item += kl_loss.item()
 
@@ -1216,7 +1214,7 @@ def process_epoch_single_domain(
     correct_preds = 0
     n_preds = 0
 
-    vae_mode = domain_model_config.model.model_type.upper() == "VAE"
+    model_base_type = domain_model_config.model.model_base_type.lower()
 
     # Iterate over batches
     for index, samples in enumerate(data_loader):
@@ -1234,7 +1232,7 @@ def process_epoch_single_domain(
             phase=phase,
             device=device,
             use_latent_structure_model=use_latent_structure_model,
-            vae_mode=vae_mode,
+            model_base_type=model_base_type,
         )
 
         recon_loss += batch_statistics["recon_loss"]
@@ -1244,7 +1242,7 @@ def process_epoch_single_domain(
             ]
             correct_preds += batch_statistics["accuracy"][0]
             n_preds += batch_statistics["accuracy"][1]
-        if vae_mode:
+        if model_base_type == 'vae':
             kl_loss += batch_statistics["kl_loss"]
         total_loss += batch_statistics["total_loss"]
 
@@ -1262,7 +1260,7 @@ def process_epoch_single_domain(
         "accuracy": accuracy,
         "total_loss": total_loss,
     }
-    if vae_mode:
+    if model_base_type == 'vae':
         epoch_statistics["kl_loss"] = kl_loss
 
     if use_latent_structure_model:

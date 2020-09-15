@@ -21,7 +21,7 @@ def evaluate_latent_integration(
     data_key_j: str = "seq_data",
     device: str = "cuda:0",
 ) -> dict:
-    if model_i.model_type != model_j.model_type:
+    if model_i.model_base_type != model_j.model_base_type:
         raise RuntimeError("Models must be of the same type, i.e. AE/AE or VAE/VAE.")
     if len(data_loader_i.dataset) != len(data_loader_j.dataset):
         raise RuntimeError(
@@ -272,7 +272,7 @@ def evaluate_latent_clf(
     data_loader_i = domain_configs[0].data_loader_dict[dataset_type]
     data_loader_j = domain_configs[1].data_loader_dict[dataset_type]
 
-    if model_i.model_type != model_j.model_type:
+    if model_i.model_base_type != model_j.model_base_type:
         raise RuntimeError("Models must be of the same type, i.e. AE/AE or VAE/VAE.")
     if len(data_loader_i.dataset) != len(data_loader_j.dataset):
         raise RuntimeError(
