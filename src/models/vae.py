@@ -196,14 +196,14 @@ class VanillaConvVAE(BaseVAE, ABC):
 class VanillaVAE(BaseVAE, ABC):
     def __init__(
         self,
-        in_dims: int = 7633,
+        input_dim: int = 7633,
         latent_dim: int = 128,
         hidden_dims: List = None,
         batchnorm: bool = False,
         lrelu_slope: float = 0.2,
     ) -> None:
         super().__init__()
-        self.in_dims = in_dims
+        self.input_dim = input_dim
         self.latent_dim = latent_dim
         if hidden_dims is None:
             self.hidden_dims = [1024, 1024, 1024, 1024, 1024, 1024]
@@ -217,7 +217,7 @@ class VanillaVAE(BaseVAE, ABC):
         # encoder
         encoder_modules = [
             nn.Sequential(
-                nn.Linear(self.in_dims, self.hidden_dims[0]),
+                nn.Linear(self.input_dim, self.hidden_dims[0]),
                 nn.BatchNorm1d(self.hidden_dims[0]),
             ),
             # nn.LeakyReLU(self.lrelu_slope),
@@ -257,7 +257,7 @@ class VanillaVAE(BaseVAE, ABC):
                 )
             )
 
-        decoder_modules.append(nn.Linear(self.hidden_dims[0], self.in_dims))
+        decoder_modules.append(nn.Linear(self.hidden_dims[0], self.input_dim))
         self.decoder = nn.Sequential(*decoder_modules)
 
     def encode(self, input: Tensor) -> Tuple[Tensor, Tensor]:

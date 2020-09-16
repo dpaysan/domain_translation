@@ -7,14 +7,14 @@ run_params:
 
   model_config : {'model_config':{'type':'VanillaAE',
                         'hidden_dims':[1024, 512, 256, 128],
-                        'latent_dim': 64,
-                        'in_dims':1276},
-                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.005},
+                        'latent_dim': 50,
+                        'in_dims':2613},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
 
   latent_clf_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':64, 'n_classes':3},
                       'optimizer_config':{'type':'adam', 'lr':0.0001},
-                      'loss_config':{'type':'ce', 'weights':[4, 3, 3]}}
+                      'loss_config':{'type':'ce',}}
 
   domain_name: 'rna'
   num_epochs: 4000

@@ -107,10 +107,12 @@ class PZYNetwork(Module, ABC):
         self.n_components = n_components
         self.latent_dim = latent_dim
 
-        self.mu = nn.Linear(n_components, latent_dim)
-        self.logvar = nn.Linear(n_components, latent_dim)
+        self.mu = nn.Embedding(n_components, latent_dim)
+        self.logvar = nn.Embedding(n_components, latent_dim)
 
     def forward(self, y: Tensor) -> Tuple[Tensor, Tensor]:
+        #y_onehot = torch.zeros(y.size()[0], self.n_components)
+        #y_onehot = y_onehot.scatter(1,y,1)
         mu = self.mu(y)
         logvar = self.logvar(y)
 
@@ -162,17 +164,31 @@ class GaussianMixtureVAE(Module, ABC):
     def __init__(
         self,
         input_dim,
-        hidden_dims_qyx: List,
-        hidden_dims_qzyx: List,
-        hidden_dims_qxz: List,
+        hidden_dims:List,
         latent_dim: int,
         n_components: int,
+        hidden_dims_qyx: List=None,
+        hidden_dims_qzyx: List=None,
+        hidden_dims_qxz: List=None,
     ):
         super().__init__()
         self.input_dim = input_dim
-        self.hidden_dims_qyx = hidden_dims_qyx
-        self.hidden_dims_qzyx = hidden_dims_qzyx
-        self.hidden_dims_qxz = hidden_dims_qxz
+
+        if hidden_dims_qyx is not None:
+            self.hidden_dims_qyx = hidden_dims_qyx
+        else:
+            self.hidden_dims_qyx = hidden_dims
+
+        if hidden_dims_qzyx is not None:
+            self.hidden_dims_qzyx = hidden_dims_qzyx
+        else:
+            self.hidden_dims_qzyx = hidden_dims
+
+        if hidden_dims_qxz is not None:
+            self.hidden_dims_qxz = hidden_dims_qxz
+        else:
+            self.hidden_dims_qxz = hidden_dims
+
         self.latent_dim = latent_dim
         self.n_components = n_components
 
@@ -184,12 +200,12 @@ class GaussianMixtureVAE(Module, ABC):
 
         self.qyx_network = QYXNetwork(
             input_dim=self.input_dim,
-            hidden_dims=hidden_dims_qyx,
+            hidden_dims=self.hidden_dims_qyx,
             n_components=self.n_components,
         )
         self.qzyx_network = QZYXNetwork(
             input_dim=self.input_dim,
-            hidden_dims=hidden_dims_qzyx,
+            hidden_dims=self.hidden_dims_qzyx,
             n_components=self.n_components,
             latent_dim=self.latent_dim,
         )

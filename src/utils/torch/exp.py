@@ -100,6 +100,10 @@ def train_autoencoders_two_domains(
 
     # Forward pass of the AE/VAE
     inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
+    labels_i, labels_j = (
+        Variable(labels_i).to(device),
+        Variable(labels_j).to(device),
+    )
 
     outputs_i = model_i(inputs_i)
     outputs_j = model_j(inputs_j)
@@ -110,12 +114,94 @@ def train_autoencoders_two_domains(
     latents_i = outputs_i['latents']
     latents_j = outputs_j['latents']
 
-    if 'mu' in outputs_i and 'mu' in outputs_j:
+    if model_base_type == 'vae':
         mu_i = outputs_i['mu']
         mu_j = outputs_j['mu']
 
         logvar_i = outputs_i['logvar']
         logvar_j = outputs_j['logvar']
+
+        loss_dict_i = model_i.loss_function(inputs=inputs_i, recons=recons_i, mu=mu_i, logvar=logvar_i)
+        loss_dict_j = model_j.loss_function(inputs=inputs_j, recons=recons_j, mu=mu_j, logvar=logvar_j)
+
+        recon_loss_i = loss_dict_i['recon_loss']
+        kld_loss_i = loss_dict_i['kld_loss']
+
+        recon_loss_j = loss_dict_j['recon_loss']
+        kld_loss_j = loss_dict_j['kld_loss']
+
+        kl_loss = (kld_loss_i + kld_loss_j)
+        total_loss = alpha * (recon_loss_i + recon_loss_j) + kl_loss * lamb
+    elif model_base_type == 'gmvae':
+
+        logits_i = outputs_i['logits']
+        probs_i = outputs_i['probs']
+        component_labels_i = outputs_i['component_labels']
+        mu_i = outputs_i['mu']
+        logvar_i = outputs_i['logvar']
+        mu_component_prior_i = outputs_i['mu_component_prior']
+        logvar_component_prior_i = outputs_i['logvar_component_prior']
+
+        logits_j = outputs_j['logits']
+        probs_j = outputs_j['probs']
+        component_labels_j = outputs_j['component_labels']
+        mu_j = outputs_j['mu']
+        logvar_j = outputs_j['logvar']
+        mu_component_prior_j = outputs_j['mu_component_prior']
+        logvar_component_prior_j = outputs_j['logvar_component_prior']
+
+        loss_dict_i = model_i.loss_function(inputs=inputs_i, recons=recons_i, mu=mu_i, logvar=logvar_i, mu_prior=mu_component_prior_i,
+                      logvar_prior=logvar_component_prior_i, y_probs=probs_i, y_logits=logits_i, y_true=labels_i)
+
+        loss_dict_j = model_j.loss_function(inputs=inputs_j, recons=recons_j, mu=mu_j, logvar=logvar_j,
+                                            mu_prior=mu_component_prior_j,
+                                            logvar_prior=logvar_component_prior_j, y_probs=probs_j, y_logits=logits_j,
+                                            y_true=labels_j)
+
+        recon_loss_i = loss_dict_i['recon_loss']
+        kld_loss_i = loss_dict_i['kld_loss']
+        component_prior_loss_i = loss_dict_i['component_prior_loss']
+        component_supervision_loss_i = loss_dict_i['component_supervision_loss']
+
+        recon_loss_j = loss_dict_j['recon_loss']
+        kld_loss_j = loss_dict_j['kld_loss']
+        component_prior_loss_j = loss_dict_j['component_prior_loss']
+        component_supervision_loss_j = loss_dict_j['component_supervision_loss']
+
+        kl_loss = kld_loss_i + kld_loss_j
+
+        total_loss = alpha * (recon_loss_i + recon_loss_j) + lamb * kl_loss
+        if component_prior_loss_i is not None and component_prior_loss_j is not None:
+            total_loss += (component_prior_loss_i + component_prior_loss_j)
+        elif component_supervision_loss_i is not None and component_supervision_loss_j is not None:
+            total_loss += (component_supervision_loss_i + component_supervision_loss_j)
+
+    elif model_base_type == 'ae':
+        recon_loss_i = model_i.loss_function(inputs=inputs_i, recons=recons_i)['recon_loss']
+        recon_loss_j = model_j.loss_function(inputs=inputs_j, recons=recons_j)['recon_loss']
+        total_loss = alpha * (recon_loss_i + recon_loss_j)
+    else:
+        raise RuntimeError('Unknown model type: {}'.format(model_base_type))
+
+    # if 'mu' in outputs_i and 'mu' in outputs_j:
+    #     mu_i = outputs_i['mu']
+    #     mu_j = outputs_j['mu']
+    #
+    #     logvar_i = outputs_i['logvar']
+    #     logvar_j = outputs_j['logvar']
+    #
+    # if model_base_type == 'gmvae':
+    #     logits_i = outputs_i['logits']
+    #     probs_i = outputs_i['probs']
+    #     component_labels_i = outputs_i['component_labels']
+    #     mu_component_prior_i = outputs_i['mu_component_prior']
+    #     logvar_component_prior_i = outputs_i['logvar_component_prior']
+    #
+    #     logits_j = outputs_j['logits']
+    #     probs_j = outputs_j['probs']
+    #     component_labels_j = outputs_j['component_labels']
+    #     mu_component_prior_j = outputs_j['mu_component_prior']
+    #     logvar_component_prior_j = outputs_j['logvar_component_prior']
 
     # if partly_integrated_latent_space:
     #     if vae_mode:
@@ -133,10 +219,10 @@ def train_autoencoders_two_domains(
     #         recons_j, latents_j = model_j(inputs_j)
 
     if use_latent_discriminator:
-        labels_i, labels_j = (
-            Variable(labels_i).to(device),
-            Variable(labels_j).to(device),
-        )
+        # labels_i, labels_j = (
+        #     Variable(labels_i).to(device),
+        #     Variable(labels_j).to(device),
+        # )
 
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used group of the samples (see Adversarial AutoEncoder paper)
@@ -174,25 +260,25 @@ def train_autoencoders_two_domains(
     #recon_loss_i = recon_loss_fct_i(recons_i, inputs_i)
     #recon_loss_j = recon_loss_fct_j(recons_j, inputs_j)
 
-    if model_base_type == 'vae':
-        loss_dict_i = model_i.loss_function(inputs=inputs_i, recons=recons_i, mu=mu_i, logvar = logvar_i)
-        loss_dict_j = model_j.loss_function(inputs=inputs_j, recons=recons_j, mu=mu_j, logvar=logvar_j)
+    # if model_base_type == 'vae':
+    #     loss_dict_i = model_i.loss_function(inputs=inputs_i, recons=recons_i, mu=mu_i, logvar = logvar_i)
+    #     loss_dict_j = model_j.loss_function(inputs=inputs_j, recons=recons_j, mu=mu_j, logvar=logvar_j)
+    #
+    #     recon_loss_i = loss_dict_i['recon_loss']
+    #     kld_loss_i = loss_dict_i['kld_loss']
+    #
+    #     recon_loss_j = loss_dict_j['recon_loss']
+    #     kld_loss_j = loss_dict_j['kld_loss']
+    #     kl_loss = (kld_loss_i + kld_loss_j)
+    #     total_loss = alpha * (recon_loss_i + recon_loss_j) + kl_loss * lamb
+    # elif model_base_type == 'gmvae':
+    #     loss_dict_i = model_i.loss_function(inputs=inputs_i, recons=recons_i, mu=mu_i, logvar=logvar_i)
+    #     loss_dict_j = model_j.loss_function(inputs=inputs_j, recons=recons_j, mu=mu_j, logvar=logvar_j)
+    # else:
+    #     recon_loss_i = model_i.loss_function(inputs=inputs_i, recons=recons_i)['recon_loss']
+    #     recon_loss_j = model_j.loss_function(inputs=inputs_j, recons=recons_j)['recon_loss']
+    #     total_loss = alpha * (recon_loss_i + recon_loss_j)
 
-        recon_loss_i = loss_dict_i['recon_loss']
-        kld_loss_i = loss_dict_i['kld_loss']
-
-        recon_loss_j = loss_dict_j['recon_loss']
-        kld_loss_j = loss_dict_j['kld_loss']
-    else:
-        recon_loss_i = model_i.loss_function(inputs=inputs_i, recons=recons_i)['recon_loss']
-        recon_loss_j = model_j.loss_function(inputs=inputs_j, recons=recons_j)['recon_loss']
-
-    total_loss = alpha * (recon_loss_i + recon_loss_j)
-
-    if model_base_type == 'vae':
-        #kl_loss = compute_kld_multivariate_gaussians(mu_i, logvar_i) + compute_kld_multivariate_gaussians(mu_j, logvar_j)
-        #total_loss += kl_loss * lamb
-        kl_loss = (kld_loss_i + kld_loss_j) * lamb
 
     # Calculate adversarial loss - by mixing labels indicating domain with output predictions to "confuse" the
     # discriminator and encourage learning autoencoder that make the distinction between the modalities in the latent
@@ -251,6 +337,9 @@ def train_autoencoders_two_domains(
     if model_base_type == 'vae':
         summary_stats["kl_loss"] = kl_loss.item()
         total_loss_item += kl_loss.item() * lamb
+    elif model_base_type == 'gmvae':
+        summary_stats["kl_loss"] = kl_loss.item()
+        total_loss_item = total_loss.item()
 
     if use_latent_structure_model:
         summary_stats["latent_structure_model_loss"] = latent_sm_loss.item() * (
@@ -388,7 +477,7 @@ def process_epoch_two_domains(
     beta: float = 1.0,
     gamma: float = 1.0,
     delta: float = 1.0,
-    lamb: float = 0.00000001,
+    lamb: float = 0.000001,
     use_latent_discriminator: bool = True,
     use_latent_structure_model: bool = False,
     phase: str = "train",
@@ -491,6 +580,8 @@ def process_epoch_two_domains(
 
         if model_base_type == 'vae':
             kl_loss += ae_train_summary["kl_loss"]
+        elif model_base_type == 'gmvae':
+            kl_loss += ae_train_summary['kl_loss']
 
         if use_latent_structure_model:
             latent_sm_loss += ae_train_summary["latent_structure_model_loss"]
@@ -536,7 +627,7 @@ def process_epoch_two_domains(
         "total_loss": total_loss,
     }
 
-    if model_base_type:
+    if model_base_type in ['vae', 'gmvae']:
         epoch_statistics["kl_loss"] = kl_loss
 
     if use_latent_structure_model:
@@ -560,7 +651,7 @@ def train_val_test_loop_two_domains(
     beta: float = 1.0,
     gamma: float = 1.0,
     delta: float = 1.0,
-    lamb: float = 0.0000001,
+    lamb: float = 0.00001,
     use_latent_discriminator: bool = True,
     use_latent_structure_model: bool = False,
     num_epochs: int = 500,

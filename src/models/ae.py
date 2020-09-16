@@ -30,14 +30,14 @@ class BaseAE(nn.Module):
 class VanillaAE(BaseAE, ABC):
     def __init__(
             self,
-            in_dims: int = 2613,
+            input_dim: int = 2613,
             latent_dim: int = 128,
             hidden_dims: List = None,
             batchnorm_latent: bool = False,
             lrelu_slope: float = 0.2,
     ):
         super().__init__()
-        self.in_dims = in_dims
+        self.input_dim = input_dim
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
         self.batchnorm_latent = batchnorm_latent
@@ -49,7 +49,7 @@ class VanillaAE(BaseAE, ABC):
         if len(self.hidden_dims) > 0:
             encoder_modules = [
                 nn.Sequential(
-                    nn.Linear(self.in_dims, self.hidden_dims[0]),
+                    nn.Linear(self.input_dim, self.hidden_dims[0]),
                     # nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
@@ -96,7 +96,7 @@ class VanillaAE(BaseAE, ABC):
                 )
             )
 
-        decoder_modules.append(nn.Linear(self.hidden_dims[0], self.in_dims))
+        decoder_modules.append(nn.Linear(self.hidden_dims[0], self.input_dim))
 
         self.decoder = nn.Sequential(*decoder_modules)
 
@@ -118,7 +118,7 @@ class VanillaAE(BaseAE, ABC):
 class TwoLatentSpaceAE(BaseAE, ABC):
     def __init__(
             self,
-            in_dims: int = 2613,
+            input_dim: int = 2613,
             latent_dim_1: int = 128,
             latent_dim_2: int = 64,
             hidden_dims: List = None,
@@ -126,7 +126,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             lrelu_slope: float = 0.2,
     ):
         super().__init__()
-        self.in_dims = in_dims
+        self.input_dim = input_dim
         self.latent_dim_1 = latent_dim_1
         self.latent_dim_2 = latent_dim_2
         self.hidden_dims = hidden_dims
@@ -139,7 +139,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
         if len(self.hidden_dims) > 0:
             encoder_modules = [
                 nn.Sequential(
-                    nn.Linear(self.in_dims, self.hidden_dims[0]),
+                    nn.Linear(self.input_dim, self.hidden_dims[0]),
                     # nn.BatchNorm1d(self.hidden_dims[0]),
                     # nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
@@ -181,7 +181,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
                 )
             )
 
-        decoder_modules.append(nn.Linear(self.hidden_dims[0], self.in_dims))
+        decoder_modules.append(nn.Linear(self.hidden_dims[0], self.input_dim))
 
         self.decoder = nn.Sequential(*decoder_modules)
 
