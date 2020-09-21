@@ -16,7 +16,7 @@ class BaseVAE(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.recon_loss_module = None
-        self.model_base_type = 'vae'
+        self.model_base_type = "vae"
 
     def encode(self, input: Tensor) -> List[Tensor]:
         raise NotImplementedError
@@ -37,10 +37,12 @@ class BaseVAE(nn.Module):
     def forward(self, *inputs: Tensor) -> Tensor:
         pass
 
-    def loss_function(self, inputs: Tensor, recons:Tensor, mu:Tensor, logvar:Tensor) -> dict:
+    def loss_function(
+        self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
+    ) -> dict:
         recon_loss = self.recon_loss_module(inputs, recons)
         kld_loss = compute_kld_multivariate_gaussians(mu=mu, logvar=logvar)
-        loss_dict = {'recon_loss':recon_loss, 'kld_loss':kld_loss}
+        loss_dict = {"recon_loss": recon_loss, "kld_loss": kld_loss}
         return loss_dict
 
 
@@ -60,7 +62,7 @@ class VanillaConvVAE(BaseVAE, ABC):
         self.lrelu_slope = lrelu_slope
         self.batchnorm = batchnorm
         self.updated = False
-        #self.model_type = "VAE"
+        # self.model_type = "VAE"
         self.n_latent_spaces = 1
 
         # encoder
@@ -171,7 +173,7 @@ class VanillaConvVAE(BaseVAE, ABC):
         mu, logvar = self.encode(input)
         z = self.reparameterize(mu, logvar)
         recons = self.decode(z)
-        output = {'recons':recons, 'latents':z, 'mu':mu, 'logvar':logvar}
+        output = {"recons": recons, "latents": z, "mu": mu, "logvar": logvar}
         return output
 
     def get_latent_representation(self, input: Tensor) -> Tensor:
@@ -189,7 +191,9 @@ class VanillaConvVAE(BaseVAE, ABC):
         samples = self.decode(z)
         return samples
 
-    def loss_function(self, inputs: Tensor, recons:Tensor, mu:Tensor, logvar:Tensor) -> dict:
+    def loss_function(
+        self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
+    ) -> dict:
         return super().loss_function(inputs=inputs, recons=recons, mu=mu, logvar=logvar)
 
 
@@ -212,7 +216,7 @@ class VanillaVAE(BaseVAE, ABC):
         self.batchnorm = batchnorm
         self.updated = False
         self.lrelu_slope = lrelu_slope
-        #self.model_type = "VAE"
+        # self.model_type = "VAE"
 
         # encoder
         encoder_modules = [
@@ -280,7 +284,7 @@ class VanillaVAE(BaseVAE, ABC):
         mu, logvar = self.encode(input)
         z = self.reparameterize(mu, logvar)
         recons = self.decode(z)
-        output = {'recons':recons, 'latents':z, 'mu':mu, 'logvar':logvar}
+        output = {"recons": recons, "latents": z, "mu": mu, "logvar": logvar}
         return output
 
     def get_latent_representation(self, input: Tensor) -> Tensor:
@@ -298,7 +302,9 @@ class VanillaVAE(BaseVAE, ABC):
         samples = self.decode(z)
         return samples
 
-    def loss_function(self, inputs: Tensor, recons:Tensor, mu:Tensor, logvar:Tensor) -> dict:
+    def loss_function(
+        self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
+    ) -> dict:
         return super().loss_function(inputs=inputs, recons=recons, mu=mu, logvar=logvar)
 
 

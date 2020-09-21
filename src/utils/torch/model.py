@@ -26,7 +26,7 @@ from src.models.latent_models import (
     LatentClassifier,
     LatentRegressor,
 )
-from src.models.gmvae import GaussianMixtureVAE
+from src.models.gmvae import GaussianMixtureVAE, GaussianMixtureConvVAE
 from src.models.vae import VanillaConvVAE, VanillaVAE
 from src.utils.torch.general import get_device
 
@@ -66,8 +66,10 @@ def get_domain_configuration(
         model = VanillaAE(**model_dict)
     elif model_type == "TwoLatentSpaceAE":
         model = TwoLatentSpaceAE(**model_dict)
-    elif model_type == 'GaussianMixtureVAE':
+    elif model_type == "GaussianMixtureVAE":
         model = GaussianMixtureVAE(**model_dict)
+    elif model_type == 'GaussianMixtureConvVAE':
+        model = GaussianMixtureConvVAE(**model_dict)
     else:
         raise NotImplementedError('Unknown model type "{}"'.format(model_type))
 

@@ -2,24 +2,25 @@ output_dir: '../../data/a549/experiments'
 module: src.experiments.model_pretraining
 class: PretrainAeExperiment
 run_params:
-  data_config: {'data_fname':'../../data/a549_dex/processed/atac_data.csv',
+  data_config: {'data_fname':'../../data/a549_dex/processed/rna_data.csv',
                       'data_key':'seq_data', 'label_key':'label'}
 
-  model_config : {'model_config':{'type':'VanillaAE',
-                        'hidden_dims':[2048, 2048, 2048, 2048, 2048, 2048, 2048,],
+  model_config : {'model_config':{'type':'GaussianMixtureVAE',
+                        'hidden_dims':[1024, 512, 256, 128],
+                        'n_components': 3,
                         'latent_dim': 50,
-                        'input_dim':815},
-                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.0005},
+                        'input_dim':2613},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':50, 'n_classes':3},
                       'optimizer_config':{'type':'adam', 'lr':0.00001},
                       'loss_config':{'type':'ce',}}
 
-  domain_name: 'atac'
-  num_epochs: 10000
-  early_stopping: -1
-  train_val_test_split: [0.6, 0.2, 0.2]
+  domain_name: 'rna'
+  num_epochs: 4000
+  early_stopping: 100
+  train_val_test_split: [0.6, 0.3, 0.1]
   batch_size: 32
   random_state: 1001
 
@@ -31,11 +32,11 @@ pipeline:
   - method: initialize_clf_model
   #- method: load_model
   #  params:
-  #    weights_fname: '../../data/a549/experiments/20200813_153042/best_model.pth
+  #    weights_fname: '../../data/experiments/20200805_134219/best_vae.pth'
   - method: train_models
     params:
-      alpha: 0
-      gamma: 0.1
-      save_freq: 1000
-      use_latent_structure_model: True
+      gamma: 100.0
+      lamb: 1.0
+      save_freq: 100
+      use_latent_structure_model: False
 

@@ -8,18 +8,18 @@ run_params:
   model_config : {'model_config':{'type':'VanillaAE',
                         'hidden_dims':[1024, 512, 256, 128],
                         'latent_dim': 50,
-                        'in_dims':2613},
-                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
+                        'input_dim':2613},
+                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
 
-  latent_clf_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':64, 'n_classes':3},
+  latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':50, 'n_classes':3},
                       'optimizer_config':{'type':'adam', 'lr':0.0001},
                       'loss_config':{'type':'ce',}}
 
   domain_name: 'rna'
-  num_epochs: 4000
-  early_stopping: 50
-  train_val_test_split: [0.7, 0.2, 0.1]
+  num_epochs: 10000
+  early_stopping: 100
+  train_val_test_split: [0.6, 0.2, 0.2]
   batch_size: 32
   random_state: 1234
 
@@ -34,7 +34,8 @@ pipeline:
   #    weights_fname: '../../data/experiments/20200805_134219/best_vae.pth'
   - method: train_models
     params:
-      beta: 0.001
+      alpha: 0
+      gamma: 0.1
       save_freq: 1000
-      use_clf: True
+      use_latent_structure_model: True
 

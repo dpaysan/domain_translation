@@ -5,11 +5,12 @@ run_params:
   data_config: {'data_fname':'../../data/a549_dex/processed/atac_data.csv',
                       'data_key':'seq_data', 'label_key':'label'}
 
-  model_config : {'model_config':{'type':'VanillaAE',
-                        'hidden_dims':[2048, 2048, 2048, 2048, 2048, 2048, 2048,],
+  model_config : {'model_config':{'type':'GaussianMixtureVAE',
+                        'hidden_dims':[512, 256, 128, 64],
                         'latent_dim': 50,
+                        'n_components': 3,
                         'input_dim':815},
-                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.0005},
+                        'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0000},
                         'loss_config':{'type':'mae'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':50, 'n_classes':3},
@@ -18,8 +19,8 @@ run_params:
 
   domain_name: 'atac'
   num_epochs: 10000
-  early_stopping: -1
-  train_val_test_split: [0.6, 0.2, 0.2]
+  early_stopping: 100
+  train_val_test_split: [0.7, 0.2, 0.1]
   batch_size: 32
   random_state: 1001
 
@@ -34,8 +35,8 @@ pipeline:
   #    weights_fname: '../../data/a549/experiments/20200813_153042/best_model.pth
   - method: train_models
     params:
-      alpha: 0
-      gamma: 0.1
-      save_freq: 1000
-      use_latent_structure_model: True
+      gamma: 1.0
+      lamb: 0.001
+      save_freq: 100
+      use_latent_structure_model: False
 

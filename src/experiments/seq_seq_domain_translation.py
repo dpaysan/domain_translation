@@ -10,7 +10,7 @@ from src.experiments.base import BaseTwoDomainExperiment, BaseTwoDomainExperimen
 from src.helper.data import DataHandler, DataHandlerCV
 from src.utils.basic.io import get_model_file_list_for_two_domain_experiment
 from src.utils.torch.data import init_seq_dataset
-from src.utils.torch.evaluation import evaluate_latent_clf
+from src.utils.torch.evaluation import evaluate_latent_clf_two_domains
 from src.utils.torch.exp import train_val_test_loop_two_domains
 from src.utils.torch.model import (
     get_domain_configuration,
@@ -570,15 +570,16 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
             self.loss_dicts.append(loss_dict)
 
             if use_latent_structure_model:
-                confusion_dict = evaluate_latent_clf(
+                confusion_dict = evaluate_latent_clf_two_domains(
                     domain_configs=self.domain_configs,
                     latent_clf=self.latent_structure_model_config["model"],
                     device=self.device,
                     dataset_type="test",
                 )
                 logging.debug(
-                    "Confusion matrices of the latent classifier for fold {}: %s"
-                    .format(str(i + 1)),
+                    "Confusion matrices of the latent classifier for fold {}: %s".format(
+                        str(i + 1)
+                    ),
                     confusion_dict,
                 )
 
@@ -733,14 +734,15 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                 latent_distance_loss=self.latent_distance_loss,
             )
             if use_latent_structure_model:
-                confusion_dict = evaluate_latent_clf(
+                confusion_dict = evaluate_latent_clf_two_domains(
                     domain_configs=self.domain_configs,
                     latent_clf=self.latent_structure_model_config["model"],
                     device=self.device,
                     dataset_type="test",
                 )
                 logging.debug(
-                    "Confusion matrices of the latent classifier for fold {}: %s"
-                    .format(str(i + 1)),
+                    "Confusion matrices of the latent classifier for fold {}: %s".format(
+                        str(i + 1)
+                    ),
                     confusion_dict,
                 )

@@ -1,3 +1,4 @@
+import logging
 from typing import List
 
 import torch
@@ -8,6 +9,7 @@ from src.utils.torch.data import (
     init_nuclei_image_dataset,
     init_seq_dataset,
 )
+from src.utils.torch.evaluation import evaluate_latent_clf_two_domains, evaluate_latent_clf_one_domain
 from src.utils.torch.exp import train_val_test_loop_vae
 from src.utils.torch.general import get_device
 from src.utils.torch.model import (
@@ -114,7 +116,8 @@ class PretrainAeExperiment(BaseExperiment):
 
     def train_models(
         self,
-        beta: float = 1.0,
+        alpha: float = 1.0,
+        gamma: float = 1.0,
         lamb: float = 0.00000001,
         use_latent_structure_model: bool = False,
         save_freq: int = 50,
@@ -126,11 +129,25 @@ class PretrainAeExperiment(BaseExperiment):
             num_epochs=self.num_epochs,
             early_stopping=self.early_stopping,
             device=self.device,
-            gamma=beta,
+            alpha=alpha,
+            gamma=gamma,
             lamb=lamb,
             use_latent_structure_model=use_latent_structure_model,
             save_freq=save_freq,
         )
+
+        if use_latent_structure_model:
+            confusion_dict = evaluate_latent_clf_one_domain(
+                domain_config=self.domain_config,
+                latent_clf=self.latent_structure_model_config["model"],
+                device=self.device,
+                dataset_type="test",
+            )
+            logging.debug(
+                "Confusion matrices of the latent classifier: %s".format(
+                ),
+                confusion_dict,
+            )
 
     def load_model(self, weights_fname):
         weights = torch.load(weights_fname)

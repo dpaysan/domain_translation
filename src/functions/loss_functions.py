@@ -19,18 +19,26 @@ def kl_divergence(mu: Tensor, logsigma: Tensor) -> Tensor:
     return kld
 
 
-def compute_kld_multivariate_gaussians(mu:Tensor, logvar:Tensor, mu_prior=None, logvar_prior:Tensor=None)->Tensor:
+def compute_kld_multivariate_gaussians(
+    mu: Tensor, logvar: Tensor, mu_prior=None, logvar_prior: Tensor = None
+) -> Tensor:
     if mu_prior is None:
         mu_prior = torch.zeros_like(mu)
     if logvar_prior is None:
         logvar_prior = torch.ones_like(logvar)
 
-    #KLloss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-    kld = 0.5 * torch.sum(logvar_prior - logvar - 1 + (mu-mu_prior).pow(2)/logvar_prior.exp() +logvar.exp()/logvar_prior.exp())
+    # KLloss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    kld = 0.5 * torch.sum(
+        logvar_prior
+        - logvar
+        - 1
+        + (mu - mu_prior).pow(2) / logvar_prior.exp()
+        + logvar.exp() / logvar_prior.exp()
+    )
     return kld
 
 
-def compute_kld_categoricals(ps:Tensor, qs:Tensor=None)->Tensor:
+def compute_kld_categoricals(ps: Tensor, qs: Tensor = None) -> Tensor:
     if qs is None:
         qs = torch.ones_like(ps).div(ps.size()[1])
 

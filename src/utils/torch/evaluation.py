@@ -45,8 +45,8 @@ def evaluate_latent_integration(
     ):
         input_i, input_j = samples_i[data_key_i], samples_j[data_key_j]
         input_i, input_j = input_i.to(device), input_j.to(device)
-        latent_i = model_i(input_i)['latents'].detach().cpu().numpy()
-        latent_j = model_j(input_j)['latents'].detach().cpu().numpy()
+        latent_i = model_i(input_i)["latents"].detach().cpu().numpy()
+        latent_j = model_j(input_j)["latents"].detach().cpu().numpy()
 
         latents_i.append(latent_i)
         latents_j.append(latent_j)
@@ -96,13 +96,13 @@ def get_latent_representations_for_model(
             labels.append(sample[label_key].item())
 
         output = model(input)
-        shared_latent_representation = output['latents']
+        shared_latent_representation = output["latents"]
         shared_latent_representations.append(
             shared_latent_representation.detach().cpu().numpy()
         )
-        #if hasattr(model, "n_latent_spaces") and model.n_latent_spaces == 2:
-        if 'unshared_latents' in output:
-            domain_specific_latent_representation = output['unshared_latents']
+        # if hasattr(model, "n_latent_spaces") and model.n_latent_spaces == 2:
+        if "unshared_latents" in output:
+            domain_specific_latent_representation = output["unshared_latents"]
             domain_specific_latent_representations.append(
                 domain_specific_latent_representation.detach().cpu().numpy()
             )
@@ -165,8 +165,9 @@ def save_latents_to_csv(
         dataset = domain_config.data_loader_dict[dataset_type].dataset
     except KeyError:
         raise RuntimeError(
-            "Unknown dataset_type: {}, expected one of the following: train, val, test"
-            .format(dataset_type)
+            "Unknown dataset_type: {}, expected one of the following: train, val, test".format(
+                dataset_type
+            )
         )
     save_latents_and_labels_to_csv(
         model=model,
@@ -253,7 +254,32 @@ def get_shared_latent_space_dict_for_multiple_domains(
     return latents_dict, label_dict
 
 
-def evaluate_latent_clf(
+def evaluate_latent_clf_one_domain(domain_config:DomainConfig, latent_clf:torch.nn.Module, dataset_type:str='test', device:str='cuda:0'):
+    model = domain_config.domain_model_config.model.to(device)
+    latent_clf.to(device)
+
+    data_key = domain_config.data_key
+    label_key = domain_config.label_key
+
+    data_loader = domain_config.data_loader_dict[dataset_type]
+
+    single_sample_loader = DataLoader(dataset=data_loader.dataset, shuffle=False, batch_size=1)
+    labels = []
+    preds = []
+
+    for idx, sample in enumerate(single_sample_loader):
+        input = sample[data_key].to(device)
+        label = sample[label_key].to(device)
+        latent = model(input)['latents']
+        _, pred = torch.max(latent_clf(latent), dim=1)
+
+        labels.append(label.cpu().numpy())
+        preds.append(pred.cpu().detach().numpy())
+    labels = np.array(labels).squeeze()
+    preds = np.array(preds).squeeze()
+    return confusion_matrix(labels, preds)
+
+def evaluate_latent_clf_two_domains(
     domain_configs: List[DomainConfig],
     latent_clf: torch.nn.Module,
     dataset_type: str = "test",
@@ -301,8 +327,8 @@ def evaluate_latent_clf(
         label_i, label_j = samples_i[label_key_i], samples_j[label_key_j]
 
         input_i, input_j = input_i.to(device), input_j.to(device)
-        latent_i = model_i(input_i)['latents']
-        latent_j = model_j(input_j)['latents']
+        latent_i = model_i(input_i)["latents"]
+        latent_j = model_j(input_j)["latents"]
 
         _, pred_i = torch.max(latent_clf(latent_i), dim=1)
         _, pred_j = torch.max(latent_clf(latent_j), dim=1)

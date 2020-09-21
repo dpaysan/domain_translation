@@ -57,7 +57,7 @@ def visualize_image_vae_performance(
     image_vae = domain_model_config.model.to(device)
     image_inputs = domain_model_config.inputs.to(device)
 
-    recon_images, _, _, _ = image_vae(image_inputs)
+    recon_images = image_vae(image_inputs)['recons']
     sample_images = image_vae.sample(5, device=device)
 
     for i in range(5):
