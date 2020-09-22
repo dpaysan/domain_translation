@@ -68,7 +68,7 @@ def get_domain_configuration(
         model = TwoLatentSpaceAE(**model_dict)
     elif model_type == "GaussianMixtureVAE":
         model = GaussianMixtureVAE(**model_dict)
-    elif model_type == 'GaussianMixtureConvVAE':
+    elif model_type == "GaussianMixtureConvVAE":
         model = GaussianMixtureConvVAE(**model_dict)
     else:
         raise NotImplementedError('Unknown model type "{}"'.format(model_type))

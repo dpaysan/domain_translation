@@ -9,8 +9,11 @@ from src.utils.torch.data import (
     init_nuclei_image_dataset,
     init_seq_dataset,
 )
-from src.utils.torch.evaluation import evaluate_latent_clf_two_domains, evaluate_latent_clf_one_domain
-from src.utils.torch.exp import train_val_test_loop_vae
+from src.utils.torch.evaluation import (
+    evaluate_latent_clf_two_domains,
+    evaluate_latent_clf_one_domain,
+)
+from src.utils.torch.exp import train_val_test_loop_single_domain
 from src.utils.torch.general import get_device
 from src.utils.torch.model import (
     get_domain_configuration,
@@ -122,7 +125,7 @@ class PretrainAeExperiment(BaseExperiment):
         use_latent_structure_model: bool = False,
         save_freq: int = 50,
     ):
-        self.trained_models, self.loss_dict = train_val_test_loop_vae(
+        self.trained_models, self.loss_dict = train_val_test_loop_single_domain(
             output_dir=self.output_dir,
             domain_config=self.domain_config,
             latent_structure_model_config=self.latent_structure_model_config,
@@ -144,8 +147,7 @@ class PretrainAeExperiment(BaseExperiment):
                 dataset_type="test",
             )
             logging.debug(
-                "Confusion matrices of the latent classifier: %s".format(
-                ),
+                "Confusion matrices of the latent classifier: %s".format(),
                 confusion_dict,
             )
 

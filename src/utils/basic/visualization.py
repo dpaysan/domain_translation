@@ -16,7 +16,20 @@ from src.helper.models import DomainConfig
 from src.utils.torch.evaluation import (
     get_shared_latent_space_dict_for_multiple_domains,
     get_full_latent_space_dict_for_multiple_domains,
+    save_latents_to_csv,
 )
+
+SMALL_SIZE = 16
+MEDIUM_SIZE = 20
+BIGGER_SIZE = 24
+
+plt.rc("font", size=SMALL_SIZE)  # controls default text sizes
+plt.rc("axes", titlesize=SMALL_SIZE)  # fontsize of the axes title
+plt.rc("axes", labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+plt.rc("xtick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc("ytick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc("legend", fontsize=SMALL_SIZE)  # legend fontsize
+plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
 def plot_train_val_hist(
@@ -52,7 +65,9 @@ def plot_train_val_hist(
     plt.ylabel(y_label)
     plt.xlabel("Epoch")
     plt.legend(
-        ("Training Loss", "Validation Loss", "Validation loss"), loc="upper right"
+        ("Training Loss", "Validation Loss", "Validation loss"),
+        loc="upper right",
+        markerscale=2.0,
     )
     if title is None:
         title = "Fitting History"
@@ -119,8 +134,12 @@ def plot_latent_representations(
         palette=sns.color_palette("dark", len(set(domain_names))),
         data=transformed,
         legend="full",
-        alpha=0.3,
+        alpha=0.4,
+        s=60,
     )
+
+    plt.legend(markerscale=2.0)
+
     if labels is not None:
         label_point(
             transformed.iloc[:, 0],
@@ -136,7 +155,7 @@ def plot_latent_representations(
 def label_point(x, y, val, ax):
     a = pd.concat({"x": x, "y": y, "val": val}, axis=1)
     for i, point in a.iterrows():
-        ax.text(point["x"] + 0.02, point["y"], str(int(point["val"])), fontsize=6)
+        ax.text(point["x"] + 0.02, point["y"], str(int(point["val"])), fontsize=12)
 
 
 def visualize_shared_latent_space(
@@ -224,3 +243,44 @@ def visualize_correlation_structure_latent_space(
     plot_correlations_latent_space(
         latents_domain_dict=latents_domain_dict, save_path=save_path
     )
+
+
+def visualize_model_performance(
+    output_dir: str,
+    domain_configs: List[DomainConfig],
+    dataset_types: List[str] = None,
+    device: str = "cuda:0",
+):
+    os.makedirs(output_dir, exist_ok=True)
+    if dataset_types is None:
+        dataset_types = ["train", "val"]
+
+    for dataset_type in dataset_types:
+        visualize_shared_latent_space(
+            domain_configs=domain_configs,
+            save_path=output_dir
+            + "/shared_latent_space_umap_{}.png".format(dataset_type),
+            dataset_type=dataset_type,
+            random_state=42,
+            reduction="umap",
+            device=device,
+        )
+
+        visualize_correlation_structure_latent_space(
+            domain_configs=domain_configs,
+            save_path=output_dir
+            + "/latent_space_correlation_structure_{}.png".format(dataset_type),
+            dataset_type=dataset_type,
+            device=device,
+        )
+
+    for domain_config in domain_configs:
+        domain_name = domain_config.name
+        for dataset_type in dataset_types:
+            save_latents_to_csv(
+                domain_config=domain_config,
+                save_path=output_dir
+                + "/{}_latent_representations_{}.csv".format(domain_name, dataset_type),
+                dataset_type=dataset_type,
+                device=device,
+            )

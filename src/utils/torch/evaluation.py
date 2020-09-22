@@ -165,9 +165,8 @@ def save_latents_to_csv(
         dataset = domain_config.data_loader_dict[dataset_type].dataset
     except KeyError:
         raise RuntimeError(
-            "Unknown dataset_type: {}, expected one of the following: train, val, test".format(
-                dataset_type
-            )
+            "Unknown dataset_type: {}, expected one of the following: train, val, test"
+            .format(dataset_type)
         )
     save_latents_and_labels_to_csv(
         model=model,
@@ -254,7 +253,12 @@ def get_shared_latent_space_dict_for_multiple_domains(
     return latents_dict, label_dict
 
 
-def evaluate_latent_clf_one_domain(domain_config:DomainConfig, latent_clf:torch.nn.Module, dataset_type:str='test', device:str='cuda:0'):
+def evaluate_latent_clf_one_domain(
+    domain_config: DomainConfig,
+    latent_clf: torch.nn.Module,
+    dataset_type: str = "test",
+    device: str = "cuda:0",
+):
     model = domain_config.domain_model_config.model.to(device)
     latent_clf.to(device)
 
@@ -263,14 +267,16 @@ def evaluate_latent_clf_one_domain(domain_config:DomainConfig, latent_clf:torch.
 
     data_loader = domain_config.data_loader_dict[dataset_type]
 
-    single_sample_loader = DataLoader(dataset=data_loader.dataset, shuffle=False, batch_size=1)
+    single_sample_loader = DataLoader(
+        dataset=data_loader.dataset, shuffle=False, batch_size=1
+    )
     labels = []
     preds = []
 
     for idx, sample in enumerate(single_sample_loader):
         input = sample[data_key].to(device)
         label = sample[label_key].to(device)
-        latent = model(input)['latents']
+        latent = model(input)["latents"]
         _, pred = torch.max(latent_clf(latent), dim=1)
 
         labels.append(label.cpu().numpy())
@@ -278,6 +284,7 @@ def evaluate_latent_clf_one_domain(domain_config:DomainConfig, latent_clf:torch.
     labels = np.array(labels).squeeze()
     preds = np.array(preds).squeeze()
     return confusion_matrix(labels, preds)
+
 
 def evaluate_latent_clf_two_domains(
     domain_configs: List[DomainConfig],

@@ -19,7 +19,10 @@ class QYXConvNetwork(Module, ABC):
     """ Realizes q(y|x) for the GMVAE"""
 
     def __init__(
-        self, input_dim: int, n_components: int, hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
+        self,
+        input_dim: int,
+        n_components: int,
+        hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -36,7 +39,7 @@ class QYXConvNetwork(Module, ABC):
                     padding=1,
                     bias=False,
                 ),
-                #nn.BatchNorm2d(self.hidden_dims[0]),
+                # nn.BatchNorm2d(self.hidden_dims[0]),
                 nn.PReLU(),
             )
         ]
@@ -113,7 +116,11 @@ class QZYXConvNetwork(Module, ABC):
             )
 
         self.network = nn.Sequential(*modules)
-        self.hidden = nn.Sequential(nn.Linear(self.hidden_dims[-1] * 2 * 2, self.latent_dim), nn.BatchNorm1d(self.latent_dim), nn.PReLU(),)
+        self.hidden = nn.Sequential(
+            nn.Linear(self.hidden_dims[-1] * 2 * 2, self.latent_dim),
+            nn.BatchNorm1d(self.latent_dim),
+            nn.PReLU(),
+        )
         self.mu = nn.Linear(self.latent_dim + self.n_classes, self.latent_dim)
         self.logsigma = nn.Linear(self.latent_dim + self.n_classes, self.latent_dim)
 
@@ -181,7 +188,7 @@ class PXZConvNetwork(Module, ABC):
             )
         )
 
-        #modules.append(nn.Linear(self.hidden_dims[0], self.input_dim))
+        # modules.append(nn.Linear(self.hidden_dims[0], self.input_dim))
         if output_activation is not None:
             modules.append(get_activation_module(output_activation))
         self.network = nn.Sequential(*modules)
@@ -311,9 +318,9 @@ class GaussianMixtureConvVAE(Module, ABC):
         z = eps * std + mu
         return z
 
-    def sample(self, n_samples:int, device:str='cuda:0'):
-        y = torch.LongTensor(n_samples,1).random_(self.n_components).to(device)
-        y_onehot = torch.FloatTensor(n_samples,self.n_components).to(device)
+    def sample(self, n_samples: int, device: str = "cuda:0"):
+        y = torch.LongTensor(n_samples, 1).random_(self.n_components).to(device)
+        y_onehot = torch.FloatTensor(n_samples, self.n_components).to(device)
         y_onehot = y_onehot.zero_().scatter_(1, y, 1).long()
         z, mu, logvar = self.pzy_network(y_onehot)
         samples = self.pxz_network(z)
