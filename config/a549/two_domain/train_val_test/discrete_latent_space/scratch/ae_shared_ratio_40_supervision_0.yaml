@@ -10,7 +10,7 @@ run_params:
                                         'hidden_dims':[1024, 512, 256, 128],
                                         'latent_dim_1': 20,
                                         'latent_dim_2': 15,
-                                        'in_dims':2613},
+                                        'input_dim':2613},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
 
@@ -22,7 +22,7 @@ run_params:
                                         'hidden_dims':[512, 256, 128, 64,],
                                         'latent_dim_1': 20,
                                         'latent_dim_2': 15,
-                                        'in_dims':815},
+                                        'input_dim':815},
                         'optimizer_config':{'type':'rmsprop', 'lr':0.00001, 'weight_decay':0.0005},
                         'loss_config':{'type':'mae'}}
 
@@ -56,7 +56,7 @@ pipeline:
   - method: initialize_seq_domain_config_2
   - method: initialize_dcm_model
   - method: initialize_clf_model
-  - method: train_models_cv
+  - method: train_models
     params:
       alpha: 0.1
       beta: 1.0

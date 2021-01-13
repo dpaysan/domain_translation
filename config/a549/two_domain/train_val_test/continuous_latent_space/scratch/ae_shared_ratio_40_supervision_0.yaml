@@ -7,7 +7,7 @@ run_params:
                       'label_key':'label'}
 
   seq_model_config_1 : {'model_config':{'type':'TwoLatentSpaceAE',
-                                        'hidden_dims':[1024, 512, 256, 128],
+                                        'hidden_dims':[4096, 4096, 4096, 4096, 256],
                                         'latent_dim_1': 20,
                                         'latent_dim_2': 15,
                                         'input_dim':2613},
@@ -19,7 +19,7 @@ run_params:
                       'label_key':'label'}
 
   seq_model_config_2 : {'model_config':{'type':'TwoLatentSpaceAE',
-                                        'hidden_dims':[512, 256, 128, 64,],
+                                        'hidden_dims':[1024, 1024, 1024, 1024, 64,],
                                         'latent_dim_1': 20,
                                         'latent_dim_2': 15,
                                         'input_dim':815},
@@ -27,7 +27,7 @@ run_params:
                         'loss_config':{'type':'mae'}}
 
   latent_dcm_config: {'model_config':{'type':'LatentDiscriminator', 'n_classes':2,
-                      'latent_dim': 20, 'hidden_dims':[128, 128, 128,]},
+                      'latent_dim': 20, 'hidden_dims':[128,64]},
                       'optimizer_config':{'type':'adam', 'lr':0.00001},
                       'loss_config':{'type':'ce'}}
 
@@ -36,7 +36,7 @@ run_params:
                       'optimizer_config':{'type':'adam', 'lr':0.00001},
                       'loss_config':{'type':'mae'}}
 
-  num_epochs: 1000
+  num_epochs: 2500
   early_stopping: -1
   train_val_test_split: [0.7, 0.2, 0.1]
   batch_size: 32

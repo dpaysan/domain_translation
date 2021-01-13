@@ -20,7 +20,7 @@ from torch.optim.optimizer import Optimizer
 from torch.optim.rmsprop import RMSprop
 
 from src.helper.models import DomainConfig
-from src.models.ae import VanillaAE, TwoLatentSpaceAE
+from src.models.ae import VanillaAE, TwoLatentSpaceAE, VanillaConvAE
 from src.models.latent_models import (
     LatentDiscriminator,
     LatentClassifier,
@@ -60,6 +60,8 @@ def get_domain_configuration(
     model_type = model_dict.pop("type")
     if model_type == "VanillaConvVAE":
         model = VanillaConvVAE(**model_dict)
+    elif model_type == "VanillaConvAE":
+        model = VanillaConvAE(**model_dict)
     elif model_type == "VanillaVAE":
         model = VanillaVAE(**model_dict)
     elif model_type == "VanillaAE":

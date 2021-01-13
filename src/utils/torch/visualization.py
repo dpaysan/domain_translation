@@ -9,10 +9,10 @@ from src.helper.models import DomainModelConfig
 
 
 def visualize_image_translation_performance(
-    domain_model_configs: List[DomainModelConfig],
-    epoch: int,
-    output_dir: str,
-    device: str = "cuda:0",
+        domain_model_configs: List[DomainModelConfig],
+        epoch: int,
+        output_dir: str,
+        device: str = "cuda:0",
 ):
     # Todo make more generic
     image_dir = os.path.join(output_dir, "epoch_{}/images".format(epoch))
@@ -46,10 +46,10 @@ def visualize_image_translation_performance(
 
 
 def visualize_image_vae_performance(
-    domain_model_config: DomainModelConfig,
-    epoch: int,
-    output_dir: str,
-    device: str = "cuda:0",
+        domain_model_config: DomainModelConfig,
+        epoch: int,
+        output_dir: str,
+        device: str = "cuda:0",
 ):
     image_dir = os.path.join(output_dir, "epoch_{}/images".format(epoch))
     os.makedirs(image_dir, exist_ok=True)
@@ -72,4 +72,29 @@ def visualize_image_vae_performance(
         imageio.imwrite(
             os.path.join(image_dir, "epoch_%s_samples_%s.jpg" % (epoch, i)),
             np.uint8(sample_images[i].cpu().data.view(64, 64).numpy() * 255),
+        )
+
+
+def visualize_image_ae_performance(
+        domain_model_config: DomainModelConfig,
+        epoch: int,
+        output_dir: str,
+        device: str = "cuda:0",
+):
+    image_dir = os.path.join(output_dir, "epoch_{}/images".format(epoch))
+    os.makedirs(image_dir, exist_ok=True)
+
+    image_ae = domain_model_config.model.to(device)
+    image_inputs = domain_model_config.inputs.to(device)
+
+    recon_images = image_ae(image_inputs)["recons"]
+
+    for i in range(5):
+        imageio.imwrite(
+            os.path.join(image_dir, "epoch_%s_inputs_%s.jpg" % (epoch, i)),
+            np.uint8(image_inputs[i].cpu().data.view(128, 128).numpy() * 255),
+        )
+        imageio.imwrite(
+            os.path.join(image_dir, "epoch_%s_recons_%s.jpg" % (epoch, i)),
+            np.uint8(recon_images[i].cpu().data.view(128, 128).numpy() * 255),
         )

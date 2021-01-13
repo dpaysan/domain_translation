@@ -28,7 +28,7 @@ def get_transformation_dict_for_train_val_test():
     val_transforms = Compose(
         [
             ToPILImage(),
-            # Resize(64),
+            # Resfrom src.utils.torch.general import get_deviceize(64),
             ToTensor(),
         ]
     )

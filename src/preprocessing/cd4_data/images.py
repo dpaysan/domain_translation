@@ -98,7 +98,7 @@ def run_and_visualize_preprocessing_pipeline(
         image_names=image_names,
         save_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_images/",
     )
-    resized_images = resize_images(max_intensity_images)
+    resized_images = resize_images(max_intensity_images, size=(128,128))
     save_images_to_disk(
         images=resized_images,
         image_names=image_names,
@@ -108,7 +108,7 @@ def run_and_visualize_preprocessing_pipeline(
     image_names, labeled_images = get_only_images_with_labels(
         image_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_resized_images/",
         label_fname=(
-            "../../data/cd4/nuclear_crops_all_experiments/simple_image_labels.csv"
+            "../../../data/cd4/nuclear_crops_all_experiments/simple_image_labels.csv"
         ),
         id_column="nucleus_id",
     )

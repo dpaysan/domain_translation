@@ -6,10 +6,10 @@ run_params:
                       'data_key':'seq_data', 'label_key':'label'}
 
   model_config : {'model_config':{'type':'VanillaAE',
-                        'hidden_dims':[1024, 512, 256, 128],
+                        'hidden_dims':[4096, 4096, 4096, 4096, 4096, 4096, 4096, 128],
                         'latent_dim': 50,
                         'input_dim':2613},
-                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.0005},
+                        'optimizer_config':{'type':'adam', 'lr':0.0001, 'weight_decay':0.000},
                         'loss_config':{'type':'mae'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':50, 'n_classes':3},
@@ -18,7 +18,7 @@ run_params:
 
   domain_name: 'rna'
   num_epochs: 10000
-  early_stopping: 100
+  early_stopping: -1
   train_val_test_split: [0.6, 0.2, 0.2]
   batch_size: 32
   random_state: 1234
@@ -34,8 +34,8 @@ pipeline:
   #    weights_fname: '../../data/experiments/20200805_134219/best_vae.pth'
   - method: train_models
     params:
-      alpha: 0
-      gamma: 0.1
+      alpha: 1.0
+      gamma: 0.0
       save_freq: 1000
-      use_latent_structure_model: True
+      use_latent_structure_model: False
 

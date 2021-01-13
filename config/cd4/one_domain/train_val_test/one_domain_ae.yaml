@@ -2,11 +2,11 @@ output_dir: '../../data/cd4/experiments'
 module: src.experiments.model_pretraining
 class: PretrainAeExperiment
 run_params:
-  data_config: {'image_dir':'../../data/cd4/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images',
+  data_config: {'image_dir':'../../data/cd4/nuclear_crops_all_experiments/128px/labeled_scaled_max_intensity_resized_images',
                       'label_fname':'../../data/cd4/nuclear_crops_all_experiments/simple_image_labels.csv',
                       'data_key':'image', 'label_key':'label'}
 
-  model_config: {'model_config':{'type':'VanillaConvVAE', 'latent_dim':128},
+  model_config: {'model_config':{'type':'VanillaConvAE', 'latent_dim':256},
                        'optimizer_config':{'type':'adam','lr':0.001},
                        'loss_config':{'type':'mse'}}
 
@@ -15,11 +15,11 @@ run_params:
                       'loss_config':{'type':'ce', 'weights':[4.5,0.5]}}
 
   domain_name: 'image'
-  num_epochs: 2
-  early_stopping: -1
+  num_epochs: 500
+  early_stopping: 100
   train_val_test_split: [0.7, 0.2, 0.1]
   batch_size: 128
-  random_state: 1
+  random_state: 1234
 
 
 pipeline:
@@ -32,8 +32,7 @@ pipeline:
   #    weights_fname: '../../data/experiments/20200805_134219/best_vae.pth'
   - method: train_models
     params:
-      beta: 0.00
-      lamb: 0.0000001
-      save_freq: 100
+      gamma: 0.0
+      save_freq: 50
       use_latent_structure_model: False
 

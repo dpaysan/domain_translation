@@ -9,7 +9,7 @@ run_params:
                         'hidden_dims':[2048, 2048, 2048, 2048, 2048, 2048, 2048,],
                         'latent_dim': 50,
                         'input_dim':815},
-                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.0005},
+                        'optimizer_config':{'type':'adam', 'lr':0.00001, 'weight_decay':0.000},
                         'loss_config':{'type':'mae'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':50, 'n_classes':3},
@@ -17,7 +17,7 @@ run_params:
                       'loss_config':{'type':'ce',}}
 
   domain_name: 'atac'
-  num_epochs: 10000
+  num_epochs: 10
   early_stopping: -1
   train_val_test_split: [0.6, 0.2, 0.2]
   batch_size: 32
@@ -34,8 +34,8 @@ pipeline:
   #    weights_fname: '../../data/a549/experiments/20200813_153042/best_model.pth
   - method: train_models
     params:
-      alpha: 0
-      gamma: 0.1
-      save_freq: 1000
-      use_latent_structure_model: True
+      alpha: 1.0
+      gamma: 0.
+      save_freq: 5
+      use_latent_structure_model: False
 

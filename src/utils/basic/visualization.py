@@ -2,6 +2,7 @@ import logging
 import os
 from typing import List
 
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -116,7 +117,6 @@ def plot_latent_representations(
     elif reduction == "pca":
         mapper = PCA(n_components=2, random_state=random_state)
         transformed = mapper.fit_transform(latent_representations)
-        # print(mapper.explained_variance_ratio_)
     else:
         raise RuntimeError("Unknown reduction mode encountered {}".format(reduction))
 
@@ -284,3 +284,11 @@ def visualize_model_performance(
                 dataset_type=dataset_type,
                 device=device,
             )
+
+
+def show_cam_on_image(img, mask):
+    heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
+    heatmap = np.float32(heatmap) / 255
+    cam = heatmap + np.float32(img)
+    cam = cam / np.max(cam)
+    return np.uint8(255 * cam)
