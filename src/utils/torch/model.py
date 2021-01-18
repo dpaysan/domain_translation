@@ -20,7 +20,7 @@ from torch.optim.optimizer import Optimizer
 from torch.optim.rmsprop import RMSprop
 
 from src.helper.models import DomainConfig
-from src.models.ae import VanillaAE, TwoLatentSpaceAE, VanillaConvAE
+from src.models.ae import VanillaAE, TwoLatentSpaceAE, VanillaConvAE, GeneSetAE
 from src.models.latent_models import (
     LatentDiscriminator,
     LatentClassifier,
@@ -72,6 +72,8 @@ def get_domain_configuration(
         model = GaussianMixtureVAE(**model_dict)
     elif model_type == "GaussianMixtureConvVAE":
         model = GaussianMixtureConvVAE(**model_dict)
+    elif model_type == "GeneSetAE":
+        model = GeneSetAE(**model_dict)
     else:
         raise NotImplementedError('Unknown model type "{}"'.format(model_type))
 
@@ -129,6 +131,8 @@ def get_latent_model_configuration(
             weights = torch.FloatTensor(loss_dict.pop("weights")).to(device)
         except KeyError:
             weights = torch.ones(model_dict["n_classes"]).float().to(device)
+    else:
+        weights = None
 
     loss_type = loss_dict.pop("type")
     if loss_type == "ce":

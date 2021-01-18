@@ -16,19 +16,19 @@ gene_set_adjacencies = pd.read_csv("../../data/cd4/cd4_rna_seq_pbmc_10k/gene_keg
                                    index_col=0)
 geneset_adj_matrix = torch.from_numpy(np.array(gene_set_adjacencies))
 
-#geneset_ae = GeneSetAE(input_dim=5785, hidden_dims=[512, 512, 256], latent_dim=256,
-#                       geneset_adjacencies=torch.from_numpy(geneset_adj_matrix))
+geneset_ae = GeneSetAE(input_dim=5785, hidden_dims=[512, 512, 512, 512, 512, 512], latent_dim=512,
+                       geneset_adjacencies=geneset_adj_matrix)
 
 # geneset_ae = VanillaAE(input_dim=5785, latent_dim=256, hidden_dims=[2048, 1024, 512, 256, 256])
 
-geneset_ae = GeneSetAE_v2(adjacency_matrix=geneset_adj_matrix, hidden_dims=[128, 64, 32, 16])
+#geneset_ae = GeneSetAE_v2(adjacency_matrix=geneset_adj_matrix, hidden_dims=[128, 64, 32, 16])
 
 data_key = 'seq_data'
 label_key = 'label'
 
 dh = DataHandler(
     dataset=gene_set_dataset,
-    batch_size=2,
+    batch_size=128,
     num_workers=0,
     random_state=1234,
     transformation_dict=None,
@@ -106,7 +106,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=100):
 
 trained_geneset_ae = train_model(geneset_ae, dataloaders=data_loader_dict,
                                  criterion=criterion, optimizer=optimizer,
-                                 num_epochs=1000)
+                                 num_epochs=3000)
 print(trained_geneset_ae)
 
 

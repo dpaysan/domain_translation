@@ -1,3 +1,4 @@
+from abc import ABC
 from typing import Any, List
 import torch
 
@@ -5,7 +6,7 @@ from torch import Tensor
 from torch import nn
 
 
-class GenesetEncoder(nn.Module):
+class GenesetEncoder(nn.Module, ABC):
     def __init__(self, adjacency_matrix: Tensor, hidden_dims: List):
         super().__init__()
         self.adjacency_matrix = adjacency_matrix
@@ -53,7 +54,7 @@ class GenesetEncoder(nn.Module):
         return output
 
 
-class GenesetDecoder(nn.Module):
+class GenesetDecoder(nn.Module, ABC):
     def __init__(self, adjacency_matrix: Tensor, hidden_dims: List):
         super().__init__()
         # Adjacency matrix will be of dimensions genesets x genes
@@ -101,7 +102,7 @@ class GenesetDecoder(nn.Module):
         return output
 
 
-class GeneSetAE_v2(nn.Module):
+class GeneSetAE_v2(nn.Module, ABC):
     def __init__(self, adjacency_matrix: Tensor, hidden_dims: List = [1024, 512, 256]):
         super().__init__()
         self.adjacency_matrix = adjacency_matrix

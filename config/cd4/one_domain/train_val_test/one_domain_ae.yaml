@@ -10,15 +10,15 @@ run_params:
                        'optimizer_config':{'type':'adam','lr':0.001},
                        'loss_config':{'type':'mse'}}
 
-  latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':128, 'n_classes':2},
+  latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':256, 'n_classes':2},
                       'optimizer_config':{'type':'adam', 'lr':0.001},
                       'loss_config':{'type':'ce', 'weights':[4.5,0.5]}}
 
   domain_name: 'image'
-  num_epochs: 500
+  num_epochs: 1000
   early_stopping: 100
   train_val_test_split: [0.7, 0.2, 0.1]
-  batch_size: 128
+  batch_size: 16
   random_state: 1234
 
 
@@ -27,12 +27,9 @@ pipeline:
   - method: initialize_data_loader_dict
   - method: initialize_domain_config
   - method: initialize_clf_model
-  #- method: load_model
-  #  params:
-  #    weights_fname: '../../data/experiments/20200805_134219/best_vae.pth'
   - method: train_models
     params:
       gamma: 0.0
-      save_freq: 50
-      use_latent_structure_model: False
+      save_freq: 1
+      use_latent_structure_model: True
 

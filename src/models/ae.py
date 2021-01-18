@@ -2,6 +2,8 @@ from abc import abstractmethod, ABC
 from typing import Any, List, Tuple
 import torch
 from torch import nn, Tensor
+import numpy as np
+import pandas as pd
 
 from src.helper.custom_layers import SparseLinear
 from src.utils.torch.general import get_device
@@ -31,12 +33,12 @@ class BaseAE(nn.Module):
 
 class VanillaAE(BaseAE, ABC):
     def __init__(
-            self,
-            input_dim: int = 2613,
-            latent_dim: int = 128,
-            hidden_dims: List = None,
-            batchnorm_latent: bool = False,
-            lrelu_slope: float = 0.2,
+        self,
+        input_dim: int = 2613,
+        latent_dim: int = 128,
+        hidden_dims: List = None,
+        batchnorm_latent: bool = False,
+        lrelu_slope: float = 0.2,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -115,12 +117,12 @@ class VanillaAE(BaseAE, ABC):
 
 class VanillaConvAE(BaseAE, ABC):
     def __init__(
-            self,
-            input_channels: int = 1,
-            latent_dim: int = 128,
-            hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
-            lrelu_slope: int = 0.2,
-            batchnorm: bool = True,
+        self,
+        input_channels: int = 1,
+        latent_dim: int = 128,
+        hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
+        lrelu_slope: int = 0.2,
+        batchnorm: bool = True,
     ) -> None:
         super().__init__()
         self.in_channels = input_channels
@@ -219,7 +221,9 @@ class VanillaConvAE(BaseAE, ABC):
 
     def decode(self, input: Tensor) -> Any:
         latent_features = self.inv_latent_mapper(input)
-        latent_features = latent_features.view(latent_features.size(0), self.hidden_dims[-1], 4, 4)
+        latent_features = latent_features.view(
+            latent_features.size(0), self.hidden_dims[-1], 4, 4
+        )
         output = self.decoder(input=latent_features)
         return output
 
@@ -232,13 +236,13 @@ class VanillaConvAE(BaseAE, ABC):
 
 class TwoLatentSpaceAE(BaseAE, ABC):
     def __init__(
-            self,
-            input_dim: int = 2613,
-            latent_dim_1: int = 128,
-            latent_dim_2: int = 64,
-            hidden_dims: List = None,
-            batchnorm_latent: bool = False,
-            lrelu_slope: float = 0.2,
+        self,
+        input_dim: int = 2613,
+        latent_dim_1: int = 128,
+        latent_dim_2: int = 64,
+        hidden_dims: List = None,
+        batchnorm_latent: bool = False,
+        lrelu_slope: float = 0.2,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -316,27 +320,47 @@ class TwoLatentSpaceAE(BaseAE, ABC):
 
 
 class GeneSetAE(BaseAE, ABC):
-
-    def __init__(self,
-                 input_dim: int = 2613,
-                 latent_dim: int = 128,
-                 hidden_dims: List = None,
-                 batchnorm_latent: bool = False,
-                 geneset_adjacencies: Tensor = None):
+    def __init__(
+        self,
+        input_dim: int = 2613,
+        latent_dim: int = 128,
+        hidden_dims: List = [512,512,512, 512],
+        batchnorm_latent: bool = False,
+        geneset_adjacencies: Tensor = None,
+        geneset_adjacencies_file=None,
+    ):
         super().__init__()
         self.input_dim = input_dim
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
         self.batchnorm_latent = batchnorm_latent
-        self.geneset_adjacencies = geneset_adjacencies
+        if geneset_adjacencies is not None:
+            self.geneset_adjacencies = nn.Parameter(geneset_adjacencies, requires_grad=False)
+        elif geneset_adjacencies_file is not None:
+            geneset_adjacencies = pd.read_csv(geneset_adjacencies_file,
+                index_col=0)
+            self.geneset_adjacencies = nn.Parameter(torch.from_numpy(np.array(geneset_adjacencies)),
+                                                    requires_grad=False)
+        else:
+            raise RuntimeError(
+                "Adjacency matrix must be given as a Tensor as the geneset_adjacencies parameter or a path to a .csv \
+                file as the geneset_adjacencies_file parameter."
+            )
         self.n_latent_spaces = 1
-        self.n_genesets = geneset_adjacencies.size()[1]
+        self.n_genesets = self.geneset_adjacencies.size()[1]
 
-        self.geneset_encoding_layer = SparseLinear(self.input_dim, self.n_genesets, self.geneset_adjacencies)
+        self.geneset_encoding_layer = SparseLinear(
+            self.input_dim, self.n_genesets, self.geneset_adjacencies
+        )
         self.geneset_encoder = nn.Sequential(self.geneset_encoding_layer, nn.ReLU())
         if len(hidden_dims) > 0:
-            encoder_modules = [nn.Sequential(nn.Linear(self.n_genesets, self.hidden_dims[0]), nn.ReLU(),
-                                             nn.BatchNorm1d(self.hidden_dims[0]))]
+            encoder_modules = [
+                nn.Sequential(
+                    nn.Linear(self.n_genesets, self.hidden_dims[0]),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(self.hidden_dims[0]),
+                )
+            ]
             for i in range(1, len(hidden_dims)):
                 encoder_modules.append(
                     nn.Sequential(
@@ -347,7 +371,9 @@ class GeneSetAE(BaseAE, ABC):
                 )
             encoder_modules.append(nn.Linear(self.hidden_dims[-1], self.latent_dim))
         else:
-            encoder_modules = [nn.Sequential(nn.Linear(self.n_genesets, self.latent_dim), nn.ReLU())]
+            encoder_modules = [
+                nn.Sequential(nn.Linear(self.n_genesets, self.latent_dim), nn.ReLU())
+            ]
 
         if self.batchnorm_latent:
             encoder_modules.append(nn.BatchNorm1d(self.latent_dim))
@@ -371,11 +397,19 @@ class GeneSetAE(BaseAE, ABC):
                         nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                     )
                 )
-            decoder_modules.append(nn.Sequential(nn.Linear(self.hidden_dims[0], self.n_genesets), nn.ReLU()))
+            decoder_modules.append(
+                nn.Sequential(
+                    nn.Linear(self.hidden_dims[0], self.n_genesets), nn.ReLU()
+                )
+            )
         else:
-            decoder_modules = [nn.Sequential(nn.Linear(self.latent_dim, self.n_genesets), nn.ReLU())]
+            decoder_modules = [
+                nn.Sequential(nn.Linear(self.latent_dim, self.n_genesets), nn.ReLU())
+            ]
 
-        self.geneset_decoder = nn.Sequential(SparseLinear(self.n_genesets, self.input_dim, self.geneset_adjacencies))
+        self.geneset_decoder = nn.Sequential(
+            SparseLinear(self.n_genesets, self.input_dim, self.geneset_adjacencies)
+        )
         self.decoder = nn.Sequential(*decoder_modules)
 
     def encode(self, inputs: Tensor) -> Any:
@@ -391,4 +425,4 @@ class GeneSetAE(BaseAE, ABC):
     def forward(self, inputs: Tensor) -> Any:
         latents = self.encode(inputs)
         recons = self.decode(latents)
-        return recons
+        return {"recons": recons, "latents": latents}

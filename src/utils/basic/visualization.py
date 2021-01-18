@@ -266,13 +266,17 @@ def visualize_model_performance(
             device=device,
         )
 
-        visualize_correlation_structure_latent_space(
+        # Todo resolve hacky try-catch way to avoid error if the domains consist of datasets of different sizes
+        try:
+            visualize_correlation_structure_latent_space(
             domain_configs=domain_configs,
             save_path=output_dir
             + "/latent_space_correlation_structure_{}.png".format(dataset_type),
             dataset_type=dataset_type,
             device=device,
         )
+        except ValueError:
+            pass
 
     for domain_config in domain_configs:
         domain_name = domain_config.name

@@ -838,18 +838,18 @@ def train_val_test_loop_two_domains(
                         device=device,
                     )
 
-                    vae_i_weights = (
+                    model_i_weights = (
                         domain_configs[0].domain_model_config.model.cpu().state_dict()
                     )
-                    vae_j_weights = (
+                    model_j_weights = (
                         domain_configs[1].domain_model_config.model.cpu().state_dict()
                     )
                     torch.save(
-                        vae_i_weights,
+                        model_i_weights,
                         "{}/model_{}.pth".format(checkpoint_dir, domain_names[0]),
                     )
                     torch.save(
-                        vae_j_weights,
+                        model_j_weights,
                         "{}/model_{}.pth".format(checkpoint_dir, domain_names[1]),
                     )
 
