@@ -1,9 +1,9 @@
 from abc import abstractmethod, ABC
 from typing import Any, List, Tuple
-
 import torch
 from torch import nn, Tensor
 
+from src.helper.custom_layers import SparseLinear
 from src.utils.torch.general import get_device
 
 
@@ -31,12 +31,12 @@ class BaseAE(nn.Module):
 
 class VanillaAE(BaseAE, ABC):
     def __init__(
-        self,
-        input_dim: int = 2613,
-        latent_dim: int = 128,
-        hidden_dims: List = None,
-        batchnorm_latent: bool = False,
-        lrelu_slope: float = 0.2,
+            self,
+            input_dim: int = 2613,
+            latent_dim: int = 128,
+            hidden_dims: List = None,
+            batchnorm_latent: bool = False,
+            lrelu_slope: float = 0.2,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -44,7 +44,6 @@ class VanillaAE(BaseAE, ABC):
         self.hidden_dims = hidden_dims
         self.batchnorm_latent = batchnorm_latent
         self.lrelu_slope = lrelu_slope
-        # self.model_type = "AE"
         self.n_latent_spaces = 1
 
         # Build encoder model
@@ -52,8 +51,7 @@ class VanillaAE(BaseAE, ABC):
             encoder_modules = [
                 nn.Sequential(
                     nn.Linear(self.input_dim, self.hidden_dims[0]),
-                    # nn.LeakyReLU(self.lrelu_slope),
-                    nn.PReLU(),
+                    nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
                 )
             ]
@@ -63,7 +61,7 @@ class VanillaAE(BaseAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
                     # nn.LeakyReLU(self.lrelu_slope),
-                    nn.PReLU(),
+                    nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[i]),
                 )
             )
@@ -83,8 +81,7 @@ class VanillaAE(BaseAE, ABC):
         decoder_modules = [
             nn.Sequential(
                 nn.Linear(self.latent_dim, self.hidden_dims[-1]),
-                # nn.LeakyReLU(self.lrelu_slope),
-                nn.PReLU(),
+                nn.ReLU(),
                 nn.BatchNorm1d(self.hidden_dims[-1]),
             )
         ]
@@ -92,8 +89,7 @@ class VanillaAE(BaseAE, ABC):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                    # nn.LeakyReLU(self.lrelu_slope),
-                    nn.PReLU(),
+                    nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                 )
             )
@@ -119,12 +115,12 @@ class VanillaAE(BaseAE, ABC):
 
 class VanillaConvAE(BaseAE, ABC):
     def __init__(
-        self,
-        input_channels: int = 1,
-        latent_dim: int = 128,
-        hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
-        lrelu_slope: int = 0.2,
-        batchnorm: bool = True,
+            self,
+            input_channels: int = 1,
+            latent_dim: int = 128,
+            hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
+            lrelu_slope: int = 0.2,
+            batchnorm: bool = True,
     ) -> None:
         super().__init__()
         self.in_channels = input_channels
@@ -135,7 +131,7 @@ class VanillaConvAE(BaseAE, ABC):
         self.updated = False
         self.n_latent_spaces = 1
 
-        # encoder
+        # Build encoder
         encoder_modules = [
             nn.Sequential(
                 nn.Conv2d(
@@ -167,7 +163,7 @@ class VanillaConvAE(BaseAE, ABC):
             )
         self.encoder = nn.Sequential(*encoder_modules)
 
-        # Output of encoder are of shape 1024x2x2
+        # Output of encoder are of shape 1024x4x4
         self.device = get_device()
 
         if self.batchnorm:
@@ -176,7 +172,7 @@ class VanillaConvAE(BaseAE, ABC):
                 nn.BatchNorm1d(self.latent_dim),
             )
         else:
-            self.latent_mapper= nn.Linear(hidden_dims[-1] * 4 * 4, self.latent_dim)
+            self.latent_mapper = nn.Linear(hidden_dims[-1] * 4 * 4, self.latent_dim)
 
         self.inv_latent_mapper = nn.Sequential(
             nn.Linear(self.latent_dim, hidden_dims[-1] * 4 * 4), nn.ReLU(inplace=True)
@@ -236,13 +232,13 @@ class VanillaConvAE(BaseAE, ABC):
 
 class TwoLatentSpaceAE(BaseAE, ABC):
     def __init__(
-        self,
-        input_dim: int = 2613,
-        latent_dim_1: int = 128,
-        latent_dim_2: int = 64,
-        hidden_dims: List = None,
-        batchnorm_latent: bool = False,
-        lrelu_slope: float = 0.2,
+            self,
+            input_dim: int = 2613,
+            latent_dim_1: int = 128,
+            latent_dim_2: int = 64,
+            hidden_dims: List = None,
+            batchnorm_latent: bool = False,
+            lrelu_slope: float = 0.2,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -258,9 +254,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             encoder_modules = [
                 nn.Sequential(
                     nn.Linear(self.input_dim, self.hidden_dims[0]),
-                    # nn.BatchNorm1d(self.hidden_dims[0]),
-                    # nn.LeakyReLU(self.lrelu_slope),
-                    nn.PReLU(),
+                    nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
                 )
             ]
@@ -269,8 +263,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                    # nn.LeakyReLU(self.lrelu_slope),
-                    nn.PReLU(),
+                    nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[i]),
                 )
             )
@@ -284,8 +277,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
         decoder_modules = [
             nn.Sequential(
                 nn.Linear(self.latent_dim_1 + latent_dim_2, self.hidden_dims[-1]),
-                # nn.LeakyReLU(self.lrelu_slope),
-                nn.PReLU(),
+                nn.ReLU(),
                 nn.BatchNorm1d(self.hidden_dims[-1]),
             )
         ]
@@ -293,8 +285,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                    # nn.LeakyReLU(self.lrelu_slope),
-                    nn.PReLU(),
+                    nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                 )
             )
@@ -322,3 +313,82 @@ class TwoLatentSpaceAE(BaseAE, ABC):
 
     def loss_function(self, inputs: Tensor, recons: Tensor) -> dict:
         return super().loss_function(inputs=inputs, recons=recons)
+
+
+class GeneSetAE(BaseAE, ABC):
+
+    def __init__(self,
+                 input_dim: int = 2613,
+                 latent_dim: int = 128,
+                 hidden_dims: List = None,
+                 batchnorm_latent: bool = False,
+                 geneset_adjacencies: Tensor = None):
+        super().__init__()
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
+        self.hidden_dims = hidden_dims
+        self.batchnorm_latent = batchnorm_latent
+        self.geneset_adjacencies = geneset_adjacencies
+        self.n_latent_spaces = 1
+        self.n_genesets = geneset_adjacencies.size()[1]
+
+        self.geneset_encoding_layer = SparseLinear(self.input_dim, self.n_genesets, self.geneset_adjacencies)
+        self.geneset_encoder = nn.Sequential(self.geneset_encoding_layer, nn.ReLU())
+        if len(hidden_dims) > 0:
+            encoder_modules = [nn.Sequential(nn.Linear(self.n_genesets, self.hidden_dims[0]), nn.ReLU(),
+                                             nn.BatchNorm1d(self.hidden_dims[0]))]
+            for i in range(1, len(hidden_dims)):
+                encoder_modules.append(
+                    nn.Sequential(
+                        nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
+                        nn.ReLU(),
+                        nn.BatchNorm1d(self.hidden_dims[i]),
+                    )
+                )
+            encoder_modules.append(nn.Linear(self.hidden_dims[-1], self.latent_dim))
+        else:
+            encoder_modules = [nn.Sequential(nn.Linear(self.n_genesets, self.latent_dim), nn.ReLU())]
+
+        if self.batchnorm_latent:
+            encoder_modules.append(nn.BatchNorm1d(self.latent_dim))
+
+        self.encoder = nn.Sequential(*encoder_modules)
+
+        # Build decoder model
+        if len(hidden_dims) > 0:
+            decoder_modules = [
+                nn.Sequential(
+                    nn.Linear(self.latent_dim, self.hidden_dims[-1]),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(self.hidden_dims[-1]),
+                )
+            ]
+            for i in range(len(hidden_dims) - 1):
+                decoder_modules.append(
+                    nn.Sequential(
+                        nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
+                        nn.ReLU(),
+                        nn.BatchNorm1d(self.hidden_dims[-2 - i]),
+                    )
+                )
+            decoder_modules.append(nn.Sequential(nn.Linear(self.hidden_dims[0], self.n_genesets), nn.ReLU()))
+        else:
+            decoder_modules = [nn.Sequential(nn.Linear(self.latent_dim, self.n_genesets), nn.ReLU())]
+
+        self.geneset_decoder = nn.Sequential(SparseLinear(self.n_genesets, self.input_dim, self.geneset_adjacencies))
+        self.decoder = nn.Sequential(*decoder_modules)
+
+    def encode(self, inputs: Tensor) -> Any:
+        geneset_activities = self.geneset_encoder(inputs)
+        latents = self.encoder(geneset_activities)
+        return latents
+
+    def decode(self, latents: Tensor) -> Any:
+        decoded_geneset_activities = self.decoder(latents)
+        recons = self.geneset_decoder(decoded_geneset_activities)
+        return recons
+
+    def forward(self, inputs: Tensor) -> Any:
+        latents = self.encode(inputs)
+        recons = self.decode(latents)
+        return recons
