@@ -221,6 +221,6 @@ if __name__ == "__main__":
         except Exception:
             logging.error("", exc_info=True)
             shutil.copy(src=log_filename, dst=exp_runner.timestamped_output_dir + "/")
-            exit(1)
+            sys.exit(1)
 
     sys.exit()

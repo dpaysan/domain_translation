@@ -50,6 +50,7 @@ def visualize_image_vae_performance(
         domain_model_config: DomainModelConfig,
         epoch: int,
         output_dir: str,
+        phase: str,
         device: str = "cuda:0",
 ):
     image_dir = os.path.join(output_dir, "epoch_{}/images".format(epoch))
@@ -61,17 +62,17 @@ def visualize_image_vae_performance(
     recon_images = image_vae(image_inputs)["recons"]
     sample_images = image_vae.sample(5, device=device)
 
-    for i in range(5):
+    for i in range(10):
         imageio.imwrite(
-            os.path.join(image_dir, "epoch_%s_inputs_%s.jpg" % (epoch, i)),
+            os.path.join(image_dir, "%s_epoch_%s_inputs_%s.jpg" % (phase,epoch, i)),
             np.uint8(image_inputs[i].cpu().data.view(64, 64).numpy() * 255),
         )
         imageio.imwrite(
-            os.path.join(image_dir, "epoch_%s_recons_%s.jpg" % (epoch, i)),
+            os.path.join(image_dir, "%s_epoch_%s_recons_%s.jpg" % (phase,epoch, i)),
             np.uint8(recon_images[i].cpu().data.view(64, 64).numpy() * 255),
         )
         imageio.imwrite(
-            os.path.join(image_dir, "epoch_%s_samples_%s.jpg" % (epoch, i)),
+            os.path.join(image_dir, "%s_epoch_%s_samples_%s.jpg" % (phase,epoch, i)),
             np.uint8(sample_images[i].cpu().data.view(64, 64).numpy() * 255),
         )
 
@@ -80,6 +81,7 @@ def visualize_image_ae_performance(
         domain_model_config: DomainModelConfig,
         epoch: int,
         output_dir: str,
+        phase: str,
         device: str = "cuda:0",
 ):
     image_dir = os.path.join(output_dir, "epoch_{}/images".format(epoch))
@@ -90,12 +92,12 @@ def visualize_image_ae_performance(
 
     recon_images = image_ae(image_inputs)["recons"]
 
-    for i in range(5):
+    for i in range(image_inputs.size()[0]):
         imageio.imwrite(
-            os.path.join(image_dir, "epoch_%s_inputs_%s.jpg" % (epoch, i)),
-            np.uint8(image_inputs[i].cpu().data.view(128, 128).numpy() * 255),
+            os.path.join(image_dir, "%s_epoch_%s_inputs_%s.jpg" % (phase,epoch, i)),
+            np.uint8(image_inputs[i].cpu().data.view(64, 64).numpy() * 255),
         )
         imageio.imwrite(
-            os.path.join(image_dir, "epoch_%s_recons_%s.jpg" % (epoch, i)),
-            np.uint8(recon_images[i].cpu().data.view(128, 128).numpy() * 255),
+            os.path.join(image_dir, "%s_epoch_%s_recons_%s.jpg" % (phase,epoch, i)),
+            np.uint8(recon_images[i].cpu().data.view(64, 64).numpy() * 255),
         )
