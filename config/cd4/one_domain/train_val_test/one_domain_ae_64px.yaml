@@ -2,23 +2,23 @@ output_dir: '../../data/cd4/experiments'
 module: src.experiments.model_pretraining
 class: PretrainAeExperiment
 run_params:
-  data_config: {'image_dir':'../../data/cd4/nuclear_crops_filtered/128px/labeled_scaled_max_intensity_resized_images',
+  data_config: {'image_dir':'../../data/cd4/nuclear_crops_filtered/64px/labeled_scaled_max_intensity_resized_images',
                       'label_fname':'../../data/cd4/nuclear_crops_filtered/simple_image_labels.csv',
                       'data_key':'image', 'label_key':'label'}
 
   model_config: {'model_config':{'type':'VanillaConvAE', 'latent_dim':256, 'hidden_dims':[128, 256, 512, 1024, 1024]},
-                       'optimizer_config':{'type':'adam','lr':0.001},
-                       'loss_config':{'type':'mse'}}
+                       'optimizer_config':{'type':'adam','lr':0.0001},
+                       'loss_config':{'type':'mae'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':256, 'n_classes':2},
-                      'optimizer_config':{'type':'adam', 'lr':0.001},
+                      'optimizer_config':{'type':'adam', 'lr':0.0001},
                       'loss_config':{'type':'ce', 'weights':[4.5,0.5]}}
 
   domain_name: 'image'
-  num_epochs: 800
-  early_stopping: 100
-  train_val_test_split: [0.7, 0.2, 0.1]
-  batch_size: 128
+  num_epochs: 1000
+  early_stopping: -1
+  train_val_test_split: [0.8, 0.1, 0.1]
+  batch_size: 256
   random_state: 1234
 
 

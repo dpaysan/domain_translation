@@ -88,7 +88,7 @@ class PretrainAeExperiment(BaseExperiment):
             drop_last_batch=drop_last_batch,
         )
         dh.stratified_train_val_test_split(splits=self.train_val_test_split)
-        dh.get_data_loader_dict()
+        dh.get_data_loader_dict(shuffle=True)
         self.data_loader_dict = dh.data_loader_dict
 
     def initialize_domain_config(self):

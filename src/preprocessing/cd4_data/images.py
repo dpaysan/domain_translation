@@ -83,39 +83,39 @@ def get_only_images_with_labels(
 
 
 def run_and_visualize_preprocessing_pipeline(
-    image_dir: str = "../../../data/cd4/nuclear_crops_all_experiments/images/",
+    image_dir: str = "../../../data/cd4/nuclear_crops_filtered/images/",
 ):
     image_names, images = read_images_from_disk(image_dir=image_dir)
     scaled_images = min_max_scale_images(images)
     save_images_to_disk(
         images=scaled_images,
         image_names=image_names,
-        save_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_images/",
+        save_dir="../../../data/cd4/nuclear_crops_filtered/scaled_images/",
     )
     max_intensity_images = get_max_intensity_images(images=scaled_images)
     save_images_to_disk(
         images=max_intensity_images,
         image_names=image_names,
-        save_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_images/",
+        save_dir="../../../data/cd4/nuclear_crops_filtered/scaled_max_intensity_images/",
     )
-    resized_images = resize_images(max_intensity_images, size=(128,128))
+    resized_images = resize_images(max_intensity_images, size=(64, 64))
     save_images_to_disk(
         images=resized_images,
         image_names=image_names,
-        save_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_resized_images/",
+        save_dir="../../../data/cd4/nuclear_crops_filtered/scaled_max_intensity_resized_images/",
     )
 
     image_names, labeled_images = get_only_images_with_labels(
-        image_dir="../../../data/cd4/nuclear_crops_all_experiments/scaled_max_intensity_resized_images/",
+        image_dir="../../../data/cd4/nuclear_crops_filtered/scaled_max_intensity_resized_images/",
         label_fname=(
-            "../../../data/cd4/nuclear_crops_all_experiments/simple_image_labels.csv"
+            "../../../data/cd4/nuclear_crops_filtered/simple_image_labels.csv"
         ),
         id_column="nucleus_id",
     )
     save_images_to_disk(
         images=labeled_images,
         image_names=image_names,
-        save_dir="../../../data/cd4/nuclear_crops_all_experiments/labeled_scaled_max_intensity_resized_images/",
+        save_dir="../../../data/cd4/nuclear_crops_filtered/labeled_scaled_max_intensity_resized_images/",
     )
 
 
