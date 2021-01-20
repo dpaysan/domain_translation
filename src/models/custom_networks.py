@@ -103,10 +103,11 @@ class GenesetDecoder(nn.Module, ABC):
 
 
 class GeneSetAE_v2(nn.Module, ABC):
-    def __init__(self, adjacency_matrix: Tensor, hidden_dims: List = [1024, 512, 256]):
+    def __init__(self, adjacency_matrix: Tensor, hidden_dims: List = [64, 32, 16, 8], latent_dim:int=256):
         super().__init__()
         self.adjacency_matrix = adjacency_matrix
         self.hidden_dims = hidden_dims
+        self.latent_dim = latent_dim
 
         self.geneset_encoder = GenesetEncoder(
             adjacency_matrix=adjacency_matrix, hidden_dims=hidden_dims
@@ -114,8 +115,12 @@ class GeneSetAE_v2(nn.Module, ABC):
         self.geneset_decoder = GenesetDecoder(
             adjacency_matrix=adjacency_matrix, hidden_dims=hidden_dims[::-1]
         )
+        self.latent_mapper = nn.Linear(self.geneset_encoder.output_dim, self.latent_dim)
+        self.inv_latent_mapper = nn.Linear(self.latent_dim, self.geneset_decoder.input_dim)
 
     def forward(self, inputs: Tensor):
         geneset_activities = self.geneset_encoder(inputs)
-        output = self.geneset_decoder(geneset_activities)
-        return {'recons':output, 'latents':geneset_activities}
+        latents = self.latent_mapper(geneset_activities)
+        inv_latents = self.inv_latent_mapper(latents)
+        output = self.geneset_decoder(inv_latents)
+        return {'recons':output, 'latents':latents}
