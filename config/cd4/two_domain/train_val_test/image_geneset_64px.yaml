@@ -14,7 +14,7 @@ run_params:
                     'data_key':'seq_data',
                     'label_key':'label'}
 
-  seq_model_config : {'model_config':{'type':'GeneSetAE', 'input_dim':5785, 'hidden_dims':[512, 512, 512, 512, 512, 512],
+  seq_model_config : {'model_config':{'type':'GeneSetAE', 'input_dim':5785, 'hidden_dims':[512, 512, 512, 512, 512],
                                        'latent_dim':256,
                                        'geneset_adjacencies_file':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'},
                       'optimizer_config':{'type':'adam', 'lr':0.0001},
@@ -25,7 +25,7 @@ run_params:
                       'loss_config':{'type':'ce', 'weights':[4.5,0.5]}}
 
   latent_dcm_config: { 'model_config': { 'type': 'LatentDiscriminator', 'n_classes': 2,
-                                         'latent_dim': 256, 'hidden_dims': [1024, 1024, 1024] },
+                                         'latent_dim': 256, 'hidden_dims': [256, 512, 256] },
                        'optimizer_config': { 'type': 'adam', 'lr': 0.0001 },
                        'loss_config': { 'type': 'ce' } }
 
@@ -43,7 +43,7 @@ pipeline:
   - method: initialize_seq_data_loader_dict
   - method: initialize_image_domain_config
     params:
-      train_model: True
+      train_model: False
   - method: initialize_seq_domain_config
   - method: initialize_clf_model
   - method: initialize_dcm_model
@@ -54,8 +54,8 @@ pipeline:
   - method: train_models
     params:
       alpha: 0.1
-      beta: 1.0
-      gamma: 0.001
+      beta: 0.1
+      gamma: 0.1
       use_latent_discriminator: True
       use_latent_structure_model: True
       save_freq: 50
