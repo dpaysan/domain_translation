@@ -13,10 +13,11 @@ def visualize_image_translation_performance(
         domain_model_configs: List[DomainModelConfig],
         epoch: int,
         output_dir: str,
+        phase:str,
         device: str = "cuda:0",
 ):
     # Todo make more generic
-    image_dir = os.path.join(output_dir, "epoch_{}/images".format(epoch))
+    image_dir = os.path.join(output_dir, "epoch_{}/images/{}".format(epoch, phase))
     os.makedirs(image_dir, exist_ok=True)
 
     image_model = domain_model_configs[0].model.to(device)
@@ -30,7 +31,7 @@ def visualize_image_translation_performance(
 
     rna_latents = rna_model(rna_inputs)["latents"]
     translated_images = image_model.decode(rna_latents)
-    for i in range(5):
+    for i in range(min(image_inputs.size()[0], rna_inputs.size()[0])):
         imageio.imwrite(
             os.path.join(image_dir, "epoch_%s_inputs_%s.jpg" % (epoch, i)),
             np.uint8(image_inputs[i].squeeze().cpu().data.numpy() * 255),

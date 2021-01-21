@@ -211,10 +211,10 @@ def train_autoencoders_two_domains(
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used group of the samples (see Adversarial AutoEncoder paper)
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 5)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 20)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 5)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 20)), dim=1
         )
 
     else:
@@ -373,10 +373,10 @@ def train_latent_dcm_two_domains(
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used data modality (see Adversarial AutoEncoder paper)
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 5)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 20)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 5)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 20)), dim=1
         )
 
     else:
@@ -815,58 +815,71 @@ def train_val_test_loop_two_domains(
 
             total_loss_dict[phase].append(epoch_total_loss)
 
-            if phase == "val":
-                if i % save_freq == 0:
+            if i % save_freq == 0:
 
-                    domain_model_configs = [
-                        domain_configs[0].domain_model_config,
-                        domain_configs[1].domain_model_config,
-                    ]
-                    if domain_names[0] == "image":
-                        visualize_image_translation_performance(
-                            domain_model_configs=domain_model_configs,
-                            epoch=i,
-                            output_dir=output_dir,
-                            device=device,
-                        )
-
-                    # Save model states regularly
-                    checkpoint_dir = "{}/epoch_{}".format(output_dir, i)
-                    visualize_model_performance(
-                        output_dir=checkpoint_dir,
-                        domain_configs=domain_configs,
-                        dataset_types=["train", "val"],
+                domain_model_configs = [
+                    domain_configs[0].domain_model_config,
+                    domain_configs[1].domain_model_config,
+                ]
+                if domain_names[0] == "image":
+                    visualize_image_translation_performance(
+                        domain_model_configs=domain_model_configs,
+                        epoch=i,
+                        output_dir=output_dir,
                         device=device,
+                        phase=phase
                     )
 
-                    model_i_weights = (
-                        domain_configs[0].domain_model_config.model.cpu().state_dict()
-                    )
-                    model_j_weights = (
-                        domain_configs[1].domain_model_config.model.cpu().state_dict()
-                    )
-                    torch.save(
-                        model_i_weights,
-                        "{}/model_{}.pth".format(checkpoint_dir, domain_names[0]),
-                    )
-                    torch.save(
-                        model_j_weights,
-                        "{}/model_{}.pth".format(checkpoint_dir, domain_names[1]),
-                    )
+                # Save model states regularly
+                checkpoint_dir = "{}/epoch_{}".format(output_dir, i)
+                visualize_model_performance(
+                    output_dir=checkpoint_dir,
+                    domain_configs=domain_configs,
+                    dataset_types=[phase],
+                    device=device,
+                    reduction="umap"
+                )
+                visualize_model_performance(
+                    output_dir=checkpoint_dir,
+                    domain_configs=domain_configs,
+                    dataset_types=[phase],
+                    device=device,
+                    reduction="tsne"
+                )
+                visualize_model_performance(
+                    output_dir=checkpoint_dir,
+                    domain_configs=domain_configs,
+                    dataset_types=[phase],
+                    device=device,
+                    reduction="pca"
+                )
 
-                    if latent_dcm is not None:
-                        latent_dcm_weights = latent_dcm.cpu().state_dict()
-                        torch.save(
-                            latent_dcm_weights, "{}/dcm.pth".format(checkpoint_dir)
-                        )
-                    if latent_structure_model is not None:
-                        latent_structure_model_weights = (
-                            latent_structure_model.cpu().state_dict()
-                        )
-                        torch.save(
-                            latent_structure_model_weights,
-                            "{}/latent_structure_model.pth".format(checkpoint_dir),
-                        )
+                model_i_weights = (
+                    domain_configs[0].domain_model_config.model.cpu().state_dict()
+                )
+                model_j_weights = (
+                    domain_configs[1].domain_model_config.model.cpu().state_dict()
+                )
+                torch.save(
+                    model_i_weights,
+                    "{}/model_{}.pth".format(checkpoint_dir, domain_names[0]),
+                )
+                torch.save(
+                    model_j_weights,
+                    "{}/model_{}.pth".format(checkpoint_dir, domain_names[1]),
+                )
+
+                if latent_dcm is not None:
+                    latent_dcm_weights = latent_dcm.cpu().state_dict()
+                    torch.save(latent_dcm_weights, "{}/dcm.pth".format(checkpoint_dir))
+                if latent_structure_model is not None:
+                    latent_structure_model_weights = (
+                        latent_structure_model.cpu().state_dict()
+                    )
+                    torch.save(
+                        latent_structure_model_weights,
+                        "{}/latent_structure_model.pth".format(checkpoint_dir),
+                    )
 
     # Training complete
     time_elapsed = time.time() - start_time
@@ -1465,8 +1478,8 @@ def train_val_test_loop_single_domain(
     )
 
     # Load best model
-    #domain_config.domain_model_config.model.load_state_dict(best_model_weights)
-    #if latent_structure_model is not None:
+    # domain_config.domain_model_config.model.load_state_dict(best_model_weights)
+    # if latent_structure_model is not None:
     #    latent_structure_model.load_state_dict(best_latent_structure_model_weights)
 
     if "test" in domain_config.data_loader_dict:
@@ -1527,7 +1540,7 @@ def train_val_test_loop_single_domain(
                     epoch=i,
                     output_dir=output_dir,
                     device=device,
-                    phase="test"
+                    phase="test",
                 )
             else:
                 visualize_image_ae_performance(
@@ -1535,7 +1548,7 @@ def train_val_test_loop_single_domain(
                     epoch=i,
                     output_dir=output_dir,
                     device=device,
-                    phase="test"
+                    phase="test",
                 )
 
         visualize_model_performance(

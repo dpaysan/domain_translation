@@ -250,6 +250,7 @@ def visualize_model_performance(
     domain_configs: List[DomainConfig],
     dataset_types: List[str] = None,
     device: str = "cuda:0",
+    reduction:str = "umap",
 ):
     os.makedirs(output_dir, exist_ok=True)
     if dataset_types is None:
@@ -259,10 +260,10 @@ def visualize_model_performance(
         visualize_shared_latent_space(
             domain_configs=domain_configs,
             save_path=output_dir
-            + "/shared_latent_space_umap_{}.png".format(dataset_type),
+            + "/shared_latent_space_{}_{}.png".format(reduction,dataset_type),
             dataset_type=dataset_type,
             random_state=42,
-            reduction="umap",
+            reduction=reduction,
             device=device,
         )
 
