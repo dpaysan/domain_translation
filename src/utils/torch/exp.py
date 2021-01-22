@@ -407,7 +407,6 @@ def train_latent_dcm_two_domains(
 
     # Backpropagate loss and update parameters if in phase 'train'
     if phase == "train" and latent_dcm.trainable:
-        latent_dcm_optimizer.zero_grad()
         dcm_loss.backward()
         latent_dcm_optimizer.step()
     else:

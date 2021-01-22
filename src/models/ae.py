@@ -325,7 +325,7 @@ class GeneSetAE(BaseAE, ABC):
         input_dim: int = 2613,
         latent_dim: int = 128,
         hidden_dims: List = [512,512,512, 512],
-        batchnorm_latent: bool = False,
+        batchnorm: bool = True,
         geneset_adjacencies: Tensor = None,
         geneset_adjacencies_file=None,
     ):
@@ -333,7 +333,7 @@ class GeneSetAE(BaseAE, ABC):
         self.input_dim = input_dim
         self.latent_dim = latent_dim
         self.hidden_dims = hidden_dims
-        self.batchnorm_latent = batchnorm_latent
+        self.batchnorm = batchnorm
         if geneset_adjacencies is not None:
             self.geneset_adjacencies = nn.Parameter(geneset_adjacencies, requires_grad=False)
         elif geneset_adjacencies_file is not None:
@@ -375,7 +375,7 @@ class GeneSetAE(BaseAE, ABC):
                 nn.Sequential(nn.Linear(self.n_genesets, self.latent_dim), nn.ReLU())
             ]
 
-        if self.batchnorm_latent:
+        if self.batchnorm:
             encoder_modules.append(nn.BatchNorm1d(self.latent_dim))
 
         self.encoder = nn.Sequential(*encoder_modules)

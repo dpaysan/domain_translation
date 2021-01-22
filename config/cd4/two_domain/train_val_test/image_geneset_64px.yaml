@@ -25,8 +25,8 @@ run_params:
                       'loss_config':{'type':'ce', 'weights':[4.5,0.5]}}
 
   latent_dcm_config: { 'model_config': { 'type': 'LatentDiscriminator', 'n_classes': 2,
-                                         'latent_dim': 256, 'hidden_dims': [256, 512, 256] },
-                       'optimizer_config': { 'type': 'adam', 'lr': 0.0001 },
+                                         'latent_dim': 256, 'hidden_dims': [512, 512, 512] },
+                       'optimizer_config': { 'type': 'adam', 'lr': 0.00001 },
                        'loss_config': { 'type': 'ce' } }
 
   num_epochs: 1000
@@ -43,7 +43,7 @@ pipeline:
   - method: initialize_seq_data_loader_dict
   - method: initialize_image_domain_config
     params:
-      train_model: False
+      train_model: True
   - method: initialize_seq_domain_config
   - method: initialize_clf_model
   - method: initialize_dcm_model
@@ -54,8 +54,8 @@ pipeline:
   - method: train_models
     params:
       alpha: 0.1
-      beta: 0.1
-      gamma: 0.1
+      beta: 1
+      gamma: 0.01
       use_latent_discriminator: True
       use_latent_structure_model: True
       save_freq: 50
