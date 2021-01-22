@@ -211,10 +211,10 @@ def train_autoencoders_two_domains(
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used group of the samples (see Adversarial AutoEncoder paper)
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 10)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 2)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 10)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 2)), dim=1
         )
 
     else:
@@ -272,11 +272,6 @@ def train_autoencoders_two_domains(
 
     # Backpropagate loss and update parameters if we are in the training phase
     if phase == "train":
-        optimizer_i.zero_grad()
-        optimizer_j.zero_grad()
-        if use_latent_structure_model:
-            latent_structure_model_optimizer.zero_grad()
-
         total_loss.backward()
         if train_i:
             optimizer_i.step()
@@ -356,11 +351,11 @@ def train_latent_dcm_two_domains(
     model_i.to(device)
     model_j.to(device)
     latent_dcm.to(device)
+    latent_dcm_optimizer.zero_grad()
 
     # Set latent discriminator to train
     if phase == "train" and latent_dcm.trainable:
         latent_dcm.train()
-        latent_dcm_optimizer.zero_grad()
     else:
         latent_dcm.eval()
 
@@ -378,10 +373,10 @@ def train_latent_dcm_two_domains(
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used data modality (see Adversarial AutoEncoder paper)
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 10)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 2)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 10)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 2)), dim=1
         )
 
     else:

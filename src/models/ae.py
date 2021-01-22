@@ -352,7 +352,7 @@ class GeneSetAE(BaseAE, ABC):
         self.geneset_encoding_layer = SparseLinear(
             self.input_dim, self.n_genesets, self.geneset_adjacencies
         )
-        self.geneset_encoder = nn.Sequential(self.geneset_encoding_layer, nn.ReLU())
+        self.geneset_encoder = nn.Sequential(self.geneset_encoding_layer, nn.ReLU(), nn.BatchNorm1d(self.n_genesets))
         if len(hidden_dims) > 0:
             encoder_modules = [
                 nn.Sequential(
@@ -399,12 +399,12 @@ class GeneSetAE(BaseAE, ABC):
                 )
             decoder_modules.append(
                 nn.Sequential(
-                    nn.Linear(self.hidden_dims[0], self.n_genesets), nn.ReLU()
+                    nn.Linear(self.hidden_dims[0], self.n_genesets), nn.ReLU(), nn.BatchNorm1d(self.n_genesets)
                 )
             )
         else:
             decoder_modules = [
-                nn.Sequential(nn.Linear(self.latent_dim, self.n_genesets), nn.ReLU())
+                nn.Sequential(nn.Linear(self.latent_dim, self.n_genesets), nn.ReLU(), nn.BatchNorm1d(self.n_genesets))
             ]
 
         self.geneset_decoder = nn.Sequential(
