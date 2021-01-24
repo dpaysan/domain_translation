@@ -11,6 +11,7 @@ def merge_seq_data_and_labels(seq_data: DataFrame, seq_labels: DataFrame) -> Dat
 
     merged_data = seq_data.join(seq_labels, how="right")
     merged_data = merged_data.rename(columns={"label": "binary_label"})
+    merged_data = seq_labels.loc[:,"binary_label"] = merged_data["binary_label"].map({1:0, 0:1})
     return merged_data
 
 
