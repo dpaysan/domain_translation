@@ -20,8 +20,8 @@ def visualize_image_translation_performance(
     image_dir = os.path.join(output_dir, "epoch_{}/images/{}".format(epoch, phase))
     os.makedirs(image_dir, exist_ok=True)
 
-    image_model = domain_model_configs[0].model.to(device)
-    rna_model = domain_model_configs[1].model.to(device)
+    image_model = domain_model_configs[0].model.to(device).eval()
+    rna_model = domain_model_configs[1].model.to(device).eval()
 
     rna_inputs = domain_model_configs[1].inputs
     rna_inputs = Variable(rna_inputs).to(device)

@@ -7,26 +7,26 @@ run_params:
                        'data_key': 'image', 'label_key': 'label' }
 
   image_model_config: { 'model_config': { 'type': 'VanillaConvAE', 'latent_dim': 256, 'hidden_dims': [ 128, 256, 512, 1024, 1024 ] },
-                        'optimizer_config': { 'type': 'adam','lr': 0.0001 },
+                        'optimizer_config': { 'type': 'adam', 'lr': 0.00001, 'betas':[0.5, 0.9]},
                         'loss_config': { 'type': 'mae' } }
 
   seq_data_config: {'data_fname':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_data_and_labels.csv',
                     'data_key':'seq_data',
                     'label_key':'label'}
 
-  seq_model_config : {'model_config':{'type':'GeneSetAE', 'input_dim':5785, 'hidden_dims':[512, 512, 512, 512, 512, 512, 512, 512, 512],
+  seq_model_config : {'model_config':{'type':'GeneSetAE', 'input_dim':5785, 'hidden_dims':[1024, 1024, 1024, 1024, 1024, 1024],
                                        'latent_dim':256,
                                        'geneset_adjacencies_file':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'},
-                      'optimizer_config':{'type':'rmsprop', 'lr':0.0001},
+                      'optimizer_config':{'type':'adam', 'lr': 0.00001, 'betas':[0.5, 0.9], 'weight_decay':0.005},
                       'loss_config':{'type':'mae'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':256, 'n_classes':2},
-                      'optimizer_config':{'type':'adam', 'lr':0.0001},
+                      'optimizer_config':{'type':'adam','lr': 0.00001, 'betas':[0.5, 0.9]},
                       'loss_config':{'type':'ce'}}
 
   latent_dcm_config: { 'model_config': { 'type': 'LatentDiscriminator', 'n_classes': 2,
-                                         'latent_dim': 256, 'hidden_dims': [512, 512, 512] },
-                       'optimizer_config': { 'type': 'rmsprop', 'lr': 0.0001 },
+                                         'latent_dim': 256, 'hidden_dims': [512, 512, 512,] },
+                       'optimizer_config': { 'type': 'adam', 'lr': 0.00001, 'betas':[0.5, 0.9], 'weight_decay':0.005 },
                        'loss_config': { 'type': 'ce' } }
 
   num_epochs: 1000
@@ -53,11 +53,11 @@ pipeline:
       id: 0
   - method: train_models
     params:
-      alpha: 0.0
+      alpha: 0.1
       beta: 1.0
-      gamma: 0.0
+      gamma: 0.001
       use_latent_discriminator: True
       use_latent_structure_model: True
-      save_freq: 50
+      save_freq: 100
 
 

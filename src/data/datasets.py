@@ -10,6 +10,7 @@ from torch.utils.data import Dataset, Subset
 from torchvision import transforms
 from torchvision.transforms import Compose
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import RobustScaler, StandardScaler
 
 from src.utils.basic.io import get_file_list
 
@@ -89,6 +90,7 @@ class TorchSeqDataset(LabeledDataset):
             self.sample_ids = None
 
         self.seq_data = np.array(seq_data_and_labels.iloc[:, :-1]).astype(np.float32)
+        self.seq_data = StandardScaler().fit_transform(self.seq_data)
 
         self.labels = np.array(seq_data_and_labels.iloc[:, -1]).astype(int)
         self.transform_pipeline = transform_pipeline

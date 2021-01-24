@@ -83,7 +83,7 @@ def get_latent_representations_for_model(
     device: str = "cuda:0",
 ) -> dict:
     # create Dataloader
-    dataloader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+    dataloader = DataLoader(dataset=dataset, batch_size=32, shuffle=False)
 
     shared_latent_representations = []
     domain_specific_latent_representations = []
@@ -93,17 +93,17 @@ def get_latent_representations_for_model(
     for (idx, sample) in enumerate(dataloader):
         input = sample[data_key].to(device)
         if label_key is not None:
-            labels.append(sample[label_key].item())
+            labels.extend(sample[label_key].detach().cpu().numpy())
 
         output = model(input)
         shared_latent_representation = output["latents"]
-        shared_latent_representations.append(
+        shared_latent_representations.extend(
             shared_latent_representation.detach().cpu().numpy()
         )
         # if hasattr(model, "n_latent_spaces") and model.n_latent_spaces == 2:
         if "unshared_latents" in output:
             domain_specific_latent_representation = output["unshared_latents"]
-            domain_specific_latent_representations.append(
+            domain_specific_latent_representations.extend(
                 domain_specific_latent_representation.detach().cpu().numpy()
             )
 
