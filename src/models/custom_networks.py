@@ -5,7 +5,9 @@ import torch
 from torch import Tensor
 from torch import nn
 
-from src.models.ae import GeneSetAE
+from src.models.ae import GeneSetAE, BaseAE
+import numpy as np
+import pandas as pd
 
 
 class GenesetEncoder(nn.Module, ABC):
@@ -106,23 +108,30 @@ class GenesetDecoder(nn.Module, ABC):
         return output
 
 
-class GeneSetAE_v2(nn.Module, ABC):
+class GeneSetAE_v2(BaseAE, ABC):
     def __init__(
         self,
-        adjacency_matrix: Tensor,
+        geneset_adjacencies: Tensor=None,
+        geneset_adjacencies_file: str = None,
         hidden_dims: List = [64, 32, 16, 8],
         latent_dim: int = 256,
     ):
         super().__init__()
-        self.adjacency_matrix = adjacency_matrix
         self.hidden_dims = hidden_dims
         self.latent_dim = latent_dim
+        if geneset_adjacencies is not None:
+            self.geneset_adjacencies = nn.Parameter(geneset_adjacencies, requires_grad=False)
+        elif geneset_adjacencies_file is not None:
+            geneset_adjacencies = pd.read_csv(geneset_adjacencies_file,
+                index_col=0)
+            self.geneset_adjacencies = nn.Parameter(torch.from_numpy(np.array(geneset_adjacencies)),
+                                                    requires_grad=False)
 
         self.geneset_encoder = GenesetEncoder(
-            adjacency_matrix=adjacency_matrix, hidden_dims=hidden_dims
+            adjacency_matrix=self.adjacency_matrix, hidden_dims=hidden_dims
         )
         self.geneset_decoder = GenesetDecoder(
-            adjacency_matrix=adjacency_matrix, hidden_dims=hidden_dims[::-1]
+            adjacency_matrix=self.adjacency_matrix, hidden_dims=hidden_dims[::-1]
         )
         self.latent_mapper = nn.Linear(self.geneset_encoder.output_dim, self.latent_dim)
         self.inv_latent_mapper = nn.Linear(
