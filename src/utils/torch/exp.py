@@ -367,17 +367,19 @@ def train_latent_dcm_two_domains(
     latents_i = Variable(model_i(inputs_i)["latents"])
     latents_j = Variable(model_j(inputs_j)["latents"])
 
+
+    # add noise to inputs
+    noise_i = torch.normal(0, 0.1, latents_i.size()).to(latents_i.device)
+    noise_j = torch.normal(0, 0.1, latents_j.size()).to(latents_j.device)
+
+    latents_i += noise_i
+    latents_j += noise_j
+
     if use_latent_discriminator:
         labels_i, labels_j = (
             Variable(labels_i).to(device),
             Variable(labels_j).to(device),
         )
-        # add noise to inputs
-        noise_i = torch.normal(0, 0.1, latents_i.size()).to(latents_i.device)
-        noise_j = torch.normal(0, 0.1, latents_j.size()).to(latents_j.device)
-
-        latents_i += noise_i
-        latents_j += noise_j
 
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used data modality (see Adversarial AutoEncoder paper)
@@ -398,6 +400,12 @@ def train_latent_dcm_two_domains(
 
     domain_labels_i = torch.zeros(dcm_output_i.size(0)).long().to(device)
     domain_labels_j = torch.ones(dcm_output_j.size(0)).long().to(device)
+
+    # Randomly flip 10% of the labels
+    flip_idc = np.random.randint(0, latents_i.size()[0], int(0.1 * latents_i.size()[0]))
+    domain_labels_i[flip_idc] = 1
+    domain_labels_j[flip_idc] = 0
+
     # domain_labels_i = (
     #     torch.ones(dcm_output_i.size(0)).long().to(device).view(-1, 1) * 0.1
     # )
