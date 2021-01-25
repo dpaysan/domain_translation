@@ -6,7 +6,8 @@ run_params:
                       'label_fname':'../../data/cd4/nuclear_crops_filtered/simple_image_labels.csv',
                       'data_key':'image', 'label_key':'label'}
 
-  model_config: {'model_config':{'type':'VanillaConvAE', 'latent_dim':256, 'hidden_dims':[128, 256, 512, 1024, 1024]},
+  model_config: {'model_config':{'type':'VanillaConvAE', 'latent_dim':256, 'hidden_dims':[128, 256, 512, 1024, 1024],
+                                 'batchnorm':False},
                        'optimizer_config':{'type':'adam','lr':0.0001},
                        'loss_config':{'type':'mae'}}
 

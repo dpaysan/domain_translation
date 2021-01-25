@@ -21,6 +21,7 @@ from torch.optim.rmsprop import RMSprop
 
 from src.helper.models import DomainConfig
 from src.models.ae import VanillaAE, TwoLatentSpaceAE, VanillaConvAE, GeneSetAE
+from src.models.custom_networks import GeneSetAE_v2
 from src.models.latent_models import (
     LatentDiscriminator,
     LatentClassifier,
@@ -74,6 +75,8 @@ def get_domain_configuration(
         model = GaussianMixtureConvVAE(**model_dict)
     elif model_type == "GeneSetAE":
         model = GeneSetAE(**model_dict)
+    elif model_type == "GeneSetAE_v2":
+        model = GeneSetAE_v2(**model_dict)
     else:
         raise NotImplementedError('Unknown model type "{}"'.format(model_type))
 

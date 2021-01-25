@@ -83,6 +83,7 @@ def train_autoencoders_two_domains(
     # The discriminator will not be trained but only used to compute the adversarial loss for the AE updates
     latent_dcm.eval()
     latent_dcm.to(device)
+    latent_dcm.zero_grad()
 
     if use_latent_structure_model:
         assert latent_structure_model is not None
@@ -211,10 +212,10 @@ def train_autoencoders_two_domains(
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used group of the samples (see Adversarial AutoEncoder paper)
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 2)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 10)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 2)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 10)), dim=1
         )
 
     else:
@@ -344,6 +345,8 @@ def train_latent_dcm_two_domains(
     # Set VAE models to eval for the training of the discriminator
     model_i.eval()
     model_j.eval()
+    model_i.zero_grad()
+    model_j.zero_grad()
 
     # Send models and data to device
     inputs_i, inputs_j = Variable(inputs_i).to(device), Variable(inputs_j).to(device)
@@ -364,6 +367,14 @@ def train_latent_dcm_two_domains(
     latents_i = Variable(model_i(inputs_i)["latents"])
     latents_j = Variable(model_j(inputs_j)["latents"])
 
+
+    # add noise to inputs
+    noise_i = torch.normal(0, 0.1, latents_i.size()).to(latents_i.device)
+    noise_j = torch.normal(0, 0.1, latents_j.size()).to(latents_j.device)
+
+    latents_i += noise_i
+    latents_j += noise_j
+
     if use_latent_discriminator:
         labels_i, labels_j = (
             Variable(labels_i).to(device),
@@ -372,11 +383,12 @@ def train_latent_dcm_two_domains(
 
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used data modality (see Adversarial AutoEncoder paper)
+
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 2)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 10)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 2)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 10)), dim=1
         )
 
     else:
@@ -388,6 +400,12 @@ def train_latent_dcm_two_domains(
 
     domain_labels_i = torch.zeros(dcm_output_i.size(0)).long().to(device)
     domain_labels_j = torch.ones(dcm_output_j.size(0)).long().to(device)
+
+    # Randomly flip 10% of the labels
+    flip_idc = np.random.randint(0, latents_i.size()[0], int(0.1 * latents_i.size()[0]))
+    domain_labels_i[flip_idc] = 1
+    domain_labels_j[flip_idc] = 0
+
     # domain_labels_i = (
     #     torch.ones(dcm_output_i.size(0)).long().to(device).view(-1, 1) * 0.1
     # )
@@ -713,11 +731,15 @@ def train_val_test_loop_two_domains(
 
         # Iterate over training and validation phase
         for phase in ["train", "val"]:
-            if latent_dcm is not None:
-                if i % latent_dcm_train_freq ==0:
-                    latent_dcm.trainable = True
-                else:
-                    latent_dcm.trainable = False
+            #if latent_dcm is not None:
+                # if i % 1 <=0 :
+                #     latent_dcm.trainable = True
+                #     #domain_configs[0].domain_model_config.model.trainable = False
+                #     domain_configs[1].domain_model_config.model.trainable = False
+                # else:
+                #     latent_dcm.trainable = False
+                #     #domain_configs[0].domain_model_config.model.trainable = True
+                #     domain_configs[1].domain_model_config.model.trainable = True
 
             epoch_statistics = process_epoch_two_domains(
                 domain_configs=domain_configs,

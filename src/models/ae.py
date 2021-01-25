@@ -258,6 +258,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             encoder_modules = [
                 nn.Sequential(
                     nn.Linear(self.input_dim, self.hidden_dims[0]),
+                    #nn.LeakyReLU(0.2),
                     nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
                 )
@@ -267,6 +268,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
+                    #nn.LeakyReLU(0.2),
                     nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[i]),
                 )
@@ -281,6 +283,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
         decoder_modules = [
             nn.Sequential(
                 nn.Linear(self.latent_dim_1 + latent_dim_2, self.hidden_dims[-1]),
+                #nn.LeakyReLU(0.2),
                 nn.ReLU(),
                 nn.BatchNorm1d(self.hidden_dims[-1]),
             )
@@ -289,6 +292,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
+                    #nn.LeakyReLU(0.2),
                     nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                 )
@@ -357,6 +361,7 @@ class GeneSetAE(BaseAE, ABC):
             encoder_modules = [
                 nn.Sequential(
                     nn.Linear(self.n_genesets, self.hidden_dims[0]),
+                    #nn.LeakyReLU(0.2),
                     nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
                 )
@@ -365,6 +370,7 @@ class GeneSetAE(BaseAE, ABC):
                 encoder_modules.append(
                     nn.Sequential(
                         nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
+                        #nn.LeakyReLU(0.2),
                         nn.ReLU(),
                         nn.BatchNorm1d(self.hidden_dims[i]),
                     )
@@ -372,7 +378,7 @@ class GeneSetAE(BaseAE, ABC):
             encoder_modules.append(nn.Linear(self.hidden_dims[-1], self.latent_dim))
         else:
             encoder_modules = [
-                nn.Sequential(nn.Linear(self.n_genesets, self.latent_dim), nn.ReLU())
+                nn.Sequential(nn.Linear(self.n_genesets, self.latent_dim))
             ]
 
         if self.batchnorm:
@@ -385,14 +391,16 @@ class GeneSetAE(BaseAE, ABC):
             decoder_modules = [
                 nn.Sequential(
                     nn.Linear(self.latent_dim, self.hidden_dims[-1]),
+                    #nn.LeakyReLU(0.2),
                     nn.ReLU(),
-                    nn.BatchNorm1d(self.hidden_dims[-1]),
+                    #nn.BatchNorm1d(self.hidden_dims[-1]),
                 )
             ]
             for i in range(len(hidden_dims) - 1):
                 decoder_modules.append(
                     nn.Sequential(
                         nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
+                        #nn.LeakyReLU(0.2),
                         nn.ReLU(),
                         nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                     )

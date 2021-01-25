@@ -22,7 +22,7 @@ class LatentDiscriminator(nn.Module, ABC):
         self.trainable = trainable
 
         model_modules = [
-            nn.Sequential(nn.Linear(self.latent_dim + 2, hidden_dims[0]), nn.ReLU(),
+            nn.Sequential(nn.Linear(self.latent_dim + 10, hidden_dims[0]), nn.ReLU(),
                           #nn.BatchNorm1d(self.hidden_dims[0])
              )
         ]
