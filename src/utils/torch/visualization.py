@@ -102,3 +102,17 @@ def visualize_image_ae_performance(
             os.path.join(image_dir, "%s_epoch_%s_recons_%s.jpg" % (phase,epoch, i)),
             np.uint8(recon_images[i].cpu().data.view(64, 64).numpy() * 255),
         )
+
+
+def visualize_geneset_perturbation_in_image(data_dict:dict, output_dir:str, silencing_node:int):
+    image_dir = os.path.join(output_dir, "perturbation/silenced_set_{}".format(silencing_node))
+    trans_images = data_dict['trans_images']
+    perturbed_trans_images = data_dict['perturbed_trans_images']
+
+    for i in range(len(trans_images)):
+        imageio.imwrite(os.path.join(image_dir, "trans_image_%s.jpg" % i) ,
+                                   np.uint8(trans_images[i].squeeze() * 255))
+        imageio.imwrite(os.path.join(image_dir, "perturbed_trans_image_%s.jpg" % i) ,
+                                   np.uint8(perturbed_trans_images[i].squeeze() * 255))
+        imageio.imwrite(os.path.join(image_dir, "perturbed_diff_image_%s.jpg" % i),
+                        np.uint8((perturbed_trans_images[i] - trans_images[i]).squeeze() * 255), cmap='coolwarm')

@@ -5,6 +5,8 @@ import torch
 from torch import Tensor
 from torch import nn
 
+from src.models.ae import GeneSetAE
+
 
 class GenesetEncoder(nn.Module, ABC):
     def __init__(self, adjacency_matrix: Tensor, hidden_dims: List):
@@ -58,7 +60,9 @@ class GenesetDecoder(nn.Module, ABC):
     def __init__(self, adjacency_matrix: Tensor, hidden_dims: List):
         super().__init__()
         # Adjacency matrix will be of dimensions genesets x genes
-        self.adjacency_matrix = nn.Parameter(adjacency_matrix.transpose(0, 1), requires_grad=False)
+        self.adjacency_matrix = nn.Parameter(
+            adjacency_matrix.transpose(0, 1), requires_grad=False
+        )
         self.hidden_dims = hidden_dims
         self.geneset_decoders = []
 
@@ -103,7 +107,12 @@ class GenesetDecoder(nn.Module, ABC):
 
 
 class GeneSetAE_v2(nn.Module, ABC):
-    def __init__(self, adjacency_matrix: Tensor, hidden_dims: List = [64, 32, 16, 8], latent_dim:int=256):
+    def __init__(
+        self,
+        adjacency_matrix: Tensor,
+        hidden_dims: List = [64, 32, 16, 8],
+        latent_dim: int = 256,
+    ):
         super().__init__()
         self.adjacency_matrix = adjacency_matrix
         self.hidden_dims = hidden_dims
@@ -116,11 +125,60 @@ class GeneSetAE_v2(nn.Module, ABC):
             adjacency_matrix=adjacency_matrix, hidden_dims=hidden_dims[::-1]
         )
         self.latent_mapper = nn.Linear(self.geneset_encoder.output_dim, self.latent_dim)
-        self.inv_latent_mapper = nn.Linear(self.latent_dim, self.geneset_decoder.input_dim)
+        self.inv_latent_mapper = nn.Linear(
+            self.latent_dim, self.geneset_decoder.input_dim
+        )
 
     def forward(self, inputs: Tensor):
         geneset_activities = self.geneset_encoder(inputs)
         latents = self.latent_mapper(geneset_activities)
         inv_latents = self.inv_latent_mapper(latents)
         output = self.geneset_decoder(inv_latents)
-        return {'recons':output, 'latents':latents}
+        return {"recons": output, "latents": latents}
+
+
+class PerturbationGeneSetAE(GeneSetAE):
+    def __init(
+        self,
+        input_dim: int = 2613,
+        latent_dim: int = 128,
+        hidden_dims: List = [512, 512, 512, 512],
+        batchnorm: bool = True,
+        geneset_adjacencies: Tensor = None,
+        geneset_adjacencies_file=None,
+    ):
+        super().__init__(
+            input_dim=input_dim,
+            latent_dim=latent_dim,
+            hidden_dims=hidden_dims,
+            batchnorm=batchnorm,
+            geneset_adjacencies=geneset_adjacencies,
+            geneset_adjacencies_file=geneset_adjacencies_file,
+        )
+        self.eval()
+
+    def encode(self, inputs: Tensor) -> Any:
+        geneset_activities = self.geneset_encoder(inputs)
+        latents = self.encoder(geneset_activities)
+        return latents
+
+    def decode(self, latents: Tensor) -> Any:
+        decoded_geneset_activities = self.decoder(latents)
+        recons = self.geneset_decoder(decoded_geneset_activities)
+        return recons
+
+    def forward(self, inputs: Tensor, silence_node: int) -> Any:
+        geneset_activities = self.geneset_encoder(inputs)
+        perturbed_geneset_activities = geneset_activities.clone()
+        perturbed_geneset_activities[:, silence_node] = 0
+        latents = self.encoder(geneset_activities)
+        perturbed_latents = self.encoder(perturbed_geneset_activities)
+        recons = self.decode(latents)
+        perturbed_recons = self.decode(perturbed_latents)
+        return {
+            "recons": recons,
+            "latents": latents,
+            "geneset_activities": geneset_activities,
+            "perturbed_latents": perturbed_latents,
+            "perturbed_recons": perturbed_recons,
+        }

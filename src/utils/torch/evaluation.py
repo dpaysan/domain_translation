@@ -6,10 +6,14 @@ from sklearn.metrics import confusion_matrix
 from torch.nn import Module
 from torch.utils.data import DataLoader, Dataset
 
+from src.data.datasets import TorchSeqDataset
 from src.functions.loss_functions import max_discrepancy_loss
 from src.helper.models import DomainConfig
+from src.models.ae import GeneSetAE
+from src.models.custom_networks import PerturbationGeneSetAE
 from src.utils.basic.export import dict_to_csv
 from src.utils.basic.metric import knn_accuracy
+from src.utils.torch.general import get_device
 
 
 def evaluate_latent_integration(
@@ -359,3 +363,40 @@ def evaluate_latent_clf_two_domains(
         np.concatenate([labels_i, labels_j]), np.concatenate([preds_i, preds_j])
     )
     return confusion_dict
+
+
+def analyze_geneset_perturbation_in_image(geneset_ae: GeneSetAE, image_ae:Module, seq_dataloader:DataLoader,
+                                          seq_data_key:str, silencing_node:int):
+    device = get_device()
+    geneset_ae.to(device).eval()
+    image_ae.to(device).eval()
+    perturbation_geneset_ae = PerturbationGeneSetAE(input_dim=geneset_ae.input_dim, latent_dim=geneset_ae.latent_dim,
+                                                    hidden_dims=geneset_ae.hidden_dims,
+                                                    geneset_adjacencies=geneset_ae.geneset_adjacencies)
+    perturbation_geneset_ae.to(device)
+    perturbation_geneset_ae.load_state_dict(geneset_ae.state_dict())
+    perturbation_geneset_ae.eval()
+    geneset_ae.cpu()
+    translated_images = []
+    perturbed_translated_images = []
+    recon_sequences = []
+    perturbed_recon_sequences = []
+
+    for i, sample in seq_dataloader:
+        inputs = sample[seq_data_key].to(device)
+        output_dict = perturbation_geneset_ae(inputs, silencing_node)
+        recon_sequences.extend(output_dict['recons'].detach().cpu().numpy())
+        latents = output_dict['latents']
+        geneset_activites = output_dict['geneset_activities']
+        perturbed_latents = output_dict['perturbed_latents']
+        perturbed_recon_sequences.extend(output_dict['perturbed_recons'].detach().cpu().numpy())
+        translated_images.extend(image_ae.decode(latents).detach().cpu().numpy())
+        perturbed_translated_images.extend(image_ae.decode(perturbed_latents).detach().cpu().numpy())
+
+    data_dict = {'seq_recons': np.array(recon_sequences), 'perturbed_seq_recons':np.array(perturbed_recon_sequences),
+                 'trans_images':np.array(translated_images),
+                 'perturbed_trans_images':np.array(perturbed_translated_images)}
+    return data_dict
+
+
+
