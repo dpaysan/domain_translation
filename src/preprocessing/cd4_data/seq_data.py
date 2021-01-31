@@ -58,9 +58,9 @@ def run_seq_8k_pbmc_data_pipeline(
 
 
 def run_seq_10k_pbmc_data_pipeline_genesets(
-        data_fname: str = "../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_filtered_nCD4.csv",
-        label_fname: str = "../../data/cd4/cd4_rna_seq_pbmc_10k/nCD4_labels_0quiescent_1poised.csv",
-        seq_data_save_fname="../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_data_and_labels.csv"):
+        data_fname: str = "../../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_filtered_nCD4.csv",
+        label_fname: str = "../../../data/cd4/cd4_rna_seq_pbmc_10k/nCD4_labels_0quiescent_1poised.csv",
+        seq_data_save_fname="../../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_data_and_labels.csv"):
     seq_data = pd.read_csv(data_fname, index_col=0)
     seq_labels = pd.read_csv(label_fname, index_col=0)
     merged_seq_data_and_labels = merge_seq_data_and_labels(seq_data, seq_labels)

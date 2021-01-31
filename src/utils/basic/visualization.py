@@ -34,12 +34,12 @@ plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
 def plot_train_val_hist(
-    training_history: ndarray,
-    validation_history: ndarray,
-    output_dir: str,
-    y_label: str,
-    title=None,
-    posfix: str = "",
+        training_history: ndarray,
+        validation_history: ndarray,
+        output_dir: str,
+        y_label: str,
+        title=None,
+        posfix: str = "",
 ):
     r""" A function to visualize the evolution of the training and validation loss during the training.
     Parameters
@@ -78,11 +78,11 @@ def plot_train_val_hist(
 
 
 def plot_latent_representations(
-    latents_domain_dict: dict,
-    save_path: str,
-    random_state: int,
-    reduction: str = "umap",
-    label_dict: dict = None,
+        latents_domain_dict: dict,
+        save_path: str,
+        random_state: int,
+        reduction: str = "umap",
+        label_dict: dict = None,
 ):
     latent_representations = []
     domain_names = []
@@ -159,12 +159,12 @@ def label_point(x, y, val, ax):
 
 
 def visualize_shared_latent_space(
-    domain_configs: List[DomainConfig],
-    save_path: str,
-    random_state: int,
-    reduction: str = "umap",
-    dataset_type: str = "val",
-    device: str = "cuda:0",
+        domain_configs: List[DomainConfig],
+        save_path: str,
+        random_state: int,
+        reduction: str = "umap",
+        dataset_type: str = "val",
+        device: str = "cuda:0",
 ):
     latents_domain_dict, label_dict = get_shared_latent_space_dict_for_multiple_domains(
         domain_configs=domain_configs, dataset_type=dataset_type, device=device
@@ -232,10 +232,10 @@ def plot_correlations_latent_space(latents_domain_dict, save_path):
 
 
 def visualize_correlation_structure_latent_space(
-    domain_configs: List[DomainConfig],
-    save_path: str,
-    dataset_type: str = "val",
-    device: str = "cuda:0",
+        domain_configs: List[DomainConfig],
+        save_path: str,
+        dataset_type: str = "val",
+        device: str = "cuda:0",
 ):
     latents_domain_dict, _ = get_full_latent_space_dict_for_multiple_domains(
         domain_configs=domain_configs, dataset_type=dataset_type, device=device
@@ -246,11 +246,11 @@ def visualize_correlation_structure_latent_space(
 
 
 def visualize_model_performance(
-    output_dir: str,
-    domain_configs: List[DomainConfig],
-    dataset_types: List[str] = None,
-    device: str = "cuda:0",
-    reduction:str = "umap",
+        output_dir: str,
+        domain_configs: List[DomainConfig],
+        dataset_types: List[str] = None,
+        device: str = "cuda:0",
+        reduction: str = "umap",
 ):
     os.makedirs(output_dir, exist_ok=True)
     if dataset_types is None:
@@ -260,7 +260,7 @@ def visualize_model_performance(
         visualize_shared_latent_space(
             domain_configs=domain_configs,
             save_path=output_dir
-            + "/shared_latent_space_{}_{}.png".format(reduction,dataset_type),
+                      + "/shared_latent_space_{}_{}.png".format(reduction, dataset_type),
             dataset_type=dataset_type,
             random_state=42,
             reduction=reduction,
@@ -270,12 +270,12 @@ def visualize_model_performance(
         # Todo resolve hacky try-catch way to avoid error if the domains consist of datasets of different sizes
         try:
             visualize_correlation_structure_latent_space(
-            domain_configs=domain_configs,
-            save_path=output_dir
-            + "/latent_space_correlation_structure_{}.png".format(dataset_type),
-            dataset_type=dataset_type,
-            device=device,
-        )
+                domain_configs=domain_configs,
+                save_path=output_dir
+                          + "/latent_space_correlation_structure_{}.png".format(dataset_type),
+                dataset_type=dataset_type,
+                device=device,
+            )
         except ValueError:
             pass
 
@@ -285,7 +285,7 @@ def visualize_model_performance(
             save_latents_to_csv(
                 domain_config=domain_config,
                 save_path=output_dir
-                + "/{}_latent_representations_{}.csv".format(domain_name, dataset_type),
+                          + "/{}_latent_representations_{}.csv".format(domain_name, dataset_type),
                 dataset_type=dataset_type,
                 device=device,
             )
@@ -294,6 +294,16 @@ def visualize_model_performance(
 def show_cam_on_image(img, mask):
     heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
     heatmap = np.float32(heatmap) / 255
-    cam = heatmap + np.float32(img)
+    cam = heatmap + np.float32(cv2.cvtColor(img,cv2.COLOR_GRAY2RGB))
     cam = cam / np.max(cam)
     return np.uint8(255 * cam)
+
+
+def deprocess_image(img):
+    """ see https://github.com/jacobgil/keras-grad-cam/blob/master/grad-cam.py#L65 """
+    img = img - np.mean(img)
+    img = img / (np.std(img) + 1e-5)
+    img = img * 0.1
+    img = img + 0.5
+    img = np.clip(img, 0, 1)
+    return np.uint8(img * 255)

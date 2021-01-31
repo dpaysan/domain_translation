@@ -1,6 +1,6 @@
 output_dir: '../../data/cd4/experiments'
-module: src.experiments.image_seq_domain_translation
-class: ImageSeqTranslationExperiment
+module: src.experiments.translation_analyses
+class: ImageSeqTranslationExperimentAnalysis
 run_params:
   image_data_config: { 'image_dir': '../../data/cd4/nuclear_crops_filtered/64px/labeled_scaled_max_intensity_resized_images',
                        'label_fname': '../../data/cd4/nuclear_crops_filtered/simple_image_labels.csv',
@@ -35,7 +35,7 @@ run_params:
   num_epochs: 1000
   early_stopping: -1
   train_val_test_split: [0.8, 0.1, 0.1]
-  batch_size: 32
+  batch_size: 1
   random_state: 1234
 
 
@@ -55,7 +55,30 @@ pipeline:
     params:
       domain_model_1_weights_loc: '../../data/cd4/experiments/good_mixin_good_recon/final_image_model.pth'
       domain_model_2_weights_loc: '../../data/cd4/experiments/good_mixin_good_recon/final_rna_model.pth'
-      latent_dcm_weights_loc: '../../data/cd4/experiments/good_mixin_good_recon/final_latent_dcm.pth'
+      latent_dcm_weights_loc: '../../data/cd4/experiments/good_mixin_good_recon/final_dcm.pth'
       latent_structure_model_weights_loc: '../../data/cd4/experiments/good_mixin_good_recon/final_latent_structure_model.pth'
-  - method: perform_artificial_knockout
+#  - method: perform_artificial_knockout
+#    params:
+#      silencing_node: 190
+#      dataloader_type: 'test'
+#  - method: perform_artificial_knockout
+#    params:
+#      silencing_node: 192
+#      dataloader_type: 'test'
+#  - method: perform_artificial_knockout
+#    params:
+#      silencing_node: 196
+#      dataloader_type: 'test'
+  - method: analyze_pathway_activation_areas
+    params:
+      query_node: 190
+      dataloader_type: 'test'
+  - method: analyze_pathway_activation_areas
+    params:
+      query_node: 192
+      dataloader_type: 'test'
+  - method: analyze_pathway_activation_areas
+    params:
+      query_node: 196
+      dataloader_type: 'test'
 

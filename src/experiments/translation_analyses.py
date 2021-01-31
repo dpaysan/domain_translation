@@ -6,8 +6,9 @@ import cv2
 import torch
 
 from src.experiments.image_seq_domain_translation import ImageSeqTranslationExperiment
-from src.utils.torch.evaluation import analyze_geneset_perturbation_in_image
-from src.utils.torch.visualization import visualize_geneset_perturbation_in_image
+from src.models.custom_networks import ImageToGeneSetTranslator
+from src.utils.torch.evaluation import analyze_geneset_perturbation_in_image, analyze_guided_gradcam_for_genesets
+from src.utils.torch.visualization import visualize_geneset_perturbation_in_image, visualize_geneset_guided_grad_cams
 
 
 class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
@@ -137,6 +138,22 @@ class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
 
         visualize_geneset_perturbation_in_image(data_dict=data_dict, output_dir=self.output_dir,
                                                 silencing_node=silencing_node)
+
+    def analyze_pathway_activation_areas(self, target_layer:str="4", sequence_domain_id: int=1, image_domain_id:int=0, query_node:int=0,
+                                         dataloader_type:str='train'):
+        sequence_domain = self.domain_configs[sequence_domain_id]
+        image_domain = self.domain_configs[image_domain_id]
+        image_ae = image_domain.domain_model_config.model
+        sequence_ae = sequence_domain.domain_model_config.model
+        image_data_key = image_domain.data_key
+        image_dataloader = image_domain.data_loader_dict[dataloader_type]
+
+        image_geneset_translator = ImageToGeneSetTranslator(image_ae=image_ae, geneset_ae=sequence_ae)
+
+        data_dict = analyze_guided_gradcam_for_genesets(image_to_geneset_translator=image_geneset_translator,
+                                                        image_dataloader=image_dataloader, image_data_key=image_data_key,
+                                                        query_node=query_node, target_layer=target_layer)
+        visualize_geneset_guided_grad_cams(data_dict=data_dict, output_dir=self.output_dir, query_node=query_node)
 
 
 

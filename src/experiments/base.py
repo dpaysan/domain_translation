@@ -165,11 +165,11 @@ class BaseTwoDomainExperiment(BaseExperiment):
             torch.load(domain_model_2_weights_loc)
         )
 
-        self.latent_dcm_config["model"].load_state_dict(latent_dcm_weights_loc)
+        self.latent_dcm_config["model"].load_state_dict(torch.load(latent_dcm_weights_loc))
 
         if latent_structure_model_weights_loc is not None:
             self.latent_structure_model_config["model"].load_state_dict(
-                latent_structure_model_weights_loc
+                torch.load(latent_structure_model_weights_loc)
             )
 
 

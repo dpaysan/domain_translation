@@ -1,3 +1,4 @@
+import copy
 from typing import Tuple, List
 
 import numpy as np
@@ -10,7 +11,8 @@ from src.data.datasets import TorchSeqDataset
 from src.functions.loss_functions import max_discrepancy_loss
 from src.helper.models import DomainConfig
 from src.models.ae import GeneSetAE
-from src.models.custom_networks import PerturbationGeneSetAE
+from src.models.custom_networks import PerturbationGeneSetAE, ImageToGeneSetTranslator
+from src.models.gradcam import GradCam, GuidedBackpropReLUModel
 from src.utils.basic.export import dict_to_csv
 from src.utils.basic.metric import knn_accuracy
 from src.utils.torch.general import get_device
@@ -169,8 +171,9 @@ def save_latents_to_csv(
         dataset = domain_config.data_loader_dict[dataset_type].dataset
     except KeyError:
         raise RuntimeError(
-            "Unknown dataset_type: {}, expected one of the following: train, val, test"
-            .format(dataset_type)
+            "Unknown dataset_type: {}, expected one of the following: train, val, test".format(
+                dataset_type
+            )
         )
     save_latents_and_labels_to_csv(
         model=model,
@@ -365,14 +368,22 @@ def evaluate_latent_clf_two_domains(
     return confusion_dict
 
 
-def analyze_geneset_perturbation_in_image(geneset_ae: GeneSetAE, image_ae:Module, seq_dataloader:DataLoader,
-                                          seq_data_key:str, silencing_node:int):
+def analyze_geneset_perturbation_in_image(
+    geneset_ae: GeneSetAE,
+    image_ae: Module,
+    seq_dataloader: DataLoader,
+    seq_data_key: str,
+    silencing_node: int,
+):
     device = get_device()
     geneset_ae.to(device).eval()
     image_ae.to(device).eval()
-    perturbation_geneset_ae = PerturbationGeneSetAE(input_dim=geneset_ae.input_dim, latent_dim=geneset_ae.latent_dim,
-                                                    hidden_dims=geneset_ae.hidden_dims,
-                                                    geneset_adjacencies=geneset_ae.geneset_adjacencies)
+    perturbation_geneset_ae = PerturbationGeneSetAE(
+        input_dim=geneset_ae.input_dim,
+        latent_dim=geneset_ae.latent_dim,
+        hidden_dims=geneset_ae.hidden_dims,
+        geneset_adjacencies=geneset_ae.geneset_adjacencies,
+    )
     perturbation_geneset_ae.to(device)
     perturbation_geneset_ae.load_state_dict(geneset_ae.state_dict())
     perturbation_geneset_ae.eval()
@@ -382,21 +393,61 @@ def analyze_geneset_perturbation_in_image(geneset_ae: GeneSetAE, image_ae:Module
     recon_sequences = []
     perturbed_recon_sequences = []
 
-    for i, sample in seq_dataloader:
+    for (i, sample) in enumerate(seq_dataloader):
         inputs = sample[seq_data_key].to(device)
         output_dict = perturbation_geneset_ae(inputs, silencing_node)
-        recon_sequences.extend(output_dict['recons'].detach().cpu().numpy())
-        latents = output_dict['latents']
-        geneset_activites = output_dict['geneset_activities']
-        perturbed_latents = output_dict['perturbed_latents']
-        perturbed_recon_sequences.extend(output_dict['perturbed_recons'].detach().cpu().numpy())
-        translated_images.extend(image_ae.decode(latents).detach().cpu().numpy())
-        perturbed_translated_images.extend(image_ae.decode(perturbed_latents).detach().cpu().numpy())
+        recon_sequences.extend(list(output_dict["recons"].detach().cpu().numpy()))
+        latents = output_dict["latents"]
+        geneset_activites = output_dict["geneset_activities"]
+        perturbed_latents = output_dict["perturbed_latents"]
+        perturbed_recon_sequences.extend(
+            list(output_dict["perturbed_recons"].detach().cpu().numpy())
+        )
+        translated_images.extend(list(image_ae.decode(latents).detach().cpu().numpy()))
+        perturbed_translated_images.extend(
+            list(image_ae.decode(perturbed_latents).detach().cpu().numpy())
+        )
 
-    data_dict = {'seq_recons': np.array(recon_sequences), 'perturbed_seq_recons':np.array(perturbed_recon_sequences),
-                 'trans_images':np.array(translated_images),
-                 'perturbed_trans_images':np.array(perturbed_translated_images)}
+    data_dict = {
+        "seq_recons": np.array(recon_sequences),
+        "perturbed_seq_recons": np.array(perturbed_recon_sequences),
+        "trans_images": np.array(translated_images),
+        "perturbed_trans_images": np.array(perturbed_translated_images),
+    }
     return data_dict
 
 
+def analyze_guided_gradcam_for_genesets(
+    image_to_geneset_translator: ImageToGeneSetTranslator,
+    image_dataloader: DataLoader,
+    image_data_key: str,
+    target_layer: str,
+    query_node: int,
+):
+    device = get_device()
+    image_to_geneset_translator.eval().to(device)
 
+    grad_cam = GradCam(
+        model=image_to_geneset_translator,
+        feature_module=image_to_geneset_translator.encoder,
+        target_layer_names=[target_layer],
+        device=device,
+    )
+    gb_model = GuidedBackpropReLUModel(model=copy.deepcopy(image_to_geneset_translator), device=device)
+    guided_backpropagation_maps = []
+    gradient_cams = []
+    images = []
+
+    for (i, sample) in enumerate(image_dataloader):
+        inputs = sample[image_data_key].to(device)
+        gradient_cams.append(grad_cam(inputs, target_node=query_node).cpu().numpy())
+        guided_backpropagation_maps.extend(
+            list(gb_model(inputs, target_node=query_node))
+        )
+        images.extend(list(inputs.detach().cpu().numpy()))
+    data_dict = {
+        "images": np.array(images),
+        "gb_maps": np.array(guided_backpropagation_maps),
+        "grad_cams": np.array(gradient_cams),
+    }
+    return data_dict

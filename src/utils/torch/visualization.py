@@ -1,12 +1,15 @@
 import os
 from typing import List
 
+import cv2
 import imageio
 import numpy as np
 import torch
 from torch.autograd import Variable
+import matplotlib.pyplot as plt
 
 from src.helper.models import DomainModelConfig
+from src.utils.basic.visualization import deprocess_image, show_cam_on_image
 
 
 def visualize_image_translation_performance(
@@ -106,6 +109,7 @@ def visualize_image_ae_performance(
 
 def visualize_geneset_perturbation_in_image(data_dict:dict, output_dir:str, silencing_node:int):
     image_dir = os.path.join(output_dir, "perturbation/silenced_set_{}".format(silencing_node))
+    os.makedirs(image_dir)
     trans_images = data_dict['trans_images']
     perturbed_trans_images = data_dict['perturbed_trans_images']
 
@@ -114,5 +118,31 @@ def visualize_geneset_perturbation_in_image(data_dict:dict, output_dir:str, sile
                                    np.uint8(trans_images[i].squeeze() * 255))
         imageio.imwrite(os.path.join(image_dir, "perturbed_trans_image_%s.jpg" % i) ,
                                    np.uint8(perturbed_trans_images[i].squeeze() * 255))
-        imageio.imwrite(os.path.join(image_dir, "perturbed_diff_image_%s.jpg" % i),
-                        np.uint8((perturbed_trans_images[i] - trans_images[i]).squeeze() * 255), cmap='coolwarm')
+        plt.figure()
+        plt.imshow(trans_images[i].squeeze() * 255, cmap='gray')
+        plt.imshow((perturbed_trans_images[i].squeeze() - trans_images[i].squeeze()) * 255, cmap='seismic', alpha=0.3)
+        plt.axis("off")
+        plt.savefig(os.path.join(image_dir, "perturbed_diff_image_%s.jpg" % i), bbox_inches='tight')
+        plt.close()
+
+
+def visualize_geneset_guided_grad_cams(data_dict:dict, output_dir:str, query_node:int):
+    grad_cams = data_dict['grad_cams']
+    gb_maps = data_dict['gb_maps']
+    images = data_dict['images']
+    image_dir = os.path.join(output_dir, "guided_gradcam/queried_set_{}".format(query_node))
+    os.makedirs(image_dir)
+
+    for i in range(len(grad_cams)):
+        grayscale_cam = grad_cams[i].squeeze()
+        image = images[i].squeeze()
+        cam = show_cam_on_image(image, grayscale_cam)
+        gb = gb_maps[i]
+        gb = cv2.cvtColor(gb, cv2.COLOR_GRAY2RGB)
+        cam_mask = cv2.merge([grayscale_cam, grayscale_cam, grayscale_cam])
+        cam_gb = deprocess_image(cam_mask * gb)
+        gb = deprocess_image(gb)
+
+        cv2.imwrite(os.path.join(image_dir, "gradcam_image_%s.jpg" % i), cam)
+        cv2.imwrite(os.path.join(image_dir, "gb_map_image_%s.jpg" % i), gb)
+        cv2.imwrite(os.path.join(image_dir, "guided_gradcam_image_%s.jpg" % i), cam_gb)

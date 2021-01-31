@@ -354,7 +354,7 @@ class GeneSetAE(BaseAE, ABC):
         self.n_genesets = self.geneset_adjacencies.size()[1]
 
         self.geneset_encoding_layer = SparseLinear(
-            self.input_dim, self.n_genesets, self.geneset_adjacencies
+            self.input_dim, self.n_genesets, self.geneset_adjacencies,
         )
         self.geneset_encoder = nn.Sequential(self.geneset_encoding_layer, nn.ReLU(), nn.BatchNorm1d(self.n_genesets))
         if len(hidden_dims) > 0:
