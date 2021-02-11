@@ -1,13 +1,15 @@
+import os
 from typing import List
 
-import numpy as np
+import imageio
+import matplotlib.pyplot as plt
 import pandas as pd
-import cv2
-import torch
+import numpy as np
 
 from src.experiments.image_seq_domain_translation import ImageSeqTranslationExperiment
 from src.models.custom_networks import ImageToGeneSetTranslator
-from src.utils.torch.evaluation import analyze_geneset_perturbation_in_image, analyze_guided_gradcam_for_genesets
+from src.utils.torch.evaluation import analyze_geneset_perturbation_in_image, analyze_guided_gradcam_for_genesets, \
+    get_geneset_activities_and_translated_images
 from src.utils.torch.visualization import visualize_geneset_perturbation_in_image, visualize_geneset_guided_grad_cams
 
 
@@ -47,6 +49,7 @@ class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
             latent_distance_loss,
             latent_supervision_rate,
         )
+        self.seq_domain_id = -1
 
     def initialize_image_data_set(self):
         super().initialize_image_data_set()
@@ -68,6 +71,7 @@ class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
 
     def initialize_seq_domain_config(self):
         super().initialize_seq_domain_config()
+        self.seq_domain_id = len(self.domain_configs)-1
 
     def initialize_dcm_model(self):
         super().initialize_dcm_model()
@@ -154,6 +158,39 @@ class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
                                                         image_dataloader=image_dataloader, image_data_key=image_data_key,
                                                         query_node=query_node, target_layer=target_layer)
         visualize_geneset_guided_grad_cams(data_dict=data_dict, output_dir=self.output_dir, query_node=query_node)
+
+    def store_pathway_activities_and_translated_images(self, dataloader_type:str='train',
+                                                       geneset_adjacencies_file:str=None):
+        data_dict = get_geneset_activities_and_translated_images(domain_configs=self.domain_configs,
+                                                                 dataloader_type=dataloader_type)
+        if geneset_adjacencies_file is not None:
+            pathways = list(pd.read_csv(geneset_adjacencies_file, index_col=0).columns)
+        else:
+            pathways = None
+        cell_ids = data_dict["cell_ids"]
+        cell_labels = data_dict["labels"]
+        pathway_activities = data_dict["geneset_activities"]
+        translated_images = data_dict["translated_images"]
+
+        pathway_activity_df = pd.DataFrame(np.array(pathway_activities), columns=pathways, index=cell_ids)
+        pathway_activity_df["label"] = cell_labels
+
+        pathway_activity_df.to_csv(os.path.join(self.output_dir, "pathway_activities.csv"))
+
+        translated_image_dir = os.path.join(self.output_dir, "translated_images")
+        os.makedirs(translated_image_dir, exist_ok=True)
+        for i in range(len(translated_images)):
+            plt.figure()
+            plt.imshow(translated_images[i].reshape(64,64), cmap="gray")
+            plt.axis("off")
+            plt.savefig(os.path.join(translated_image_dir, "translated_cell_%s.jpg" % (cell_ids[i])), bbox_inches='tight')
+            plt.close()
+
+
+
+
+
+
 
 
 

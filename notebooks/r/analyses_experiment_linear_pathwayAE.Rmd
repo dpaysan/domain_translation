@@ -1,0 +1,577 @@
+---
+title: "Analyses of the linear Pathway-Autoencoder (PathwayAE) of inferring the pathway activity scores (PAS)"
+author: "Daniel Paysan"
+date: "2/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This notebook will be used to analyze the results of the experiments performed to a) infer the activity of specific pathways from scRNA-seq data of naive CD4+ Tcells of a healthy individual obtained from [10xGenomics](https://support.10xgenomics.com/single-cell-gene-expression/datasets/4.0.0/SC3_v3_NextGem_SI_PBMC_10K) and b) link these with DAPI images of naive CD4+ T cells using uncoupeled autoencoders similar to the approach presented by [Yang et al. (2021)](https://www.nature.com/articles/s41467-020-20249-2). Using a preliminary cell type identification pipeline the scRNA-seq data of a PBMC data set was screened to identify 1'379 naive CD4+ T cells. The image dataset consists of roughly 2'981 max-z projections of 64px x 64px DAPI images of naive CD4+ T cells.
+
+# 0. Environmental setup
+
+Before starting with the actual analyses we will first load the required libraries and read in the required data.
+
+```{r}
+library(Seurat)
+library(ggplot2)
+library(topGO)
+library(pheatmap)
+library(RColorBrewer)
+library(viridis)
+library(ggcorrplot)
+library(prabclus)
+library(VennDiagram)
+library(fgsea)
+
+futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger")
+```
+
+
+# 1. Read in data
+
+First, we will load the results of the preliminary cell type identification analyses for the sequencing data and select the subset that describes the naive CD4+ T cells.
+
+```{r}
+pbmc.data <- readRDS("~/Documents/PhD/coursework/fall20/sta426/project/project-tcell-activation-scrnaseq/work/pbmc_10k_w_CD4_classes.rds")
+seq.data <- subset(pbmc.data, idents = c("quiescent nCD4+ T", "poised nCD4+ T"))
+seq.data
+```
+
+Next, we will load the pathway activity scores inferred by the Pathway-Autoencoder that in its first layer has sparse connections representing the gene-pathway associations. Note that we for now only load the pathway activity scores for the subset of cell that was part of the training data.
+
+```{r}
+pathway.activities <- read.csv("~/PycharmProjects/domain_translation/data/cd4/experiments/analyses_of_current_best/pathway_activities.csv", header = T, row.names = 1)
+# The cell label was used to guide the learning of the latent space.
+cell.labels <- pathway.activities$label
+pathway.activities <- pathway.activities[,1:(NCOL(pathway.activities)-1)]
+# Rename the cells in the pathway activity scores by replacing a . with a - to match the names in the Seurat object
+rownames(pathway.activities) <- gsub("[.]", "-", rownames(pathway.activities))
+names(cell.labels) <- rownames(pathway.activities)
+```
+
+We will now subset the sc-RNAseq data set to obtain for each of the two subpopulations of naive CD4+ T cells that were in the training portion of the dataset used for domain translation, i.e. for which we have the inferred pathway activity scores available.
+
+```{r}
+seq.data.train <- subset(seq.data, cells = rownames(pathway.activities))
+poised.cells.rna.train <- subset(seq.data.train, idents=c("poised nCD4+ T"))
+quiescent.cells.rna.train <- subset(seq.data.train, idents = c("quiescent nCD4+ T"))
+```
+
+Using these labels we can verify that the cells with a label 0 are the poised naive CD4+ T cells and the ones with a label 1 are the quiescent ones.
+
+```{r}
+unique(cell.labels[colnames(poised.cells.rna.train)]) == 0 & unique(cell.labels[colnames(quiescent.cells.rna.train)]) == 1
+```
+
+Finally, we will read in the pathway-gene membership matrix that was build on top of the information of the KEGG database.
+
+```{r}
+pathway.adjacencies <- read.csv("/home/daniel/PycharmProjects/domain_translation/data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv", header = T, row.names = 1)
+```
+
+
+# 2. Validation of the inferred pathway activities
+
+## 2.1. Differential pathway activity analysis
+
+The key idea of the sparse first hidden layer in the Pathway-Autoencoder is to ensure that the score of a specific node only depends on a the expression of a certain subset of genes. In our case these subsets are the collection of genes that is known to be part of a specific pathway according to the KEGG database. As a consequence, we can ensure that each node represents what we call the activity of a certain pathway that is derived as linear combination of the expression of the respective genes of it. To validate if the learned mappings provide reasonable results for the activity we will now analyse these in more detail.
+
+First, we will exploit the fact that we know that there are two cell populations in the data set namely the naive CD4+ T cells that are poised for activation and the quiescent ones. We will perform a differential pathway-activity analyses using the inferred pathway scores and look at the differentially active pathways. To test for differential expression we will perform a two-sided, unpaired Wilcoxon rank sum test and control the FDR using the Benjamini-Hochberg method for multiple testing. 
+
+```{r}
+poised.cells.pathways <- pathway.activities[colnames(poised.cells.rna.train),]
+quiescent.cells.pathways <- pathway.activities[colnames(quiescent.cells.rna.train),]
+```
+
+Before doing so we will however first look at the marginal distribution of the inferred pathway activities.
+
+```{r}
+hist(as.matrix(pathway.activities), breaks=50, main="Histogram of the Pathway activity scores", xlab="PAS", prob = T)
+```
+
+We see that the pathway activity score matrix is very sparse. This can be explained by the sparsisty of the gene expression matrix as well as the fact that we apply a ReLU non-linearity to the raw pathway activity scores to ensure that the activity is non-negative.
+
+The Wilcoxon-rank sum test however does not depend on the scale of the data and does not make any distributional assumptions that would be violated by the zero-inflation. Thus, we proceed with the differantial activity analysis.
+
+```{r}
+dpa <- function(data.1, data.2){
+  n_pathways <- NCOL(data.1)
+  result <- matrix(NA, nrow=n_pathways, ncol=5)
+  rownames(result) <- colnames(data.1)
+  colnames(result) <- c("avg.logFC", "avg.pop.1", "avg.pop.2", "p.val", "fdr")
+  for(i in 1:n_pathways){
+    result[i,"avg.logFC"] <- log2(mean(data.1[,i])/mean(data.2[,i]))
+    result[i,"avg.pop.1"] <- mean(data.1[,i])
+    result[i, "avg.pop.2"] <- mean(data.2[,i])
+    result[i, "p.val"] <- wilcox.test(x = data.1[,i], y=data.2[,i], paired = F, alternative = "two.sided")[["p.value"]]
+  }
+  result[,"fdr"] <- p.adjust(result[,"p.val"], method = "fdr")
+  return(as.data.frame(result)[order(result[,"avg.logFC"]),])
+}
+```
+
+```{r}
+dpa.results <- na.exclude(dpa(quiescent.cells.pathways, poised.cells.pathways))
+dpa.results <- dpa.results[dpa.results$fdr < 1e-5,]
+dpa.results
+```
+
+```{r, fig.width=12}
+pheatmap(log(t(as.matrix(pathway.activities[,rownames(dpa.results[order(dpa.results[,"fdr"]),])[1:20]][order(-cell.labels),]))+1e-20), show_rownames = T, show_colnames = F, scale = "row", cluster_rows = T, cluster_cols = F, gaps_col = 667, fontsize_row = 12)
+```
+
+
+We see that the most differentially active pathways are related to the immune response to various diseases, cell-signaling or T cell proliferation. This is expected as in the preliminary analyses the enriched gene ontology terms obtained after doing a differential gene expression analyses were also significantly associated to these terms. However, the direction of the change of the pathway activity scores does not always matches our expectation. For instance, we would expect the mTOR and JAKSTAT signalling pathway to be more active in T cells poised for activation, however those cells have significantly lower activity scores for those pathways. Note that during the inference we do not provide any additional information except the pathway-gene membership relations, which explains why the direction does not always matches our expected direction (that higher scores imply higher activity).
+
+
+## 2.2. Correlation of the PAS
+
+Many pathways are highly interconnected with others and hence we would expect their activity patterns to be also highly correlated with the respective others. This would provide another validation of the applicability of the approach.
+
+The correlation structure of the derived pathway activity scores looks as follows.
+
+```{r}
+# We exclude one pathway where the activity score is always 0.
+pathway.activities.corm <- cor(pathway.activities[,-which(colnames(pathway.activities) == "hsa00780_Biotin_metabolism")])
+modified.corm <- pathway.activities.corm
+diag(modified.corm) <- 0
+hist(modified.corm, breaks=100, probability=T, main="Histogram of the pairwise-correlations of the PAS", xlab="Pearson r")
+```
+
+We see that the correlation of the individual pathway activity scores are not very large on average as visible in the above histogram.
+However, what would be interesting is to identify the top-$n$ pathways for each pathway for which the activity score is most correlated. We will derive these and compare them with the known associations of different pathways from the KEGG database.
+
+
+```{r}
+get_top_n_correlations <- function(cor.mat, n){
+  diag(cor.mat) <- 0
+  result <- list()
+  for(i in 1:nrow(cor.mat)){
+    cors <- cor.mat[i,]
+    names(cors) <- colnames(cor.mat)
+    result[[rownames(cor.mat)[i]]] <- cors[order(-abs(cors))][1:n]
+  }
+  return(result)
+}
+```
+
+```{r}
+corr.pathways.top.20 <- get_top_n_correlations(pathway.activities.corm, 20)
+corr.pathways.top.20$hsa04660_T_cell_receptor_signaling_pathway
+```
+
+Above you can see an example of how that looks like for the T-cell receptor signaling pathway for $n=20$. To compare how well these correlation represent the expected correlation patterns curated from existing literature we will first look at the overlap of the respective gene sets for the individual pathways according to the KEGG database. The assumption is that pathways with higher correlated activity patterns are also those pathways that share more genes in the respective gene sets.
+
+```{r}
+get_top_n_iou_genesets <- function(adj.mat, n){
+  result <- list()
+  iou.mat <- 1-jaccard(as.matrix(adj.mat))
+  diag(iou.mat) <- 0
+  for(i in 1:nrow(iou.mat)){
+    ious <- iou.mat[i,]
+    names(ious) <- colnames(iou.mat)
+    result[[colnames(iou.mat)[i]]] <- ious[order(-ious)][1:n]
+  }
+  return(result)
+}
+```
+
+To give an example we here also show the top 10 pathways for which the IoU score is the largest among the genesets.
+
+```{r}
+iou.genesets.top.20 <- get_top_n_iou_genesets(pathway.adjacencies, 20)
+iou.genesets.top.20$hsa04660_T_cell_receptor_signaling_pathway
+```
+
+We see that at least in the case of the "HSA04660 T cell receptor signaling pathway" the overlap of the two sets that mark the top 20 correlated pathways based on their activity score as well as the top ten most similar pathways with respect to their gene sets (measured by the IoU) is 3/20 (only the Th1-Th2 cell differentiation pathway, the Th17 cell differentiation and the Osteoclast differentiation pathway is found in both). To analyze that more quantitively we will look compute the overlap the two sets (the top 20 correlated ones with respect to their activity score and the top 10 most similar with respect to their gene sets) for all pathway and plot a histogram of the overlap.
+
+```{r}
+get_overlap_of_genesets <- function(list1, list2){
+  result <- list()
+  overlaps <- numeric(length(list1))
+  i <- 1
+  for(k in names(list1)){
+    
+    result[[k]] <- intersect(names(list1[[k]]), names(list2[[k]]))
+    overlaps[i] <- length(result[[k]])
+    i <- i + 1
+  }
+  return(list(overlaps.num=overlaps, overlaps.list=result))
+}
+```
+
+```{r}
+result <- get_overlap_of_genesets(corr.pathways.top.20, iou.genesets.top.20)
+result$overlaps.list$hsa04660_T_cell_receptor_signaling_pathway
+```
+
+We look once more at the "T cell receptor signaling pathway" to validate that the function is doing what we want. Since this is the case we will now look at the distribution of the overlaps of the top 10 gene sets.
+
+```{r}
+hist(result$overlaps.num/20, breaks=10, probability = T, main = "Overlap of the top-20 gene sets", xlab = "Relative overlap")
+```
+
+To give some reference for the above plot we will provide a reference null distribution of the overlap by drawing 100 times 2 gene sets of size n at random from the total of 339 gene sets, where each gene is drawn uniform at random without replacement and compute the overlap of the two. The distribution of the overlap could be seen as a null distribution that describes the distribution of overlap of the top-n genesets under the assumption of no relationship between the two.
+
+```{r}
+get_null_overlap_distribution <- function(n, total_size, k){
+  overlaps <- numeric(k)
+  for(i in 1:k){
+    geneset1 <- sample(1:total_size, n,  replace = F)
+    geneset2 <- sample(1:total_size, n, replace = F)
+    overlaps[i] <- length(intersect(geneset1, geneset2))
+  }
+  return(overlaps)
+}
+```
+
+```{r}
+set.seed(1234)
+null.overlaps.top.20 <- get_null_overlap_distribution(20, ncol(pathway.adjacencies), 100000)
+```
+
+Not surprisingly we see that the empirical distribution puts significantly more mass on smaller overlaps. This is because by design the activity score for pathways is computed as a nonlinear combination of the gene expression of the respective set of genes. Thus, pathways with similar gene sets should lead to correlated gene set activities. Note that the computed Pearson correlation coefficient in this analysis only assesses the linear correlation which might explain why we do not see larger correlations or overlaps of the pathway sets for each pathway.
+
+```{r}
+hist(null.overlaps.top.20/20, breaks = 10, main = "Null distribution of the overlap of the top-20 gene sets", xlab = "Relative overlap", probability = T)
+```
+
+
+
+## 2.3. Differential gene expression and gene set enrichment analysis
+
+### 2.3.1. Exploratory analysis
+
+Another way to validate the Pathway-AE is to look at the inferred pathway activity scores and analyze if different activation patterns can be explained by the scRNA-seq data of the respective cells by combining a differential gene expression analysis with a gene ontology analysis. In particular, we will look at a number of pathways and look for differentially expressed genes between the population of cells for which the pathway is not active (score = 0) and where it is active (score > 0). If the model functions as expected, we would expect the differentially expressed genes to be enriched for the specific pathway and also enriched for specific GO terms related to the pathway.
+
+While we potentially could test for all pathways we will start with analyzing a few of that we consider to be involved in the activation of naive CD4+ T cells based on known cross-links of the pathways from previously published studies.
+
+```{r}
+get_silent_active_cells_for_pathway <- function(pathway, pathway.activities){
+  silent.cells.ids <- pathway.activities[,pathway] == 0
+  silent.cells <- rownames(pathway.activities[silent.cells.ids,])
+  active.cells <- rownames(pathway.activities[!silent.cells.ids,])
+  result <- list(silent.cells=silent.cells, active.cells=active.cells)
+  return(result)
+}
+```
+
+
+```{r}
+get_genes_of_pathway <- function(pathway, pathway.adjacencies){
+  genes <- sort(rownames(pathway.adjacencies[pathway.adjacencies[,pathway] ==1,]))
+  return(genes)
+}
+```
+
+```{r}
+plot_overlap_of_dge_and_kegg_genes <- function(dge.df, pathway){
+  genes.pathway <- get_genes_of_pathway(pathway, pathway.adjacencies)
+
+  mycols <- brewer.pal(3, 'Pastel1')
+  venn.diagram(x=list(genes.pathway, rownames(dge.df)),
+             category.names =  c('KEGG DB', 'DGE silent vs. active'),  filename = paste('venn_diagram_', pathway,'.png', sep = ""),
+        output=TRUE,
+        main='Venn diagram of the DGE genes',
+        
+        # Output features
+        imagetype="png" ,
+        height = 640 , 
+        width = 640 , 
+        resolution = 100,
+        compression = "lzw",
+        
+        # Circles
+        lwd = 2,
+        lty = 'blank',
+        fill = mycols[1:2],
+        
+        # Numbers
+        cex = .6,
+        fontface = "bold",
+        fontfamily = "sans",
+        scaled=F,
+        cat.pos=c(0,180),
+        cat.cex = 0.8
+)
+}
+```
+
+```{r}
+# Compute DGE for quiescent vs poised naive CD4 T cell for comparison
+dge.quiescent.poised <- FindMarkers(seq.data, ident.1 = "quiescent nCD4+ T", ident.2 = "poised nCD4+ T", logfc.threshold = 0)
+dge.quiescent.poised <- dge.quiescent.poised[dge.quiescent.poised$p_val_adj < 1e-5,]
+```
+
+
+#### T cell receptor signaling pathway
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04660_T_cell_receptor_signaling_pathway", pathway.activities)
+dge.tcr_signaling <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.tcr_signaling <- dge.tcr_signaling[dge.tcr_signaling$p_val_adj < 0.05,]
+dge.tcr_signaling
+```
+
+In the following analyses the FDR is controlled at 5%. We see that one of the most important genesthat is downregulated in the population of cells for which we have a T cell receptor signaling pathway activity score of 0 (meaning the pathway is silenced) compared to those where it is activate is CD28 which is a known co-stimulator for the activation of naive CD4+ T cells. We also see JUN being upregulated in the active cell population. JUN/Fos are known to play an important role during T cell activation by forming the AP-1 early response transcription factor that is involved in the signaling. Similarly, the MAPK signaling pathway is involved in the T cell receptor signaling pathway as well as the PIK3 signaling pathway. The former is seen to be downregulated in the active cell population while the latter is upregulated. 
+
+```{r}
+na.omit(dge.quiescent.poised[rownames(dge.tcr_signaling),])
+```
+
+In total we find that all 9 differentially expressed genes for the population of cells with an active respectively silent T cell receptor signaling pathway as inferred by the PathwayAE to be part of the corresponding gene set. While an overlap is expected as the activity score of a pathway is derived as a function of the expression of the respective gene set, this nonetheless provides a sanity check for our inferred score.
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.tcr_signaling, "hsa04660_T_cell_receptor_signaling_pathway")
+```
+
+![](venn_diagram_hsa04660_T_cell_receptor_signaling_pathway.png)
+
+#### Th1-Th2 cell differentiation
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04658_Th1_and_Th2_cell_differentiation", pathway.activities)
+dge.th1_th2 <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.th1_th2 <- dge.th1_th2[dge.th1_th2$p_val_adj < 0.05,]
+dge.th1_th2
+```
+
+When looking at the differentially expressed genes for the populations of cells with an active and silent Th1-Th2 differentiation pathway we can also see the Fos/Jun complex to be overexpressed in the active population again suggesting an increased activity of the AP1 signaling that has been observed during the activation of naive CD4+ T cells in existing studies. Interestingly, exactly half of the differentially expressed genes are also among those differentially expressed in the population of quiescent vs poised naive CD4+ T cells. Thereby, the direction of the differential expression matches for all 7 genes those of the cells with silent vs. active Th1-Th2 cell differentiation pathways. One of the genes that is also significantly underexpressed in cells with an active Th1-Th2 pathway as well as in poised compared to quiescent naive CD4+ T cells is Actin Beta (ACTB) that is involved in the cytoskeletal organization. Reorganization of the cytoskeleton is another known factor of the activation of naive CD4+ T cells as well as the differentiation of Th1-Th2 cells.
+
+```{r}
+na.omit(dge.quiescent.poised[rownames(dge.th1_th2),])
+```
+
+
+When looking at the overlap of the differentially expressed genes and the gene set for the respective pathway we see that only 4 genes are part of both sets.
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.th1_th2, "hsa04658_Th1_and_Th2_cell_differentiation")
+```
+![](venn_diagram_hsa04658_Th1_and_Th2_cell_differentiation.png)
+
+#### Th17 cell differentiation
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04659_Th17_cell_differentiation", pathway.activities)
+dge.th17 <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.th17 <- dge.th17[dge.th17$p_val_adj < 0.05,]
+dge.th17
+```
+
+
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.th17, "hsa04659_Th17_cell_differentiation")
+```
+
+![](venn_diagram_hsa04659_Th17_cell_differentiation.png)
+
+#### MAPK signaling pathway
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04010_MAPK_signaling_pathway", pathway.activities)
+dge.mapk <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.mapk <- dge.mapk[dge.mapk$p_val_adj < 0.05,]
+dge.mapk
+```
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.mapk, "hsa04010_MAPK_signaling_pathway")
+```
+
+![](venn_diagram_hsa04010_MAPK_signaling_pathway.png)
+
+#### PI3K signaling pathway
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04151_PI3K.Akt_signaling_pathway", pathway.activities)
+dge.pi3k <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.pi3k <- dge.pi3k[dge.pi3k$p_val_adj < 0.05,]
+dge.pi3k
+```
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.pi3k, "hsa04151_PI3K.Akt_signaling_pathway")
+```
+
+![](venn_diagram_hsa04151_PI3K.Akt_signaling_pathway.png)
+
+#### TNF signaling pathway
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04668_TNF_signaling_pathway", pathway.activities)
+dge.tnf <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.tnf <- dge.tnf[dge.tnf$p_val_adj < 0.05,]
+dge.tnf
+```
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.tnf, "hsa04668_TNF_signaling_pathway")
+```
+
+![](venn_diagram_hsa04668_TNF_signaling_pathway.png)
+
+#### NF-kB signaling
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04064_NF.kappa_B_signaling_pathway", pathway.activities)
+dge.nfkb <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.nfkb <- dge.nfkb[dge.nfkb$p_val_adj < 0.05,]
+dge.nfkb
+```
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.nfkb, "hsa04064_NF.kappa_B_signaling_pathway")
+```
+
+![](venn_diagram_hsa04064_NF.kappa_B_signaling_pathway.png)
+
+#### JAK-STAT signaling
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04630_JAK.STAT_signaling_pathway", pathway.activities)
+dge.jakstat <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.jakstat <- dge.jakstat[dge.jakstat$p_val_adj < 0.05,]
+dge.jakstat
+```
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.jakstat, "hsa04630_JAK.STAT_signaling_pathway")
+```
+
+![](venn_diagram_hsa04630_JAK.STAT_signaling_pathway.png)
+
+#### mTOR signaling
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04150_mTOR_signaling_pathway", pathway.activities)
+dge.mtor <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.mtor <- dge.mtor[dge.mtor$p_val_adj < 0.05,]
+dge.mtor
+```
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.mtor, "hsa04150_mTOR_signaling_pathway")
+```
+
+![](venn_diagram_hsa04150_mTOR_signaling_pathway.png)
+
+#### Regulation of Actin cytoskeleton 
+
+```{r}
+silent.active.cells <- get_silent_active_cells_for_pathway("hsa04810_Regulation_of_actin_cytoskeleton", pathway.activities)
+dge.actn <- FindMarkers(seq.data, ident.1=silent.active.cells$silent.cells, ident.2=silent.active.cells$active.cells, logfc.threshold = 0.0)
+dge.actn <- dge.actn[dge.actn$p_val_adj < 0.05,]
+dge.actn
+```
+
+```{r}
+#plot_overlap_of_dge_and_kegg_genes(dge.actn, "hsa04810_Regulation_of_actin_cytoskeleton")
+```
+
+![](venn_diagram_hsa04810_Regulation_of_actin_cytoskeleton.png)
+
+### 2.3.2. Gene set enrichment analysis
+
+While the previous analysis just looked at a couple of pathways, we will now systematically analyse all pathways in the previous manner and test for significance in the over-representation of the differentially expressed gene sets for a specific pathway-related active vs. silent cell population in the gene sets defined by the pathway.
+
+To this end, we first construct the library consisting of a list of all available pathways and their respective gene sets and then sequentially will perform a gene set enrichment analysis using Fisher's exact test for each differentially expressed gene set related to one pathway.
+
+```{r}
+construct_pathway_list <- function(pathway.adjacencies){
+  pathways <- colnames(pathway.adjacencies)
+  result <- list()
+  for(pathway in pathways){
+    result[[pathway]] <- get_genes_of_pathway(pathway = pathway, pathway.adjacencies = pathway.adjacencies)
+  }
+  return(result)
+}
+```
+
+```{r}
+pathways.genes.list <- construct_pathway_list(pathway.adjacencies = pathway.adjacencies)
+```
+
+```{r}
+get_dge_genes_for_pathway_active_vs_silent <- function(pathway, pathway.activities, seq.data, fdr = 0.05){
+  silent.active.cells <- get_silent_active_cells_for_pathway(pathway=pathway, pathway.activities = pathway.activities)
+  if(min(length(silent.active.cells$silent.cells), length(silent.active.cells$active.cells)) > 5){
+     dge.pathway <- FindMarkers(object = seq.data, ident.1 = silent.active.cells$silent.cells, ident.2 = silent.active.cells$active.cells, logfc.threshold = 0.05)
+     dge.genes <- rownames(dge.pathway[dge.pathway$p_val_adj < fdr,])
+  }else{
+    dge.genes <- NA
+  }
+  return(dge.genes)
+ 
+}
+```
+
+```{r}
+get_dge_genes_for_all_pathways_active_vs_silent <- function(pathway.activities, pathway.genes.list, seq.data, fdr=0.05){
+  result <- list()
+  pathways <- colnames(pathway.activities)
+  for(pathway in pathways){
+    dge.genes.pathway <- get_dge_genes_for_pathway_active_vs_silent(pathway=pathway, pathway.activities = pathway.activities, seq.data = seq.data, fdr=fdr)
+    if(any(is.na(dge.genes.pathway))){
+      result[[pathway]] <- NA
+    }else{
+      fora.results <- fora(pathways=pathways.genes.list, genes = dge.genes.pathway, universe = rownames(seq.data))
+      result[[pathway]] <- fora.results[fora.results$padj < fdr, ]
+    }
+    
+  }
+  return(result)
+}
+```
+
+```{r}
+pathway.geneset.ora.results.active.silent <- get_dge_genes_for_all_pathways_active_vs_silent(pathway.activities = pathway.activities, pathway.genes.list = pathway.genes.list, seq.data = seq.data, fdr = 0.05)
+```
+
+As first quantitive measure of how well the activity score is descriptive for the activity of a specific pathway, we will look at the pathways for which the differentially expressed genes are enriched when comparing the cell populations that were predicted to be active with those that were predicted to be silent by our PathwayAE and compute the top-1/top-5 accuracy for all of them. That is we compute the percentage of all pathways for which the differentially expressed genes are enriched most for the respective pathway or where the respective pathway is among the 5 most enriched pathways.
+
+```{r}
+compute_top_n_accuracy_pathway_prediction_enrichment <- function(pathway.ora.results, n){
+  among_top_n <- numeric(length(pathway.ora.results))
+  for(i in 1:length(pathway.ora.results)){
+    pathway <- names(pathway.ora.results)[i]
+    ora.results <- pathway.ora.results[[pathway]]
+    # Cover if there were no or not enough differentially expressed genes to obtain differentially overrepresentation results
+    if(any(is.na(ora.results))){
+      among_top_n[i] <- 0
+    }else{
+      top_n_pathways <- pathway.ora.results[[pathway]][1:n,]$pathway
+      among_top_n[i] <- as.numeric(pathway %in% top_n_pathways)
+    }
+  }
+  return(sum(among_top_n)/length(among_top_n))
+}
+```
+
+
+```{r}
+top_n_accs <- numeric(20)
+for(i in 1:20){
+  top_n_accs[i] <- compute_top_n_accuracy_pathway_prediction_enrichment(pathway.ora.results = pathway.geneset.ora.results.active.silent, i)
+}
+```
+
+
+```{r}
+plot(1:20, top_n_accs, xlab = "n", ylim=c(0.8,1), type = 'b', ylab="Top-n accuracy", main="Top-n accuracy of the pathway activity score specificity")
+```
+
+We see that even when we only consider the most significantly enriched pathway as a result of an overrepresentation analysis using a hypergeometric test looking for the enrichment of a KEGG pathway among the sets of differentially expressed genes (comparing the active vs silent cells for a specific pathway as predicted by the AE) this coincides for 91.15 % of the pathways with the queried one. This provides a validation that our model as imposed to some degree by design captures the activity of a certain pathway by encoding the differences in the expression of the respective sequencing data of the cell populations at this level of abstraction.
+
+
+# 3. R Session
+```{r}
+save.image(file="pathwayae_analyses.Rdata")
+sessionInfo()
+```
+

@@ -451,3 +451,48 @@ def analyze_guided_gradcam_for_genesets(
         "grad_cams": np.array(gradient_cams),
     }
     return data_dict
+
+def get_geneset_activities_and_translated_images(domain_configs:List[DomainConfig], dataloader_type:str):
+    if len(domain_configs) != 2:
+        raise RuntimeError("Expects two domain configurations (image and sequencing domain)")
+    if domain_configs[0].name == "image" and domain_configs[1].name == "rna":
+        image_domain_config = domain_configs[0]
+        rna_domain_config = domain_configs[1]
+    elif domain_configs[0].name == "rna" and domain_configs[1].name == "image":
+        image_domain_config = domain_configs[1]
+        rna_domain_config = domain_configs[0]
+    else:
+        raise RuntimeError("Expected domain configuration types are >image< and >rna<.")
+
+    rna_data_loader = rna_domain_config.data_loader_dict[dataloader_type]
+    device = get_device()
+    all_geneset_activities = []
+    all_labels = []
+    all_translated_images = []
+    all_cell_ids = []
+    geneset_ae = rna_domain_config.domain_model_config.model.to(device).eval()
+    image_ae = image_domain_config.domain_model_config.model.to(device).eval()
+
+    for i, sample in enumerate(rna_data_loader):
+        rna_inputs = sample[rna_domain_config.data_key].to(device)
+        rna_labels = sample[rna_domain_config.label_key]
+        cell_ids = sample["id"]
+
+        geneset_ae_output = geneset_ae(rna_inputs)
+        latents = geneset_ae_output["latents"]
+        geneset_activities = geneset_ae_output["geneset_activites"]
+        translated_images = image_ae.decode(latents)
+
+        all_geneset_activities.extend(list(geneset_activities.clone().detach().cpu().numpy()))
+        all_labels.extend(list(rna_labels.clone().detach().cpu().numpy()))
+        all_translated_images.extend(list(translated_images.clone().detach().cpu().numpy()))
+        all_cell_ids.extend(cell_ids)
+
+    data_dict = {"cell_ids":all_cell_ids, "labels":all_labels, "geneset_activities":all_geneset_activities,
+            "translated_images":all_translated_images}
+    return data_dict
+
+
+
+
+
