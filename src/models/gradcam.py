@@ -34,7 +34,9 @@ class FeatureExtractor:
 class ModelExtractor:
     """ Class to extract network output, activation and gradients from targetted layers."""
 
-    def __init__(self, model: nn.Module, feature_module: nn.Module, target_layers: List[str]):
+    def __init__(
+        self, model: nn.Module, feature_module: nn.Module, target_layers: List[str]
+    ):
         self.model = model
         self.feature_module = feature_module
         self.feature_extractor = FeatureExtractor(self.feature_module, target_layers)
@@ -65,7 +67,9 @@ class GradCam:
         self.device = device
         self.model.to(self.device)
 
-        self.extractor = ModelExtractor(self.model, self.feature_module, target_layer_names)
+        self.extractor = ModelExtractor(
+            self.model, self.feature_module, target_layer_names
+        )
 
     def forward(self, input_img):
         return self.model(input_img)
@@ -120,8 +124,10 @@ class GuidedBackpropReLU(Function):
     @staticmethod
     def forward(self, input):
         positive_mask = (input > 0).type_as(input)
-        #output = torch.mul(x, positive_mask)
-        output = torch.addcmul(torch.zeros(input.size()).type_as(input), input, positive_mask)
+        # output = torch.mul(x, positive_mask)
+        output = torch.addcmul(
+            torch.zeros(input.size()).type_as(input), input, positive_mask
+        )
         self.save_for_backward(input, output)
         return output
 
@@ -136,9 +142,13 @@ class GuidedBackpropReLU(Function):
         # grad_input = torch.mul(torch.mul(grad_output, positive_mask_input), positive_mask_gradient)
         positive_mask_1 = (input > 0).type_as(grad_output)
         positive_mask_2 = (grad_output > 0).type_as(grad_output)
-        grad_input = torch.addcmul(torch.zeros(input.size()).type_as(input),
-                                   torch.addcmul(torch.zeros(input.size()).type_as(input), grad_output,
-                                                 positive_mask_1), positive_mask_2)
+        grad_input = torch.addcmul(
+            torch.zeros(input.size()).type_as(input),
+            torch.addcmul(
+                torch.zeros(input.size()).type_as(input), grad_output, positive_mask_1
+            ),
+            positive_mask_2,
+        )
         return grad_input
 
 
@@ -152,7 +162,7 @@ class GuidedBackpropReLUModel:
         def recursive_relu_apply(module_top):
             for idx, module in module_top._modules.items():
                 recursive_relu_apply(module)
-                if module.__class__.__name__ == 'ReLU':
+                if module.__class__.__name__ == "ReLU":
                     module_top._modules[idx] = GuidedBackpropReLU.apply
 
         # recursively replace ReLU with GuidedBackpropReLU

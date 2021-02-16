@@ -153,5 +153,3 @@ def get_latent_model_configuration(
 
     latent_model_config = {"model": model, "optimizer": optimizer, "loss": latent_loss}
     return latent_model_config
-
-

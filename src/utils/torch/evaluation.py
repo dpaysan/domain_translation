@@ -75,7 +75,8 @@ def evaluate_latent_integration(
     latent_l1_distance = max_discrepancy_loss(
         torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device)
     ).item()
-    # latent_l1_distance = torch.nn.L1Loss()(torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(device))
+    # latent_l1_distance = torch.nn.L1Loss()(torch.from_numpy(latents_i).to(device), torch.from_numpy(latents_j).to(
+    # device))
 
     metrics = {"knn_accs": knn_accs, "latent_l1_distance": latent_l1_distance}
     return metrics
@@ -433,7 +434,9 @@ def analyze_guided_gradcam_for_genesets(
         target_layer_names=[target_layer],
         device=device,
     )
-    gb_model = GuidedBackpropReLUModel(model=copy.deepcopy(image_to_geneset_translator), device=device)
+    gb_model = GuidedBackpropReLUModel(
+        model=copy.deepcopy(image_to_geneset_translator), device=device
+    )
     guided_backpropagation_maps = []
     gradient_cams = []
     images = []
@@ -452,9 +455,14 @@ def analyze_guided_gradcam_for_genesets(
     }
     return data_dict
 
-def get_geneset_activities_and_translated_images(domain_configs:List[DomainConfig], dataloader_type:str):
+
+def get_geneset_activities_and_translated_images_sequences(
+    domain_configs: List[DomainConfig], dataloader_type: str
+):
     if len(domain_configs) != 2:
-        raise RuntimeError("Expects two domain configurations (image and sequencing domain)")
+        raise RuntimeError(
+            "Expects two domain configurations (image and sequencing domain)"
+        )
     if domain_configs[0].name == "image" and domain_configs[1].name == "rna":
         image_domain_config = domain_configs[0]
         rna_domain_config = domain_configs[1]
@@ -465,11 +473,25 @@ def get_geneset_activities_and_translated_images(domain_configs:List[DomainConfi
         raise RuntimeError("Expected domain configuration types are >image< and >rna<.")
 
     rna_data_loader = rna_domain_config.data_loader_dict[dataloader_type]
+    image_data_loader = image_domain_config.data_loader_dict[dataloader_type]
     device = get_device()
+
+    rna_cell_ids = []
+    all_rna_labels = []
+    all_rna_inputs = []
+    all_rna_latents = []
     all_geneset_activities = []
-    all_labels = []
     all_translated_images = []
-    all_cell_ids = []
+    all_image_latents = []
+
+    image_cell_ids = []
+    all_image_labels = []
+    all_image_inputs = []
+    all_translated_rna_seq = []
+    all_translated_rna_latents = []
+    all_translated_geneset_activities = []
+    all_translated_image_latents = []
+
     geneset_ae = rna_domain_config.domain_model_config.model.to(device).eval()
     image_ae = image_domain_config.domain_model_config.model.to(device).eval()
 
@@ -482,17 +504,63 @@ def get_geneset_activities_and_translated_images(domain_configs:List[DomainConfi
         latents = geneset_ae_output["latents"]
         geneset_activities = geneset_ae_output["geneset_activites"]
         translated_images = image_ae.decode(latents)
+        translated_image_latents = image_ae.encode(translated_images)
 
-        all_geneset_activities.extend(list(geneset_activities.clone().detach().cpu().numpy()))
-        all_labels.extend(list(rna_labels.clone().detach().cpu().numpy()))
-        all_translated_images.extend(list(translated_images.clone().detach().cpu().numpy()))
-        all_cell_ids.extend(cell_ids)
+        rna_cell_ids.extend(cell_ids)
+        all_rna_labels.extend(list(rna_labels.clone().detach().cpu().numpy()))
+        all_rna_inputs.extend(list(rna_inputs.clone().detach().cpu().numpy()))
+        all_geneset_activities.extend(
+            list(geneset_activities.clone().detach().cpu().numpy())
+        )
+        all_translated_images.extend(
+            list(translated_images.clone().detach().cpu().numpy())
+        )
+        all_translated_image_latents.extend(
+            list(translated_image_latents.clone().detach().cpu().numpy())
+        )
 
-    data_dict = {"cell_ids":all_cell_ids, "labels":all_labels, "geneset_activities":all_geneset_activities,
-            "translated_images":all_translated_images}
+        all_rna_latents.extend(list(latents.clone().detach().cpu().numpy()))
+
+    for i, sample in enumerate(image_data_loader):
+        image_inputs = sample[image_domain_config.data_key].to(device)
+        image_labels = sample[image_domain_config.label_key].to(device)
+        cell_ids = sample["id"]
+
+        image_ae_output = image_ae(image_inputs)
+        latents = image_ae_output["latents"]
+        translated_sequences, translated_geneset_activities = geneset_ae.decode(latents)
+        geneset_ae_output = geneset_ae(translated_sequences)
+        translated_rna_latents = geneset_ae_output["latents"]
+
+        image_cell_ids.extend(cell_ids)
+        all_image_labels.extend(list(image_labels.clone().detach().cpu().numpy()))
+        all_image_inputs.extend(list(image_inputs.clone().detach().cpu().numpy()))
+        all_translated_geneset_activities.extend(
+            list(translated_geneset_activities.clone().detach().cpu().numpy())
+        )
+        all_translated_rna_seq.extend(
+            list(translated_sequences.clone().detach().cpu().numpy())
+        )
+        all_image_latents.extend(list(latents.clone().detach().cpu().numpy()))
+
+        all_translated_rna_latents.extend(
+            list(translated_rna_latents.clone().detach().cpu().numpy())
+        )
+
+    data_dict = {
+        "rna_cell_ids": rna_cell_ids,
+        "rna_labels": all_rna_labels,
+        "rna_inputs": all_rna_inputs,
+        "rna_latents": all_rna_latents,
+        "geneset_activities": all_geneset_activities,
+        "translated_images": all_translated_images,
+        "translated_image_latents": all_translated_image_latents,
+        "image_cell_ids": image_cell_ids,
+        "image_labels": all_image_labels,
+        "image_inputs": all_image_inputs,
+        "image_latents": all_image_latents,
+        "translated_sequences": all_translated_rna_seq,
+        "translated_sequence_latents": all_translated_rna_latents,
+        "translated_geneset_activities": all_translated_geneset_activities,
+    }
     return data_dict
-
-
-
-
-

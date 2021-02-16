@@ -258,7 +258,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             encoder_modules = [
                 nn.Sequential(
                     nn.Linear(self.input_dim, self.hidden_dims[0]),
-                    #nn.LeakyReLU(0.2),
+                    # nn.LeakyReLU(0.2),
                     nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
                 )
@@ -268,7 +268,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                    #nn.LeakyReLU(0.2),
+                    # nn.LeakyReLU(0.2),
                     nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[i]),
                 )
@@ -283,7 +283,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
         decoder_modules = [
             nn.Sequential(
                 nn.Linear(self.latent_dim_1 + latent_dim_2, self.hidden_dims[-1]),
-                #nn.LeakyReLU(0.2),
+                # nn.LeakyReLU(0.2),
                 nn.ReLU(),
                 nn.BatchNorm1d(self.hidden_dims[-1]),
             )
@@ -292,7 +292,7 @@ class TwoLatentSpaceAE(BaseAE, ABC):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                    #nn.LeakyReLU(0.2),
+                    # nn.LeakyReLU(0.2),
                     nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                 )
@@ -328,7 +328,7 @@ class GeneSetAE(BaseAE, ABC):
         self,
         input_dim: int = 2613,
         latent_dim: int = 128,
-        hidden_dims: List = [512,512,512, 512],
+        hidden_dims: List = [512, 512, 512, 512],
         batchnorm: bool = True,
         geneset_adjacencies: Tensor = None,
         geneset_adjacencies_file=None,
@@ -339,12 +339,14 @@ class GeneSetAE(BaseAE, ABC):
         self.hidden_dims = hidden_dims
         self.batchnorm = batchnorm
         if geneset_adjacencies is not None:
-            self.geneset_adjacencies = nn.Parameter(geneset_adjacencies, requires_grad=False)
+            self.geneset_adjacencies = nn.Parameter(
+                geneset_adjacencies, requires_grad=False
+            )
         elif geneset_adjacencies_file is not None:
-            geneset_adjacencies = pd.read_csv(geneset_adjacencies_file,
-                index_col=0)
-            self.geneset_adjacencies = nn.Parameter(torch.from_numpy(np.array(geneset_adjacencies)),
-                                                    requires_grad=False)
+            geneset_adjacencies = pd.read_csv(geneset_adjacencies_file, index_col=0)
+            self.geneset_adjacencies = nn.Parameter(
+                torch.from_numpy(np.array(geneset_adjacencies)), requires_grad=False
+            )
         else:
             raise RuntimeError(
                 "Adjacency matrix must be given as a Tensor as the geneset_adjacencies parameter or a path to a .csv \
@@ -362,7 +364,7 @@ class GeneSetAE(BaseAE, ABC):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.n_genesets, self.hidden_dims[0]),
-                    #nn.LeakyReLU(0.2),
+                    # nn.LeakyReLU(0.2),
                     nn.ReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
                 )
@@ -371,7 +373,7 @@ class GeneSetAE(BaseAE, ABC):
                 encoder_modules.append(
                     nn.Sequential(
                         nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                        #nn.LeakyReLU(0.2),
+                        # nn.LeakyReLU(0.2),
                         nn.ReLU(),
                         nn.BatchNorm1d(self.hidden_dims[i]),
                     )
@@ -379,7 +381,8 @@ class GeneSetAE(BaseAE, ABC):
             encoder_modules.append(nn.Linear(self.hidden_dims[-1], self.latent_dim))
         else:
             encoder_modules.append(
-                nn.Sequential(nn.Linear(self.n_genesets, self.latent_dim)))
+                nn.Sequential(nn.Linear(self.n_genesets, self.latent_dim))
+            )
 
         if self.batchnorm:
             encoder_modules.append(nn.BatchNorm1d(self.latent_dim))
@@ -391,16 +394,16 @@ class GeneSetAE(BaseAE, ABC):
             decoder_modules = [
                 nn.Sequential(
                     nn.Linear(self.latent_dim, self.hidden_dims[-1]),
-                    #nn.LeakyReLU(0.2),
+                    # nn.LeakyReLU(0.2),
                     nn.ReLU(),
-                    #nn.BatchNorm1d(self.hidden_dims[-1]),
+                    # nn.BatchNorm1d(self.hidden_dims[-1]),
                 )
             ]
             for i in range(len(hidden_dims) - 1):
                 decoder_modules.append(
                     nn.Sequential(
                         nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                        #nn.LeakyReLU(0.2),
+                        # nn.LeakyReLU(0.2),
                         nn.ReLU(),
                         nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                     )
@@ -415,8 +418,9 @@ class GeneSetAE(BaseAE, ABC):
                 nn.Sequential(nn.Linear(self.latent_dim, self.n_genesets), nn.ReLU())
             ]
 
-        self.geneset_decoder = nn.Sequential(nn.BatchNorm1d(self.n_genesets),
-            SparseLinear(self.n_genesets, self.input_dim, self.geneset_adjacencies)
+        self.geneset_decoder = nn.Sequential(
+            nn.BatchNorm1d(self.n_genesets),
+            SparseLinear(self.n_genesets, self.input_dim, self.geneset_adjacencies),
         )
         self.decoder = nn.Sequential(*decoder_modules)
 
@@ -433,5 +437,9 @@ class GeneSetAE(BaseAE, ABC):
     def forward(self, inputs: Tensor) -> Any:
         latents, geneset_activities = self.encode(inputs)
         recons, decoded_geneset_activities = self.decode(latents)
-        return {"recons": recons, "latents": latents, "geneset_activites":geneset_activities,
-                "decoded_geneset_activities":decoded_geneset_activities}
+        return {
+            "recons": recons,
+            "latents": latents,
+            "geneset_activites": geneset_activities,
+            "decoded_geneset_activities": decoded_geneset_activities,
+        }

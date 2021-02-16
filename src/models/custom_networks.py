@@ -111,7 +111,7 @@ class GenesetDecoder(nn.Module, ABC):
 class GeneSetAE_v2(BaseAE, ABC):
     def __init__(
         self,
-        geneset_adjacencies: Tensor=None,
+        geneset_adjacencies: Tensor = None,
         geneset_adjacencies_file: str = None,
         hidden_dims: List = [64, 32, 16, 8],
         latent_dim: int = 256,
@@ -120,12 +120,14 @@ class GeneSetAE_v2(BaseAE, ABC):
         self.hidden_dims = hidden_dims
         self.latent_dim = latent_dim
         if geneset_adjacencies is not None:
-            self.geneset_adjacencies = nn.Parameter(geneset_adjacencies, requires_grad=False)
+            self.geneset_adjacencies = nn.Parameter(
+                geneset_adjacencies, requires_grad=False
+            )
         elif geneset_adjacencies_file is not None:
-            geneset_adjacencies = pd.read_csv(geneset_adjacencies_file,
-                index_col=0)
-            self.geneset_adjacencies = nn.Parameter(torch.from_numpy(np.array(geneset_adjacencies)),
-                                                    requires_grad=False)
+            geneset_adjacencies = pd.read_csv(geneset_adjacencies_file, index_col=0)
+            self.geneset_adjacencies = nn.Parameter(
+                torch.from_numpy(np.array(geneset_adjacencies)), requires_grad=False
+            )
 
         self.geneset_encoder = GenesetEncoder(
             adjacency_matrix=self.adjacency_matrix, hidden_dims=hidden_dims
@@ -178,19 +180,13 @@ class PerturbationGeneSetAE(GeneSetAE):
         return recons
 
     def forward(self, inputs: Tensor, silence_node: int) -> Any:
-        #Todo resolve this hacky way with the problem of the Batchnorm1d being in the self.geneset_encoder
-        geneset_encoder_modules = list(self.geneset_encoder.children())
-        raw_geneset_activites = geneset_encoder_modules[0](inputs)
-        geneset_activities = geneset_encoder_modules[1](raw_geneset_activites)
+        geneset_activities = self.geneset_encoder(inputs)
 
         perturbed_geneset_activities = geneset_activities.clone()
         perturbed_geneset_activities[:, silence_node] = 0
 
-        normalized_geneset_activities = geneset_encoder_modules[2](geneset_activities)
-        normalized_perturbed_geneset_activities = geneset_encoder_modules[2](perturbed_geneset_activities
-                                                                             )
-        latents = self.encoder(normalized_geneset_activities)
-        perturbed_latents = self.encoder(normalized_perturbed_geneset_activities)
+        latents = self.encoder(geneset_activities)
+        perturbed_latents = self.encoder(perturbed_geneset_activities)
         recons = self.decode(latents)
         perturbed_recons = self.decode(perturbed_latents)
         return {
@@ -203,21 +199,20 @@ class PerturbationGeneSetAE(GeneSetAE):
 
 
 class ImageToGeneSetTranslator(nn.Module):
-    def __init__(self, image_ae:VanillaConvAE, geneset_ae: GeneSetAE):
+    def __init__(self, image_ae: VanillaConvAE, geneset_ae: GeneSetAE):
         super().__init__()
         self.encoder = image_ae.encoder
         self.latent_mapper = image_ae.latent_mapper
         self.decoder = nn.Sequential(*list(geneset_ae.decoder.children())[:-1])
-        self.decoder.add_module('geneset_activation',
-                                               nn.Sequential(*list(list(geneset_ae.decoder.children())[-1].children())[:-1]))
+        self.decoder.add_module(
+            "geneset_activation",
+            nn.Sequential(
+                *list(list(geneset_ae.decoder.children())[-1].children())[:-1]
+            ),
+        )
 
     def forward(self, inputs):
         encoded_inputs = self.encoder(inputs).view(inputs.size()[0], -1)
         latents = self.latent_mapper(encoded_inputs)
         geneset_activities = self.decoder(latents)
         return geneset_activities
-
-
-
-
-

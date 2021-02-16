@@ -577,8 +577,9 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                     dataset_type="test",
                 )
                 logging.debug(
-                    "Confusion matrices of the latent classifier for fold {}: %s"
-                    .format(str(i + 1)),
+                    "Confusion matrices of the latent classifier for fold {}: %s".format(
+                        str(i + 1)
+                    ),
                     confusion_dict,
                 )
 
@@ -740,7 +741,8 @@ class SeqSeqTranslationExperimentCV(BaseTwoDomainExperimentCV):
                     dataset_type="test",
                 )
                 logging.debug(
-                    "Confusion matrices of the latent classifier for fold {}: %s"
-                    .format(str(i + 1)),
+                    "Confusion matrices of the latent classifier for fold {}: %s".format(
+                        str(i + 1)
+                    ),
                     confusion_dict,
                 )

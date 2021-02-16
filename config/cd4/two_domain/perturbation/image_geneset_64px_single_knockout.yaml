@@ -53,32 +53,35 @@ pipeline:
   - method: initialize_dcm_model
   - method: load_pretrained_models
     params:
-      domain_model_1_weights_loc: '../../data/cd4/experiments/good_mixin_good_recon/final_image_model.pth'
-      domain_model_2_weights_loc: '../../data/cd4/experiments/good_mixin_good_recon/final_rna_model.pth'
-      latent_dcm_weights_loc: '../../data/cd4/experiments/good_mixin_good_recon/final_dcm.pth'
-      latent_structure_model_weights_loc: '../../data/cd4/experiments/good_mixin_good_recon/final_latent_structure_model.pth'
+      domain_model_1_weights_loc: '../../data/cd4/experiments/current_best/final_image_model.pth'
+      domain_model_2_weights_loc: '../../data/cd4/experiments/current_best/final_rna_model.pth'
+      latent_dcm_weights_loc: '../../data/cd4/experiments/current_best/final_dcm.pth'
+      latent_structure_model_weights_loc: '../../data/cd4/experiments/current_best/final_latent_structure_model.pth'
 #  - method: perform_artificial_knockout
 #    params:
 #      silencing_node: 190
-#      dataloader_type: 'test'
+#      dataloader_type: 'train'
 #  - method: perform_artificial_knockout
 #    params:
 #      silencing_node: 192
-#      dataloader_type: 'test'
+#      dataloader_type: 'train'
 #  - method: perform_artificial_knockout
 #    params:
 #      silencing_node: 196
-#      dataloader_type: 'test'
+#      dataloader_type: 'train'
   - method: analyze_pathway_activation_areas
     params:
       query_node: 190
       dataloader_type: 'test'
+      target_layer: '1'
   - method: analyze_pathway_activation_areas
     params:
       query_node: 192
       dataloader_type: 'test'
+      target_layer: '1'
   - method: analyze_pathway_activation_areas
     params:
       query_node: 196
       dataloader_type: 'test'
+      target_layer: '1'
 

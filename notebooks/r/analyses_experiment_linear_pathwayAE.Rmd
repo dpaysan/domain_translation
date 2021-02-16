@@ -26,6 +26,7 @@ library(ggcorrplot)
 library(prabclus)
 library(VennDiagram)
 library(fgsea)
+library(gplots)
 
 futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger")
 ```
@@ -121,7 +122,8 @@ dpa.results
 ```
 
 ```{r, fig.width=12}
-pheatmap(log(t(as.matrix(pathway.activities[,rownames(dpa.results[order(dpa.results[,"fdr"]),])[1:20]][order(-cell.labels),]))+1e-20), show_rownames = T, show_colnames = F, scale = "row", cluster_rows = T, cluster_cols = F, gaps_col = 667, fontsize_row = 12)
+color = brewer.pal(n = 10, name = "RdBu")
+pheatmap(log(t(as.matrix(pathway.activities[,rownames(dpa.results[order(dpa.results[,"fdr"]),])[1:10]][order(-cell.labels),]))+1e-20), show_rownames = T, show_colnames = F, scale = "row", cluster_rows = T, cluster_cols = F, gaps_col = 667, fontsize_row = 12)
 ```
 
 

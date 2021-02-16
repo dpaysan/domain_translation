@@ -57,7 +57,7 @@ pipeline:
       domain_model_2_weights_loc: '../../data/cd4/experiments/current_best/final_rna_model.pth'
       latent_dcm_weights_loc: '../../data/cd4/experiments/current_best/final_dcm.pth'
       latent_structure_model_weights_loc: '../../data/cd4/experiments/current_best/final_latent_structure_model.pth'
-  - method: store_pathway_activities_and_translated_images
+  - method: store_pathway_activities_and_translated_images_sequences
     params:
       dataloader_type: 'train'
       geneset_adjacencies_file: '../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'

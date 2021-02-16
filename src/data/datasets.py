@@ -26,16 +26,18 @@ class TorchNucleiImageDataset(LabeledDataset):
     def __init__(
         self,
         image_dir: str,
-        label_fname: str,
+        label_fname: str = None,
         transform_pipeline: Compose = None,
         paired_training_idc: List[int] = None,
     ):
         super(TorchNucleiImageDataset, self).__init__()
 
         self.image_dir = image_dir
-        labels = pd.read_csv(label_fname, index_col=0)
-        labels = labels.sort_values(by="nucleus_id")
-        self.labels = np.array(labels.loc[:, "binary_label"])
+        if label_fname is not None:
+            labels = pd.read_csv(label_fname, index_col=0)
+            labels = labels.sort_values(by="nucleus_id")
+            self.labels = np.array(labels.loc[:, "binary_label"])
+            self.ids = np.array(labels.loc[:, "nucleus_id"])
         self.image_locs = get_file_list(self.image_dir)
         self.transform_pipeline = transform_pipeline
         self.paired_training_idc = paired_training_idc
@@ -51,8 +53,9 @@ class TorchNucleiImageDataset(LabeledDataset):
 
         label = np.array(self.labels[index]).astype(int)
         label = torch.from_numpy(label)
+        cell_id = self.ids[index]
 
-        sample = {"image": image, "label": label}
+        sample = {"image": image, "label": label, "id": cell_id}
         if self.paired_training_idc is not None:
             if index in self.paired_training_idc:
                 sample["train_pair"] = torch.from_numpy(np.array(1))

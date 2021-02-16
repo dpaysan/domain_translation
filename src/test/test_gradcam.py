@@ -21,12 +21,10 @@ def deprocess_image(img):
 
 
 def preprocess_image(img):
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    preprocessing = transforms.Compose([
-        transforms.ToTensor(),
-        normalize,
-    ])
+    normalize = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+    )
+    preprocessing = transforms.Compose([transforms.ToTensor(), normalize,])
     return preprocessing(img.copy()).unsqueeze(0)
 
 
@@ -41,18 +39,19 @@ def show_cam_on_image(img, mask):
 
 device = get_device()
 model = resnet50(pretrained=True).to(device)
-grad_cam = GradCam(model=model, feature_module=model.layer4, \
-                   target_layer_names=["2"], device=device)
+grad_cam = GradCam(
+    model=model, feature_module=model.layer4, target_layer_names=["2"], device=device
+)
 
 img = cv2.imread("/home/daniel/Downloads/epoch_426_inputs_0.jpg", 1)
-img = cv2.resize(img, (640,480))
+img = cv2.resize(img, (640, 480))
 img = np.float32(img) / 255
-#img = cv2.resize(img, (224, 224))
+# img = cv2.resize(img, (224, 224))
 # Opencv loads as BGR:
-#img = img[:, :, ::-1]
-#img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+# img = img[:, :, ::-1]
+# img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
 input_img = preprocess_image(img)
-#input_img = torch.from_numpy(img).view(1,3,224,224)
+# input_img = torch.from_numpy(img).view(1,3,224,224)
 
 # If None, returns the map for the highest scoring category.
 # Otherwise, targets the requested category.
@@ -72,6 +71,6 @@ cam_gb = deprocess_image(cam_mask * gb)
 gb = deprocess_image(gb)
 
 cv2.imwrite("cam.jpg", cam)
-cv2.imwrite('gb.jpg', gb)
-cv2.imwrite('cam_gb.jpg', cam_gb)
+cv2.imwrite("gb.jpg", gb)
+cv2.imwrite("cam_gb.jpg", cam_gb)
 cv2.imwrite("gs_cam.jpg", grayscale_cam)
