@@ -64,9 +64,9 @@ def visualize_image_vae_performance(
     image_inputs = domain_model_config.inputs.to(device)
 
     recon_images = image_vae(image_inputs)["recons"]
-    sample_images = image_vae.sample(5, device=device)
+    sample_images = image_vae.sample(image_inputs.size(0), device=device)
 
-    for i in range(10):
+    for i in range(image_inputs.size(0)):
         imageio.imwrite(
             os.path.join(image_dir, "%s_epoch_%s_inputs_%s.jpg" % (phase, epoch, i)),
             np.uint8(image_inputs[i].cpu().data.view(64, 64).numpy() * 255),

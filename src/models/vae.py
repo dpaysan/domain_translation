@@ -308,6 +308,116 @@ class VanillaVAE(BaseVAE, ABC):
         return super().loss_function(inputs=inputs, recons=recons, mu=mu, logvar=logvar)
 
 
+class GeneSetVAE(BaseVAE, ABC):
+    def __init__(
+        self,
+        input_dim: int = 7633,
+        latent_dim: int = 128,
+        hidden_dims: List = None,
+        batchnorm: bool = False,
+        lrelu_slope: float = 0.2,
+    ) -> None:
+        super().__init__()
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
+        if hidden_dims is None:
+            self.hidden_dims = [1024, 1024, 1024, 1024, 1024, 1024]
+        else:
+            self.hidden_dims = hidden_dims
+        self.batchnorm = batchnorm
+        self.updated = False
+        self.lrelu_slope = lrelu_slope
+        # self.model_type = "VAE"
+
+        # encoder
+        encoder_modules = [
+            nn.Sequential(
+                nn.Linear(self.input_dim, self.hidden_dims[0]),
+                nn.BatchNorm1d(self.hidden_dims[0]),
+            ),
+            # nn.LeakyReLU(self.lrelu_slope),
+            nn.PReLU(),
+        ]
+        for i in range(1, len(self.hidden_dims)):
+            encoder_modules.append(
+                nn.Sequential(
+                    nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
+                    nn.BatchNorm1d(self.hidden_dims[i]),
+                    # nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
+                )
+            )
+
+        self.encoder = nn.Sequential(*encoder_modules)
+        if self.batchnorm:
+            self.mu_fc = nn.Sequential(
+                nn.Linear(self.hidden_dims[-1], self.latent_dim),
+                nn.BatchNorm1d(self.latent_dim),
+            )
+        else:
+            self.mu_fc = nn.Linear(self.hidden_dims[-1], self.latent_dim)
+        self.logvar_fc = nn.Linear(self.hidden_dims[-1], self.latent_dim)
+
+        # decoder
+        decoder_modules = [
+            nn.Sequential(nn.Linear(self.latent_dim, self.hidden_dims[-1]))
+        ]
+        for i in range(0, len(self.hidden_dims) - 1):
+            decoder_modules.append(
+                nn.Sequential(
+                    nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
+                    nn.BatchNorm1d(self.hidden_dims[-2 - i]),
+                    # nn.LeakyReLU(self.lrelu_slope),
+                    nn.PReLU(),
+                )
+            )
+
+        decoder_modules.append(nn.Linear(self.hidden_dims[0], self.input_dim))
+        self.decoder = nn.Sequential(*decoder_modules)
+
+    def encode(self, input: Tensor) -> Tuple[Tensor, Tensor]:
+        h = self.encoder(input)
+        mu = self.mu_fc(h)
+        logvar = self.logvar_fc(h)
+        return mu, logvar
+
+    def decode(self, input: Tensor) -> Tensor:
+        output = self.decoder(input)
+        return output
+
+    def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
+        std = logvar.mul(0.5).exp()
+        eps = Variable(torch.FloatTensor(std.size()).normal_().to(mu.device))
+        z = eps * std + mu
+        return z
+
+    def forward(self, input: Tensor) -> dict:
+        mu, logvar = self.encode(input)
+        z = self.reparameterize(mu, logvar)
+        recons = self.decode(z)
+        output = {"recons": recons, "latents": z, "mu": mu, "logvar": logvar}
+        return output
+
+    def get_latent_representation(self, input: Tensor) -> Tensor:
+        mu, logvar = self.encode(input)
+        z = self.reparameterize(mu, logvar)
+        return z
+
+    def generate(self, z: Tensor, **kwargs) -> Tensor:
+        output = self.decode(z)
+        return output
+
+    def sample(self, num_samples: int, device: torch.device, **kwargs) -> Tensor:
+        z = torch.randn(num_samples, self.latent_dim)
+        z = z.to(device)
+        samples = self.decode(z)
+        return samples
+
+    def loss_function(
+        self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
+    ) -> dict:
+        return super().loss_function(inputs=inputs, recons=recons, mu=mu, logvar=logvar)
+
 # class GaussianMixtureBaseVAE(BaseVAE, ABC):
 #     def __init__(
 #             self,
