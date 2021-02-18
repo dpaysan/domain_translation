@@ -1,6 +1,9 @@
 from abc import abstractmethod, ABC
 from typing import List, Any, Tuple
 
+import pandas as pd
+import numpy as np
+
 import torch
 from torch import Tensor
 from torch import nn
@@ -9,6 +12,7 @@ from torch.nn import Module
 
 # from src.models.custom_networks import MixtureComponentInferenceNetwork
 from src.functions.loss_functions import compute_kld_multivariate_gaussians
+from src.helper.custom_layers import SparseLinear
 from src.utils.torch.general import get_device
 
 
@@ -38,7 +42,7 @@ class BaseVAE(nn.Module):
         pass
 
     def loss_function(
-        self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
+            self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
     ) -> dict:
         recon_loss = self.recon_loss_module(inputs, recons)
         kld_loss = compute_kld_multivariate_gaussians(mu=mu, logvar=logvar)
@@ -48,12 +52,12 @@ class BaseVAE(nn.Module):
 
 class VanillaConvVAE(BaseVAE, ABC):
     def __init__(
-        self,
-        input_channels: int = 1,
-        latent_dim: int = 128,
-        hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
-        lrelu_slope: int = 0.2,
-        batchnorm: bool = True,
+            self,
+            input_channels: int = 1,
+            latent_dim: int = 128,
+            hidden_dims: List[int] = [128, 256, 512, 1024, 1024],
+            lrelu_slope: int = 0.2,
+            batchnorm: bool = True,
     ) -> None:
         super().__init__()
         self.in_channels = input_channels
@@ -192,19 +196,19 @@ class VanillaConvVAE(BaseVAE, ABC):
         return samples
 
     def loss_function(
-        self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
+            self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
     ) -> dict:
         return super().loss_function(inputs=inputs, recons=recons, mu=mu, logvar=logvar)
 
 
 class VanillaVAE(BaseVAE, ABC):
     def __init__(
-        self,
-        input_dim: int = 7633,
-        latent_dim: int = 128,
-        hidden_dims: List = None,
-        batchnorm: bool = False,
-        lrelu_slope: float = 0.2,
+            self,
+            input_dim: int = 7633,
+            latent_dim: int = 128,
+            hidden_dims: List = None,
+            batchnorm: bool = False,
+            lrelu_slope: float = 0.2,
     ) -> None:
         super().__init__()
         self.input_dim = input_dim
@@ -223,17 +227,17 @@ class VanillaVAE(BaseVAE, ABC):
             nn.Sequential(
                 nn.Linear(self.input_dim, self.hidden_dims[0]),
                 nn.BatchNorm1d(self.hidden_dims[0]),
+                nn.PReLU()
             ),
             # nn.LeakyReLU(self.lrelu_slope),
-            nn.PReLU(),
         ]
         for i in range(1, len(self.hidden_dims)):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                    nn.BatchNorm1d(self.hidden_dims[i]),
-                    # nn.LeakyReLU(self.lrelu_slope),
+                    #nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
+                    nn.BatchNorm1d(self.hidden_dims[i]),
                 )
             )
 
@@ -255,9 +259,9 @@ class VanillaVAE(BaseVAE, ABC):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                    nn.BatchNorm1d(self.hidden_dims[-2 - i]),
-                    # nn.LeakyReLU(self.lrelu_slope),
+                    #nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
+                    nn.BatchNorm1d(self.hidden_dims[-2 - i]),
                 )
             )
 
@@ -303,19 +307,21 @@ class VanillaVAE(BaseVAE, ABC):
         return samples
 
     def loss_function(
-        self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
+            self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
     ) -> dict:
         return super().loss_function(inputs=inputs, recons=recons, mu=mu, logvar=logvar)
 
 
 class GeneSetVAE(BaseVAE, ABC):
     def __init__(
-        self,
-        input_dim: int = 7633,
-        latent_dim: int = 128,
-        hidden_dims: List = None,
-        batchnorm: bool = False,
-        lrelu_slope: float = 0.2,
+            self,
+            input_dim: int = 7633,
+            latent_dim: int = 128,
+            hidden_dims: List = None,
+            batchnorm: bool = False,
+            geneset_adjacencies: Tensor = None,
+            geneset_adjacencies_file=None,
+            lrelu_slope: float = 0.2,
     ) -> None:
         super().__init__()
         self.input_dim = input_dim
@@ -327,28 +333,53 @@ class GeneSetVAE(BaseVAE, ABC):
         self.batchnorm = batchnorm
         self.updated = False
         self.lrelu_slope = lrelu_slope
-        # self.model_type = "VAE"
+        if geneset_adjacencies is not None:
+            self.geneset_adjacencies = nn.Parameter(
+                geneset_adjacencies, requires_grad=False
+            )
+        elif geneset_adjacencies_file is not None:
+            geneset_adjacencies = pd.read_csv(geneset_adjacencies_file, index_col=0)
+            self.geneset_adjacencies = nn.Parameter(
+                torch.from_numpy(np.array(geneset_adjacencies)), requires_grad=False
+            )
+        else:
+            raise RuntimeError(
+                "Adjacency matrix must be given as a Tensor as the geneset_adjacencies parameter or a path to a .csv \
+                file as the geneset_adjacencies_file parameter."
+            )
+        self.n_genesets = self.geneset_adjacencies.size()[1]
 
         # encoder
-        encoder_modules = [
-            nn.Sequential(
-                nn.Linear(self.input_dim, self.hidden_dims[0]),
-                nn.BatchNorm1d(self.hidden_dims[0]),
-            ),
-            # nn.LeakyReLU(self.lrelu_slope),
-            nn.PReLU(),
-        ]
-        for i in range(1, len(self.hidden_dims)):
+        self.geneset_encoding_layer = SparseLinear(
+            self.input_dim, self.n_genesets, self.geneset_adjacencies,
+        )
+        self.geneset_encoder = self.geneset_encoding_layer
+
+        encoder_modules = [nn.PReLU(), nn.BatchNorm1d(self.n_genesets)]
+        if len(hidden_dims) > 0:
             encoder_modules.append(
                 nn.Sequential(
-                    nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                    nn.BatchNorm1d(self.hidden_dims[i]),
-                    # nn.LeakyReLU(self.lrelu_slope),
+                    nn.Linear(self.n_genesets, self.hidden_dims[0]),
+                    #nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
+                    nn.BatchNorm1d(self.hidden_dims[0]),
                 )
             )
+            for i in range(1, len(hidden_dims)):
+                encoder_modules.append(
+                    nn.Sequential(
+                        nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
+                        #nn.LeakyReLU(self.lrelu_slope),
+                        nn.PReLU(),
+                        nn.BatchNorm1d(self.hidden_dims[i]),
+                    )
+                )
+
+        if self.batchnorm:
+            encoder_modules.append(nn.BatchNorm1d(self.latent_dim))
 
         self.encoder = nn.Sequential(*encoder_modules)
+
         if self.batchnorm:
             self.mu_fc = nn.Sequential(
                 nn.Linear(self.hidden_dims[-1], self.latent_dim),
@@ -358,65 +389,88 @@ class GeneSetVAE(BaseVAE, ABC):
             self.mu_fc = nn.Linear(self.hidden_dims[-1], self.latent_dim)
         self.logvar_fc = nn.Linear(self.hidden_dims[-1], self.latent_dim)
 
-        # decoder
-        decoder_modules = [
-            nn.Sequential(nn.Linear(self.latent_dim, self.hidden_dims[-1]))
-        ]
-        for i in range(0, len(self.hidden_dims) - 1):
-            decoder_modules.append(
+        # Build decoder model
+        if len(hidden_dims) > 0:
+            decoder_modules = [
                 nn.Sequential(
-                    nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
-                    nn.BatchNorm1d(self.hidden_dims[-2 - i]),
-                    # nn.LeakyReLU(self.lrelu_slope),
+                    nn.Linear(self.latent_dim, self.hidden_dims[-1]),
+                    #nn.LeakyReLU(self.lrelu_slope),
                     nn.PReLU(),
+                    nn.BatchNorm1d(self.hidden_dims[-1]),
                 )
+            ]
+            for i in range(len(hidden_dims) - 1):
+                decoder_modules.append(
+                    nn.Sequential(
+                        nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
+                        #nn.LeakyReLU(self.lrelu_slope),
+                        nn.PReLU(),
+                        nn.BatchNorm1d(self.hidden_dims[-2 - i]),
+                    )
+                )
+            decoder_modules.append(
+                    nn.Linear(self.hidden_dims[0], self.n_genesets)
             )
+        else:
+            decoder_modules = [
+                nn.Linear(self.latent_dim, self.n_genesets)
+            ]
 
-        decoder_modules.append(nn.Linear(self.hidden_dims[0], self.input_dim))
         self.decoder = nn.Sequential(*decoder_modules)
 
-    def encode(self, input: Tensor) -> Tuple[Tensor, Tensor]:
-        h = self.encoder(input)
+        self.geneset_decoder = nn.Sequential(
+            #nn.LeakyReLU(self.lrelu_slope),
+            nn.PReLU(),
+            nn.BatchNorm1d(self.n_genesets),
+            SparseLinear(self.n_genesets, self.input_dim, self.geneset_adjacencies),
+        )
+
+    def encode(self, input: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+        geneset_activities = self.geneset_encoder(input)
+        h = self.encoder(geneset_activities)
         mu = self.mu_fc(h)
         logvar = self.logvar_fc(h)
-        return mu, logvar
+        return mu, logvar, geneset_activities
 
-    def decode(self, input: Tensor) -> Tensor:
-        output = self.decoder(input)
-        return output
+    def decode(self, input: Tensor) -> Tuple[Tensor, Tensor]:
+        decoded_geneset_activities = self.decoder(input)
+        recons = self.geneset_decoder(decoded_geneset_activities)
+        return recons, decoded_geneset_activities
 
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
         std = logvar.mul(0.5).exp()
         eps = Variable(torch.FloatTensor(std.size()).normal_().to(mu.device))
-        z = eps * std + mu
-        return z
+        latents = eps * std + mu
+        return latents
 
     def forward(self, input: Tensor) -> dict:
-        mu, logvar = self.encode(input)
-        z = self.reparameterize(mu, logvar)
-        recons = self.decode(z)
-        output = {"recons": recons, "latents": z, "mu": mu, "logvar": logvar}
+        mu, logvar, geneset_activities = self.encode(input)
+        latents = self.reparameterize(mu, logvar)
+        recons, decoded_geneset_activities = self.decode(latents)
+        output = {"recons": recons, "latents": latents, "mu": mu, "logvar": logvar,
+                  "geneset_activities":geneset_activities, "decoded_geneset_activities":decoded_geneset_activities}
         return output
 
-    def get_latent_representation(self, input: Tensor) -> Tensor:
-        mu, logvar = self.encode(input)
-        z = self.reparameterize(mu, logvar)
-        return z
+    def get_latent_representation(self, input: Tensor) -> Tuple[Tensor, Tensor]:
+        mu, logvar, geneset_activities = self.encode(input)
+        latents = self.reparameterize(mu, logvar)
+        return latents, geneset_activities
 
     def generate(self, z: Tensor, **kwargs) -> Tensor:
-        output = self.decode(z)
+        output, _ = self.decode(z)
         return output
 
     def sample(self, num_samples: int, device: torch.device, **kwargs) -> Tensor:
         z = torch.randn(num_samples, self.latent_dim)
         z = z.to(device)
-        samples = self.decode(z)
+        samples, _ = self.decode(z)
         return samples
 
     def loss_function(
-        self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
+            self, inputs: Tensor, recons: Tensor, mu: Tensor, logvar: Tensor
     ) -> dict:
         return super().loss_function(inputs=inputs, recons=recons, mu=mu, logvar=logvar)
+
 
 # class GaussianMixtureBaseVAE(BaseVAE, ABC):
 #     def __init__(
@@ -527,3 +581,4 @@ class GeneSetVAE(BaseVAE, ABC):
 #         output = {'mu': mu, 'var': var, 'latents': z, 'logits': logits, 'responsibility': prob, 'component_label': y}
 #
 #         return output
+

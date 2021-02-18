@@ -359,6 +359,7 @@ class GeneSetAE(BaseAE, ABC):
             self.input_dim, self.n_genesets, self.geneset_adjacencies,
         )
         self.geneset_encoder = nn.Sequential(self.geneset_encoding_layer, nn.ReLU())
+
         encoder_modules = [nn.BatchNorm1d(self.n_genesets)]
         if len(hidden_dims) > 0:
             encoder_modules.append(

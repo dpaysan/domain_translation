@@ -28,7 +28,7 @@ from src.models.latent_models import (
     LatentRegressor,
 )
 from src.models.gmvae import GaussianMixtureVAE, GaussianMixtureConvVAE
-from src.models.vae import VanillaConvVAE, VanillaVAE
+from src.models.vae import VanillaConvVAE, VanillaVAE, GeneSetVAE
 from src.utils.torch.general import get_device
 
 
@@ -77,6 +77,8 @@ def get_domain_configuration(
         model = GeneSetAE(**model_dict)
     elif model_type == "GeneSetAE_v2":
         model = GeneSetAE_v2(**model_dict)
+    elif model_type == "GeneSetVAE":
+        model = GeneSetVAE(**model_dict)
     else:
         raise NotImplementedError('Unknown model type "{}"'.format(model_type))
 

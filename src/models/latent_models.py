@@ -24,7 +24,7 @@ class LatentDiscriminator(nn.Module, ABC):
         model_modules = [
             nn.Sequential(
                 nn.Linear(self.latent_dim + 10, hidden_dims[0]),
-                nn.ReLU(),
+                nn.PReLU(),
                 # nn.BatchNorm1d(self.hidden_dims[0])
             )
         ]
@@ -32,7 +32,7 @@ class LatentDiscriminator(nn.Module, ABC):
             model_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i], self.hidden_dims[i + 1]),
-                    nn.ReLU(),
+                    nn.PReLU(),
                     # nn.BatchNorm1d(self.hidden_dims[i+1])
                 )
             )
@@ -70,7 +70,7 @@ class LatentClassifier(nn.Module, ABC):
                 model_components.append(
                     nn.Sequential(
                         nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                        nn.ReLU(),
+                        nn.PReLU(),
                     )
                 )
             model_components.append(nn.Linear(self.hidden_dims[-1], self.n_classes))
@@ -103,14 +103,14 @@ class LatentRegressor(nn.Module, ABC):
             self.hidden_dims = hidden_dims
             model_components = [
                 nn.Sequential(
-                    nn.Linear(self.latent_dim, self.hidden_dims[0]), nn.ReLU()
+                    nn.Linear(self.latent_dim, self.hidden_dims[0]), nn.PReLU()
                 )
             ]
             for i in range(1, len(self.hidden_dims)):
                 model_components.append(
                     nn.Sequential(
                         nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
-                        nn.ReLU(),
+                        nn.PReLU(),
                     )
                 )
             model_components.append(nn.Linear(self.hidden_dims[-1], self.n_classes))

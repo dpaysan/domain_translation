@@ -575,5 +575,5 @@ We see that even when we only consider the most significantly enriched pathway a
 ```{r}
 save.image(file="pathwayae_analyses.Rdata")
 sessionInfo()
-```
+  ```
 
