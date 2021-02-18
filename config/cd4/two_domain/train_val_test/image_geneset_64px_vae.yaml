@@ -8,7 +8,7 @@ run_params:
 
   image_model_config: { 'model_config': { 'type': 'VanillaConvVAE', 'latent_dim': 256,
                                           'hidden_dims': [ 128, 256, 512, 1024, 1024 ], 'batchnorm':True},
-                        'optimizer_config': { 'type': 'adam', 'lr': 0.00001, 'betas':[0.5, 0.9]},
+                        'optimizer_config': { 'type': 'adam', 'lr': 0.0001, 'betas':[0.5, 0.9]},
                         'loss_config': { 'type': 'mae' } }
 
   seq_data_config: {'data_fname':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_data_and_labels.csv',
@@ -20,17 +20,17 @@ run_params:
                                       'batchnorm':True,
                                        'latent_dim':256,
                                        'geneset_adjacencies_file':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'},
-                      'optimizer_config':{'type':'adam', 'lr': 0.00001, 'betas':[0.5, 0.9], 'weight_decay':0.0},
+                      'optimizer_config':{'type':'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.0},
                       'loss_config':{'type':'mae'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':256, 'n_classes':2},
-                      'optimizer_config':{'type':'adam','lr': 0.00001, 'betas':[0.5, 0.9]},
-                      'loss_config':{'type':'ce', 'weights':[1.0,2.75]}}
+                      'optimizer_config':{'type':'adam','lr': 0.0001, 'betas':[0.5, 0.9]},
+                      'loss_config':{'type':'ce', 'weights':[2.5,1.0]}}
 
   latent_dcm_config: { 'model_config': { 'type': 'LatentDiscriminator', 'n_classes': 2,
-                                         'latent_dim': 256, 'hidden_dims': [128, 64,] },
-                       'optimizer_config': { 'type': 'adam', 'lr': 0.00001, 'betas':[0.5, 0.9], 'weight_decay':0.005 },
-                       'loss_config': { 'type': 'ce', 'weights':[2.5,1.0] } }
+                                         'latent_dim': 256, 'hidden_dims': [128, 128, 64,] },
+                       'optimizer_config': { 'type': 'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.005 },
+                       'loss_config': { 'type': 'ce', 'weights':[1.0,2.75]}}
 
   num_epochs: 1000
   early_stopping: -1
@@ -56,11 +56,12 @@ pipeline:
       id: 0
   - method: train_models
     params:
-      alpha: 1.0
+      alpha: 0.1
       beta: 1.0
       gamma: 0.001
+      lamb: 0.000001
       use_latent_discriminator: True
       use_latent_structure_model: True
-      save_freq: 100
+      save_freq: 50
 
 
