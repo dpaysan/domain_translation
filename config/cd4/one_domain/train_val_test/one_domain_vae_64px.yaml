@@ -30,7 +30,7 @@ pipeline:
   - method: initialize_clf_model
   - method: train_models
     params:
-      gamma: 0.001
+      gamma: 0.01
       lamb: 0.0000001
       save_freq: 100
       use_latent_structure_model: True

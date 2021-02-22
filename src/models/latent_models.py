@@ -21,23 +21,26 @@ class LatentDiscriminator(nn.Module, ABC):
         self.n_classes = n_classes
         self.trainable = trainable
 
-        model_modules = [
+        if hidden_dims is not None:
+            model_modules = [
             nn.Sequential(
-                nn.Linear(self.latent_dim + 10, hidden_dims[0]),
-                nn.PReLU(),
+                nn.Linear(self.latent_dim + 20, hidden_dims[0]),
+                nn.ReLU(),
                 # nn.BatchNorm1d(self.hidden_dims[0])
             )
         ]
-        for i in range(0, len(self.hidden_dims) - 1):
-            model_modules.append(
+            for i in range(0, len(self.hidden_dims) - 1):
+                model_modules.append(
                 nn.Sequential(
                     nn.Linear(self.hidden_dims[i], self.hidden_dims[i + 1]),
-                    nn.PReLU(),
-                    # nn.BatchNorm1d(self.hidden_dims[i+1])
+                    nn.ReLU(),
+                    #nn.BatchNorm1d(self.hidden_dims[i+1])
                 )
             )
-        model_modules.append(nn.Linear(self.hidden_dims[-1], self.n_classes))
-        self.model = nn.Sequential(*model_modules)
+            model_modules.append(nn.Linear(self.hidden_dims[-1], self.n_classes))
+            self.model = nn.Sequential(*model_modules)
+        else:
+            self.model = nn.Linear(self.latent_dim + 20, self.n_classes)
 
     def forward(self, input: Tensor) -> Tensor:
         output = self.model(input)

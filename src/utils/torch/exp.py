@@ -2,6 +2,7 @@ import copy
 import logging
 import os
 import time
+from itertools import cycle
 from typing import List, Tuple
 
 import numpy as np
@@ -212,10 +213,10 @@ def train_autoencoders_two_domains(
         # Add class label to latent representations to ensure that latent representations encode generic information
         # independent from the used group of the samples (see Adversarial AutoEncoder paper)
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 10)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 20)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 10)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 20)), dim=1
         )
 
     else:
@@ -258,6 +259,8 @@ def train_autoencoders_two_domains(
             + latent_structure_model_loss(latent_structure_model_output_j, labels_j)
         )
         total_loss += latent_sm_loss * gamma
+        latent_sm_acc_i = accuracy(latent_structure_model_output_i, labels_i)
+        latent_sm_acc_j = accuracy(latent_structure_model_output_j, labels_j)
 
     # Add loss measuring the distance between a pair of samples in the latent space if this is desired
     # Be careful using this option as it is important that the samples in the batch are actually paired
@@ -307,6 +310,8 @@ def train_autoencoders_two_domains(
             batch_size_i + batch_size_j
         )
         total_loss_item += summary_stats["latent_structure_model_loss"] * gamma
+        summary_stats["latent_structure_model_accuracy_i"] = latent_sm_acc_i
+        summary_stats["latent_structure_model_accuracy_j"] = latent_sm_acc_j
 
     if paired_training_mask is not None and paired_distance_samples > 0:
         summary_stats["latent_distance_loss"] = (
@@ -383,10 +388,10 @@ def train_latent_dcm_two_domains(
         # independent from the used data modality (see Adversarial AutoEncoder paper)
 
         dcm_input_i = torch.cat(
-            (latents_i, labels_i.float().view(-1, 1).expand(-1, 10)), dim=1
+            (latents_i, labels_i.float().view(-1, 1).expand(-1, 20)), dim=1
         )
         dcm_input_j = torch.cat(
-            (latents_j, labels_j.float().view(-1, 1).expand(-1, 10)), dim=1
+            (latents_j, labels_j.float().view(-1, 1).expand(-1, 20)), dim=1
         )
 
     else:
@@ -489,6 +494,11 @@ def process_epoch_two_domains(
     n_preds_j = 0
     paired_distance_samples = 0
 
+    n_class_preds_i = 0
+    correct_class_preds_i = 0
+    n_class_preds_j = 0
+    correct_class_preds_j = 0
+
     if (
         domain_model_config_i.model.model_base_type
         != domain_model_config_i.model.model_base_type
@@ -563,6 +573,14 @@ def process_epoch_two_domains(
 
         if use_latent_structure_model:
             latent_sm_loss += ae_train_summary["latent_structure_model_loss"]
+            correct_class_preds_i += ae_train_summary[
+                "latent_structure_model_accuracy_i"
+            ][0]
+            n_class_preds_i += ae_train_summary["latent_structure_model_accuracy_i"][1]
+            correct_class_preds_j += ae_train_summary[
+                "latent_structure_model_accuracy_j"
+            ][0]
+            n_class_preds_j += ae_train_summary["latent_structure_model_accuracy_j"][1]
 
         dcm_train_summary = train_latent_dcm_two_domains(
             domain_model_configurations=domain_model_configs,
@@ -610,7 +628,11 @@ def process_epoch_two_domains(
 
     if use_latent_structure_model:
         latent_sm_loss /= n_preds_i + n_preds_j
+        class_i_accuracy = correct_class_preds_i / n_class_preds_i
+        class_j_accuracy = correct_class_preds_j / n_class_preds_j
         epoch_statistics["latent_structure_model_loss"] = latent_sm_loss
+        epoch_statistics["latent_structure_model_accuracy_i"] = class_i_accuracy
+        epoch_statistics["latent_structure_model_accuracy_j"] = class_j_accuracy
 
     if paired_training_mask is not None and paired_distance_samples > 0:
         epoch_statistics["latent_distance_loss"] = (
@@ -806,6 +828,18 @@ def train_val_test_loop_two_domains(
                         epoch_statistics["latent_structure_model_loss"]
                     )
                 )
+                logging.debug(
+                    "Latent structure model accuracy for {} domain: {:.8f}".format(
+                        domain_names[0],
+                        epoch_statistics["latent_structure_model_accuracy_i"],
+                    )
+                )
+                logging.debug(
+                    "Latent structure model accuracy for {} domain: {:.8f}".format(
+                        domain_names[1],
+                        epoch_statistics["latent_structure_model_accuracy_j"],
+                    )
+                )
 
             if "latent_distance_loss" in epoch_statistics:
                 logging.debug(
@@ -997,6 +1031,18 @@ def train_val_test_loop_two_domains(
             logging.debug(
                 "Latent structure model loss: {:.8f}".format(
                     epoch_statistics["latent_structure_model_loss"]
+                )
+            )
+            logging.debug(
+                "Latent structure model accuracy for domain {}: {:.8f}".format(
+                    domain_names[0],
+                    epoch_statistics["latent_structure_model_accuracy_i"],
+                )
+            )
+            logging.debug(
+                "Latent structure model accuracy for domain {}: {:.8f}".format(
+                    domain_names[1],
+                    epoch_statistics["latent_structure_model_accuracy_j"],
                 )
             )
 

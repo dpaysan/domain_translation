@@ -16,7 +16,7 @@ run_params:
                     'label_key':'label'}
 
   seq_model_config : {'model_config':{'type':'GeneSetVAE', 'input_dim':5785,
-                                      'hidden_dims':[256, 256, 256,],
+                                      'hidden_dims':[256, 256, 256],
                                       'batchnorm':True,
                                        'latent_dim':256,
                                        'geneset_adjacencies_file':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'},
@@ -24,18 +24,18 @@ run_params:
                       'loss_config':{'type':'mae'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':256, 'n_classes':2},
-                      'optimizer_config':{'type':'adam','lr': 0.0001, 'betas':[0.5, 0.9]},
-                      'loss_config':{'type':'ce', 'weights':[2.5,1.0]}}
+                      'optimizer_config':{'type':'adam','lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.05},
+                      'loss_config':{'type':'ce', 'weights':[3.0,1.0]}}
 
   latent_dcm_config: { 'model_config': { 'type': 'LatentDiscriminator', 'n_classes': 2,
-                                         'latent_dim': 256, 'hidden_dims': [128, 128, 64,] },
-                       'optimizer_config': { 'type': 'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.005 },
-                       'loss_config': { 'type': 'ce', 'weights':[1.0,2.75]}}
+                                         'latent_dim': 256,},
+                       'optimizer_config': { 'type': 'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.05 },
+                       'loss_config': { 'type': 'ce'}}
 
   num_epochs: 1000
   early_stopping: -1
   train_val_test_split: [0.8, 0.1, 0.1]
-  batch_size: 32
+  batch_size: 128
   random_state: 1234
 
 
@@ -52,13 +52,17 @@ pipeline:
   - method: initialize_dcm_model
   - method: load_model_for_domain_config
     params:
-      weights_fname: '../../data/cd4/experiments/pretrain_image_vae_64px/epoch_900/model.pth'
+      weights_fname: '../../data/cd4/experiments/20210221_101738/epoch_500/model.pth'
       id: 0
+#  - method: load_model_for_domain_config
+#    params:
+#      weights_fname: '../../data/cd4/experiments/pretrain_image_geneset_vae_64px/final_rna_model.pth'
+#      id: 1
   - method: train_models
     params:
       alpha: 0.1
       beta: 1.0
-      gamma: 0.001
+      gamma: 0.01
       lamb: 0.000001
       use_latent_discriminator: True
       use_latent_structure_model: True
