@@ -166,3 +166,5 @@ def visualize_geneset_guided_grad_cams(
         cv2.imwrite(os.path.join(image_dir, "gb_map_image_%s.jpg" % i), gb)
         cv2.imwrite(os.path.join(image_dir, "guided_gradcam_image_%s.jpg" % i), cam_gb)
         cv2.imwrite(os.path.join(image_dir, "input_image_%s.jpg" %i), np.uint8(image * 255))
+
+

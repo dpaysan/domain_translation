@@ -441,6 +441,6 @@ class GeneSetAE(BaseAE, ABC):
         return {
             "recons": recons,
             "latents": latents,
-            "geneset_activites": geneset_activities,
+            "geneset_activities": geneset_activities,
             "decoded_geneset_activities": decoded_geneset_activities,
         }

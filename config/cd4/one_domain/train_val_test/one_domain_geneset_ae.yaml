@@ -1,0 +1,40 @@
+output_dir: '../../data/cd4/experiments'
+module: src.experiments.model_pretraining
+class: PretrainAeExperiment
+run_params:
+  data_config: {'data_fname':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_data_and_labels.csv',
+                    'data_key':'seq_data',
+                    'label_key':'label'}
+
+  model_config : {'model_config':{'type':'GeneSetAE', 'input_dim':5785,
+                                      'hidden_dims':[256, 256, 256],
+                                      'batchnorm':True,
+                                       'latent_dim':256,
+                                       'geneset_adjacencies_file':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'},
+                      'optimizer_config':{'type':'adam', 'lr': 0.001, 'betas':[0.5, 0.9], 'weight_decay':0.0},
+                      'loss_config':{'type':'mse'}}
+
+  latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':256, 'n_classes':2},
+                      'optimizer_config':{'type':'adam', 'lr':0.001},
+                      'loss_config':{'type':'ce', 'weights':[3.0, 1.0]}}
+
+  domain_name: 'rna'
+  num_epochs: 2000
+  early_stopping: -1
+  train_val_test_split: [0.8, 0.1, 0.1]
+  batch_size: 128
+  random_state: 1234
+
+
+pipeline:
+  - method: initialize_seq_data_set
+  - method: initialize_data_loader_dict
+  - method: initialize_domain_config
+  - method: initialize_clf_model
+  - method: train_models
+    params:
+      gamma: 0.0
+      lamb:
+      save_freq: 100
+      use_latent_structure_model: True
+

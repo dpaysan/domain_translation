@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib.gridspec import GridSpec
 from numpy import ndarray
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -307,3 +308,45 @@ def deprocess_image(img):
     img = img + 0.5
     img = np.clip(img, 0, 1)
     return np.uint8(img * 255)
+
+
+def visualize_image_grid_in_umap_space(
+    grid_points: np.ndarray,
+    latents: np.ndarray,
+    all_domain_labels: np.ndarray,
+    mapped_images: np.ndarray,
+    random_state=1234,
+):
+    mapper = UMAP(random_state=random_state)
+    transformed = mapper.fit_transform(latents)
+    fig = plt.figure(figsize=(12, 6))
+    gs = GridSpec(10, 20, fig)
+    scatter_ax = fig.add_subplot(gs[:, :10])
+    digit_axes = np.zeros((10, 10), dtype=object)
+    for i in range(10):
+        for j in range(10):
+            digit_axes[i, j] = fig.add_subplot(gs[i, 10 + j])
+
+    # Use umap.plot to plot to the major axis
+    # umap.plot.points(mapper, labels=labels, ax=scatter_ax)
+    domain_labels_int = np.zeros(len(all_domain_labels))
+    domain_labels_int[all_domain_labels == "rna"] = 1
+    scatter_ax.scatter(
+        mapper.embedding_[:, 0],
+        mapper.embedding_[:, 1],
+        c=domain_labels_int.astype(np.int32),
+        cmap="Spectral",
+        s=2,
+    )
+    scatter_ax.set(xticks=[], yticks=[])
+
+    # Plot the locations of the text points
+    scatter_ax.scatter(grid_points[:, 0], grid_points[:, 1], marker="x", c="k", s=20)
+
+    # Plot each of the generated digit images
+    for i in range(10):
+        for j in range(10):
+            digit_axes[i, j].imshow(mapped_images[i * 10 + j].reshape(64, 64))
+            digit_axes[i, j].set(xticks=[], yticks=[])
+
+    return fig

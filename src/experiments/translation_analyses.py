@@ -8,10 +8,12 @@ import numpy as np
 
 from src.experiments.image_seq_domain_translation import ImageSeqTranslationExperiment
 from src.models.custom_networks import ImageToGeneSetTranslator
+from src.utils.basic.visualization import visualize_image_grid_in_umap_space
 from src.utils.torch.evaluation import (
     analyze_geneset_perturbation_in_image,
     analyze_guided_gradcam_for_genesets,
     get_geneset_activities_and_translated_images_sequences,
+    perform_latent_walk_in_umap_space,
 )
 from src.utils.torch.visualization import (
     visualize_geneset_perturbation_in_image,
@@ -209,6 +211,8 @@ class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
         rna_inputs = data_dict["rna_inputs"]
         rna_latents = data_dict["rna_latents"]
         pathway_activities = data_dict["geneset_activities"]
+        reconstructed_pathway_activities = data_dict["reconstructed_geneset_activities"]
+        reconstructed_rna_inputs = data_dict["reconstructed_rna_inputs"]
         translated_images = data_dict["translated_images"]
         translated_image_latents = data_dict["translated_image_latents"]
 
@@ -239,6 +243,13 @@ class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
 
         rna_latents_df = pd.DataFrame(np.array(rna_latents), index=rna_cell_ids)
         rna_latents_df.to_csv(os.path.join(self.output_dir, "rna_latents.csv"))
+
+        reconstructed_pathway_activities_df = pd.DataFrame(np.array(reconstructed_pathway_activities), columns=pathways,
+                                                           index=rna_cell_ids)
+        reconstructed_pathway_activities_df.to_csv(os.path.join(self.output_dir, "reconstructed_pathway_activities.csv"))
+
+        reconstructed_rna_inputs_df = pd.DataFrame(np.array(reconstructed_rna_inputs), columns=genes, index=rna_cell_ids)
+        reconstructed_rna_inputs_df.to_csv(os.path.join(self.output_dir, "reconstructed_rna_inputs.csv"))
 
         image_label_df = pd.DataFrame(
             np.array(image_labels), columns=["label"], index=image_cell_ids
@@ -293,3 +304,75 @@ class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
                 os.path.join(input_image_dir, "%s.jpg" % (image_cell_ids[i])),
                 image_inputs[i].reshape(64, 64),
             )
+
+    def analyze_latent_representations_in_umap_space(
+        self, dataloader_type: str = "train"
+    ):
+        data_dict = perform_latent_walk_in_umap_space(
+            domain_configs=self.domain_configs,
+            dataloader_type=dataloader_type,
+            random_state=self.random_state,
+        )
+        grid_points = data_dict["grid_points"]
+        grid_images = data_dict["grid_images"]
+        grid_sequences = data_dict["grid_sequences"]
+        grid_pathway_activities = data_dict["grid_geneset_activities"]
+        all_latents = data_dict["all_latents"]
+        all_labels = data_dict["all_labels"]
+        all_domain_labels = data_dict["all_domain_labels"]
+        all_cell_ids = data_dict["all_cell_ids"]
+
+        latent_df = pd.DataFrame(np.array(all_latents), index=all_cell_ids)
+        latent_df["labels"] = all_labels
+        latent_df["domain"] = all_domain_labels
+
+        latent_space_analyses_directory = os.path.join(
+            self.output_dir, "latent_space_analyses"
+        )
+        os.makedirs(latent_space_analyses_directory, exist_ok=True)
+
+        latent_df.to_csv(
+            os.path.join(latent_space_analyses_directory, "all_latents.csv")
+        )
+        np.savetxt(
+            os.path.join(latent_space_analyses_directory, "umap_grid_points.csv"),
+            grid_points,
+            delimiter=",",
+        )
+        np.savetxt(
+            os.path.join(
+                latent_space_analyses_directory, "umap_grid_reconstructed_rnaseq.csv"
+            ),
+            grid_sequences,
+            delimiter=",",
+        )
+        np.savetxt(
+            os.path.join(
+                latent_space_analyses_directory,
+                "umap_grid_reconstructed_pathway_activities.csv",
+            ),
+            grid_pathway_activities,
+            delimiter=",",
+        )
+
+        for i in range(len(grid_images)):
+            imageio.imwrite(
+                os.path.join(
+                    latent_space_analyses_directory, "grid_image_{}.jpg".format(i)
+                ),
+                grid_images[i].reshape(64, 64),
+            )
+
+        image_visualization_latent_space = visualize_image_grid_in_umap_space(
+            grid_points=grid_points,
+            latents=all_latents,
+            all_domain_labels=all_domain_labels,
+            mapped_images=grid_images,
+            random_state=self.random_state,
+        )
+        plt.gcf()
+        plt.savefig(
+            os.path.join(
+                latent_space_analyses_directory, "visualization_umap_space_images.png"
+            )
+        )

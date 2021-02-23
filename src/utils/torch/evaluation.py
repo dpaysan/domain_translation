@@ -16,6 +16,7 @@ from src.models.gradcam import GradCam, GuidedBackpropReLUModel
 from src.utils.basic.export import dict_to_csv
 from src.utils.basic.metric import knn_accuracy
 from src.utils.torch.general import get_device
+from umap import UMAP
 
 
 def evaluate_latent_integration(
@@ -481,6 +482,8 @@ def get_geneset_activities_and_translated_images_sequences(
     all_rna_inputs = []
     all_rna_latents = []
     all_geneset_activities = []
+    all_reconstructed_geneset_activities = []
+    all_reconstructed_rna_inputs = []
     all_translated_images = []
     all_image_latents = []
 
@@ -502,9 +505,11 @@ def get_geneset_activities_and_translated_images_sequences(
 
         geneset_ae_output = geneset_ae(rna_inputs)
         latents = geneset_ae_output["latents"]
-        geneset_activities = geneset_ae_output["geneset_activites"]
+        geneset_activities = geneset_ae_output["geneset_activities"]
+        reconstructed_geneset_activities = geneset_ae_output["decoded_geneset_activities"]
+        reconstructed_rna_inputs = geneset_ae_output["recons"]
         translated_images = image_ae.decode(latents)
-        translated_image_latents = image_ae.encode(translated_images)
+        translated_image_latents = image_ae(translated_images)["latents"]
 
         rna_cell_ids.extend(cell_ids)
         all_rna_labels.extend(list(rna_labels.clone().detach().cpu().numpy()))
@@ -520,6 +525,9 @@ def get_geneset_activities_and_translated_images_sequences(
         )
 
         all_rna_latents.extend(list(latents.clone().detach().cpu().numpy()))
+
+        all_reconstructed_geneset_activities.extend(list(reconstructed_geneset_activities.clone().detach().cpu().numpy()))
+        all_reconstructed_rna_inputs.extend(list(reconstructed_rna_inputs.clone().detach().cpu().numpy()))
 
     for i, sample in enumerate(image_data_loader):
         image_inputs = sample[image_domain_config.data_key].to(device)
@@ -553,6 +561,8 @@ def get_geneset_activities_and_translated_images_sequences(
         "rna_inputs": all_rna_inputs,
         "rna_latents": all_rna_latents,
         "geneset_activities": all_geneset_activities,
+        "reconstructed_geneset_activities": all_reconstructed_geneset_activities,
+        "reconstructed_rna_inputs":all_reconstructed_rna_inputs,
         "translated_images": all_translated_images,
         "translated_image_latents": all_translated_image_latents,
         "image_cell_ids": image_cell_ids,
@@ -563,4 +573,120 @@ def get_geneset_activities_and_translated_images_sequences(
         "translated_sequence_latents": all_translated_rna_latents,
         "translated_geneset_activities": all_translated_geneset_activities,
     }
+    return data_dict
+
+
+def perform_latent_walk_in_umap_space(
+    domain_configs: List[DomainConfig], dataloader_type: str, random_state: int = 1234
+):
+    if len(domain_configs) != 2:
+        raise RuntimeError(
+            "Expects two domain configurations (image and sequencing domain)"
+        )
+    if domain_configs[0].name == "image" and domain_configs[1].name == "rna":
+        image_domain_config = domain_configs[0]
+        rna_domain_config = domain_configs[1]
+    elif domain_configs[0].name == "rna" and domain_configs[1].name == "image":
+        image_domain_config = domain_configs[1]
+        rna_domain_config = domain_configs[0]
+    else:
+        raise RuntimeError("Expected domain configuration types are >image< and >rna<.")
+
+    rna_data_loader = rna_domain_config.data_loader_dict[dataloader_type]
+    image_data_loader = image_domain_config.data_loader_dict[dataloader_type]
+    device = get_device()
+
+    geneset_ae = rna_domain_config.domain_model_config.model.to(device).eval()
+    image_ae = image_domain_config.domain_model_config.model.to(device).eval()
+
+    all_rna_latents = []
+    all_rna_labels = []
+    all_image_latents = []
+    all_image_labels = []
+    grid_sequences = []
+    grid_geneset_activities = []
+    grid_images = []
+    rna_cell_ids = []
+    image_cell_ids = []
+
+    for i, sample in enumerate(rna_data_loader):
+        rna_inputs = sample[rna_domain_config.data_key].to(device)
+        rna_labels = sample[rna_domain_config.label_key]
+        rna_cell_ids.extend(sample["id"])
+
+        geneset_ae_output = geneset_ae(rna_inputs)
+        latents = geneset_ae_output["latents"]
+        all_rna_latents.extend(list(latents.clone().detach().cpu().numpy()))
+        all_rna_labels.extend(list(rna_labels.clone().detach().cpu().numpy()))
+
+    for i, sample in enumerate(image_data_loader):
+        image_inputs = sample[image_domain_config.data_key].to(device)
+        image_labels = sample[image_domain_config.label_key].to(device)
+        image_cell_ids.extend(sample["id"])
+
+        image_ae_output = image_ae(image_inputs)
+        latents = image_ae_output["latents"]
+        all_image_latents.extend(list(latents.clone().detach().cpu().numpy()))
+        all_image_labels.extend(list(image_labels.clone().detach().cpu().numpy()))
+
+    all_latents = np.concatenate(
+        (np.array(all_image_latents), np.array(all_rna_latents)), axis=0
+    )
+    all_labels = np.concatenate(
+        (np.array(all_image_labels), np.array(all_rna_labels)), axis=0
+    )
+    all_domain_labels = np.concatenate(
+        (
+            np.repeat("image", len(all_image_labels)),
+            np.repeat("rna", len(all_rna_labels)),
+        ),
+        axis=0,
+    )
+    all_cell_ids = np.concatenate((image_cell_ids, rna_cell_ids), axis=0)
+
+    mapper = UMAP(random_state=random_state)
+    transformed = mapper.fit_transform(all_latents)
+    min_umap_c1 = 1.5*min(transformed[:, 0])
+    max_umap_c1 = 1.5*max(transformed[:, 0])
+    min_umap_c2 = 1.5*min(transformed[:, 1])
+    max_umap_c2 = 1.5*max(transformed[:, 1])
+
+    test_pts = np.array(
+        [
+            (np.array([min_umap_c1, min_umap_c2]) * (1 - x) + np.array([min_umap_c1, max_umap_c2]) * x)
+            * (1 - y)
+            + (np.array([max_umap_c1, min_umap_c2]) * (1 - x) + np.array([max_umap_c1, max_umap_c2]) * x)
+            * y
+            for y in np.linspace(0, 1, 10)
+            for x in np.linspace(0, 1, 10)
+        ]
+    )
+
+    inv_transformed_points = mapper.inverse_transform(test_pts)
+    test_pts_ds = torch.utils.data.TensorDataset(torch.from_numpy(inv_transformed_points))
+    test_pts_loader = torch.utils.data.DataLoader(
+        test_pts_ds, batch_size=64, shuffle=False
+    )
+
+    for i, sample in enumerate(test_pts_loader):
+        image_recons = image_ae.decode(sample[0].to(device))
+        rna_recons, decoded_geneset_activities = geneset_ae.decode(sample[0].to(device))
+
+        grid_images.extend(list(image_recons.clone().detach().cpu().numpy()))
+        grid_sequences.extend(list(rna_recons.clone().detach().cpu().numpy()))
+        grid_geneset_activities.extend(
+            list(decoded_geneset_activities.clone().detach().cpu().numpy())
+        )
+
+    data_dict = {
+        "grid_points": test_pts,
+        "grid_images": grid_images,
+        "grid_sequences": grid_sequences,
+        "grid_geneset_activities": grid_geneset_activities,
+        "all_latents": all_latents,
+        "all_labels": all_labels,
+        "all_domain_labels": all_domain_labels,
+        "all_cell_ids": all_cell_ids,
+    }
+
     return data_dict
