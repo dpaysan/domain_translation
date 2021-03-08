@@ -21,18 +21,18 @@ run_params:
                                        'latent_dim':256,
                                        'geneset_adjacencies_file':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'},
                       'optimizer_config':{'type':'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.0},
-                      'loss_config':{'type':'mae'}}
+                      'loss_config':{'type':'mse'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':256, 'n_classes':2},
-                      'optimizer_config':{'type':'adam','lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.05},
+                      'optimizer_config':{'type':'adam','lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.0},
                       'loss_config':{'type':'ce', 'weights':[3.0,1.0]}}
 
   latent_dcm_config: { 'model_config': { 'type': 'LatentDiscriminator', 'n_classes': 2,
-                                         'latent_dim': 256,},
-                       'optimizer_config': { 'type': 'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.05 },
+                                         'latent_dim': 256, 'hidden_dims': [128, 64, 32] },
+                       'optimizer_config': { 'type': 'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.00 },
                        'loss_config': { 'type': 'ce'}}
 
-  num_epochs: 1000
+  num_epochs: 2000
   early_stopping: -1
   train_val_test_split: [0.8, 0.1, 0.1]
   batch_size: 128
@@ -48,6 +48,7 @@ pipeline:
     params:
       train_model: False
   - method: initialize_seq_domain_config
+    train_model: True
   - method: initialize_clf_model
   - method: initialize_dcm_model
   - method: load_model_for_domain_config
@@ -56,16 +57,14 @@ pipeline:
       id: 0
 #  - method: load_model_for_domain_config
 #    params:
-#      weights_fname: '../../data/cd4/experiments/pretrain_image_geneset_vae_64px/final_rna_model.pth'
+#      weights_fname: '../../data/cd4/experiments/pretrain_geneset_vae_64px/epoch_900/model.pth'
 #      id: 1
   - method: train_models
     params:
-      alpha: 0.1
+      alpha: 5.0
       beta: 1.0
-      gamma: 0.01
-      lamb: 0.000001
+      gamma: 0.001
+      lamb: 0.00001
       use_latent_discriminator: True
       use_latent_structure_model: True
-      save_freq: 50
-
-
+      save_freq: 100
