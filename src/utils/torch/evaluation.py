@@ -646,16 +646,16 @@ def perform_latent_walk_in_umap_space(
 
     mapper = UMAP(random_state=random_state)
     transformed = mapper.fit_transform(all_latents)
-    min_umap_c1 = 1.5*min(transformed[:, 0])
-    max_umap_c1 = 1.5*max(transformed[:, 0])
-    min_umap_c2 = 1.5*min(transformed[:, 1])
-    max_umap_c2 = 1.5*max(transformed[:, 1])
+    min_umap_c1 = min(transformed[:, 0])
+    max_umap_c1 = max(transformed[:, 0])
+    min_umap_c2 = min(transformed[:, 1])
+    max_umap_c2 = max(transformed[:, 1])
 
     test_pts = np.array(
         [
-            (np.array([min_umap_c1, min_umap_c2]) * (1 - x) + np.array([min_umap_c1, max_umap_c2]) * x)
+            (np.array([min_umap_c1, max_umap_c2]) * (1 - x) + np.array([max_umap_c1, max_umap_c2]) * x)
             * (1 - y)
-            + (np.array([max_umap_c1, min_umap_c2]) * (1 - x) + np.array([max_umap_c1, max_umap_c2]) * x)
+            + (np.array([min_umap_c1, min_umap_c2]) * (1 - x) + np.array([max_umap_c1, min_umap_c2]) * x)
             * y
             for y in np.linspace(0, 1, 10)
             for x in np.linspace(0, 1, 10)

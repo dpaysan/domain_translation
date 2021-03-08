@@ -339,6 +339,8 @@ def visualize_image_grid_in_umap_space(
         s=2,
     )
     scatter_ax.set(xticks=[], yticks=[])
+    # scatter_ax.set_xlim((min(grid_points[:,0]), 1.05 * max(grid_points[:,0])))
+    # scatter_ax.set_ylim((1.05 * min(grid_points[:,1]), 1.05 * max(grid_points[:, 1])))
 
     # Plot the locations of the text points
     scatter_ax.scatter(grid_points[:, 0], grid_points[:, 1], marker="x", c="k", s=20)
