@@ -16,7 +16,7 @@ run_params:
                       'loss_config':{'type':'ce', 'weights':[4.5,0.5]}}
 
   domain_name: 'image'
-  num_epochs: 1000
+  num_epochs: 500
   early_stopping: -1
   train_val_test_split: [0.8, 0.1, 0.1]
   batch_size: 256

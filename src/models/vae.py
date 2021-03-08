@@ -355,14 +355,14 @@ class GeneSetVAE(BaseVAE, ABC):
         )
         self.geneset_encoder = self.geneset_encoding_layer
 
-        encoder_modules = [nn.PReLU(), nn.BatchNorm1d(self.n_genesets)]
+        encoder_modules = [nn.BatchNorm1d(self.n_genesets), nn.PReLU(),]
         if len(hidden_dims) > 0:
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(self.n_genesets, self.hidden_dims[0]),
                     #nn.LeakyReLU(self.lrelu_slope),
-                    nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[0]),
+                    nn.PReLU(),
                 )
             )
             for i in range(1, len(hidden_dims)):
@@ -370,13 +370,10 @@ class GeneSetVAE(BaseVAE, ABC):
                     nn.Sequential(
                         nn.Linear(self.hidden_dims[i - 1], self.hidden_dims[i]),
                         #nn.LeakyReLU(self.lrelu_slope),
-                        nn.PReLU(),
                         nn.BatchNorm1d(self.hidden_dims[i]),
+                        nn.PReLU(),
                     )
                 )
-
-        if self.batchnorm:
-            encoder_modules.append(nn.BatchNorm1d(self.latent_dim))
 
         self.encoder = nn.Sequential(*encoder_modules)
 
@@ -395,8 +392,8 @@ class GeneSetVAE(BaseVAE, ABC):
                 nn.Sequential(
                     nn.Linear(self.latent_dim, self.hidden_dims[-1]),
                     #nn.LeakyReLU(self.lrelu_slope),
-                    nn.PReLU(),
                     nn.BatchNorm1d(self.hidden_dims[-1]),
+                    nn.PReLU(),
                 )
             ]
             for i in range(len(hidden_dims) - 1):
@@ -404,8 +401,8 @@ class GeneSetVAE(BaseVAE, ABC):
                     nn.Sequential(
                         nn.Linear(self.hidden_dims[-1 - i], self.hidden_dims[-2 - i]),
                         #nn.LeakyReLU(self.lrelu_slope),
-                        nn.PReLU(),
                         nn.BatchNorm1d(self.hidden_dims[-2 - i]),
+                        nn.PReLU(),
                     )
                 )
             decoder_modules.append(
@@ -420,8 +417,8 @@ class GeneSetVAE(BaseVAE, ABC):
 
         self.geneset_decoder = nn.Sequential(
             #nn.LeakyReLU(self.lrelu_slope),
-            nn.PReLU(),
             nn.BatchNorm1d(self.n_genesets),
+            nn.PReLU(),
             SparseLinear(self.n_genesets, self.input_dim, self.geneset_adjacencies),
         )
 
