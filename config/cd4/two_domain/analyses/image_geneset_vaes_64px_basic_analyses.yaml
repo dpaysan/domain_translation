@@ -21,15 +21,15 @@ run_params:
                                        'latent_dim':256,
                                        'geneset_adjacencies_file':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'},
                       'optimizer_config':{'type':'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.0},
-                      'loss_config':{'type':'mae'}}
+                      'loss_config':{'type':'mse'}}
 
   latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':256, 'n_classes':2},
-                      'optimizer_config':{'type':'adam','lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.05},
-                      'loss_config':{'type':'ce', 'weights':[3.0,1.0]}}
+                      'optimizer_config':{'type':'adam','lr': 0.001, 'betas':[0.5, 0.9], 'weight_decay':0.0},
+                      'loss_config':{'type':'ce', 'weights':[5.0,1.0]}}
 
   latent_dcm_config: { 'model_config': { 'type': 'LatentDiscriminator', 'n_classes': 2,
-                                         'latent_dim': 256, 'hidden_dims': [128, 64, 32] },
-                       'optimizer_config': { 'type': 'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.0 },
+                                         'latent_dim': 256, 'hidden_dims': [1024, 1024, 1024] },
+                       'optimizer_config': { 'type': 'adam', 'lr': 0.0001, 'betas':[0.5, 0.9], 'weight_decay':0.000 },
                        'loss_config': { 'type': 'ce'}}
 
   num_epochs: 1000
@@ -53,15 +53,15 @@ pipeline:
   - method: initialize_dcm_model
   - method: load_pretrained_models
     params:
-      domain_model_1_weights_loc: '../../data/cd4/experiments/20210224_065013/final_image_model.pth'
-      domain_model_2_weights_loc: '../../data/cd4/experiments/20210224_065013/final_rna_model.pth'
-      latent_dcm_weights_loc: '../../data/cd4/experiments/20210224_065013/final_dcm.pth'
-      latent_structure_model_weights_loc: '../../data/cd4/experiments/20210224_065013/final_latent_structure_model.pth'
+      domain_model_1_weights_loc: '../../data/cd4/experiments/best_image_geneset_vae_mix/final_image_model.pth'
+      domain_model_2_weights_loc: '../../data/cd4/experiments/best_image_geneset_vae_mix/final_rna_model.pth'
+      latent_dcm_weights_loc: '../../data/cd4/experiments/best_image_geneset_vae_mix/final_dcm.pth'
+      latent_structure_model_weights_loc: '../../data/cd4/experiments/best_image_geneset_vae_mix/final_latent_structure_model.pth'
   - method: store_pathway_activities_and_translated_images_sequences
     params:
       dataloader_type: 'train'
       geneset_adjacencies_file: '../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'
-#  - method: analyze_latent_representations_in_umap_space
-#    params:
-#      dataloader_type: 'train'
+  - method: analyze_latent_representations_in_umap_space
+    params:
+      dataloader_type: 'train'
 
