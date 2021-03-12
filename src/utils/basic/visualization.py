@@ -19,6 +19,7 @@ from src.utils.torch.evaluation import (
     get_shared_latent_space_dict_for_multiple_domains,
     get_full_latent_space_dict_for_multiple_domains,
     save_latents_to_csv,
+    get_cycle_latents_for_domain,
 )
 
 SMALL_SIZE = 16
@@ -185,7 +186,10 @@ def plot_correlations_latent_space(latents_domain_dict, save_path):
     shared_colnames = []
     specific_colnames = []
     for domain_name, latents in latents_domain_dict.items():
-        shared_latents, domain_specific_latents = latents
+        if len(latents) == 2:
+            shared_latents, domain_specific_latents = latents
+        else:
+            shared_latents, domain_specific_latents = latents, None
         shared_latents_in_domains.append(shared_latents)
 
         shared_colnames.append(
@@ -246,6 +250,18 @@ def visualize_correlation_structure_latent_space(
     )
 
 
+def visualize_single_domain_cycling_correlation_structure(
+    domain_config: DomainConfig,
+    save_path: str,
+    dataset_type: str,
+    device: str = "cuda:0",
+):
+    latent_dict = get_cycle_latents_for_domain(
+        domain_config=domain_config, dataset_type=dataset_type, device=device
+    )
+    plot_correlations_latent_space(latent_dict, save_path)
+
+
 def visualize_model_performance(
     output_dir: str,
     domain_configs: List[DomainConfig],
@@ -288,6 +304,15 @@ def visualize_model_performance(
                 save_path=output_dir
                 + "/{}_latent_representations_{}.csv".format(domain_name, dataset_type),
                 dataset_type=dataset_type,
+                device=device,
+            )
+            visualize_single_domain_cycling_correlation_structure(
+                domain_config=domain_config,
+                dataset_type=dataset_type,
+                save_path=output_dir
+                + "/{}_cycling_correlation_structure_{}.png".format(
+                    domain_name, dataset_type
+                ),
                 device=device,
             )
 

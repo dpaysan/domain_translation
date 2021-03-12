@@ -9,20 +9,20 @@ run_params:
   model_config : {'model_config':{'type':'GeneSetVAE', 'input_dim':5785,
                                       'hidden_dims':[256, 256, 256],
                                       'batchnorm':True,
-                                       'latent_dim':256,
+                                       'latent_dim':128,
                                        'geneset_adjacencies_file':'../../data/cd4/cd4_rna_seq_pbmc_10k/gene_kegg_pathway_adj_filtered_nCD4.csv'},
                       'optimizer_config':{'type':'adam', 'lr': 0.001, 'betas':[0.5, 0.9], 'weight_decay':0.0},
                       'loss_config':{'type':'mse'}}
 
-  latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':256, 'n_classes':2},
+  latent_structure_model_config: {'model_config':{'type':'LatentClassifier', 'latent_dim':128, 'n_classes':2},
                       'optimizer_config':{'type':'adam', 'lr':0.001},
-                      'loss_config':{'type':'ce', 'weights':[3.0, 1.0]}}
+                      'loss_config':{'type':'ce', 'weights':[1.5, 1.0]}}
 
   domain_name: 'rna'
-  num_epochs: 1000
+  num_epochs: 501
   early_stopping: -1
   train_val_test_split: [0.8, 0.1, 0.1]
-  batch_size: 256
+  batch_size: 32
   random_state: 1234
 
 
@@ -33,8 +33,8 @@ pipeline:
   - method: initialize_clf_model
   - method: train_models
     params:
-      gamma: 0.01
-      lamb: 0.000001
+      gamma: 0.001
+      lamb: 0.00000001
       save_freq: 100
       use_latent_structure_model: True
 

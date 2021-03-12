@@ -14,6 +14,7 @@ from src.helper.custom_losses import (
     RobustBCELoss,
     RobustCrossEntropyLoss,
     RobustBCEWithLogitsLoss,
+    RobustWeightedMSELoss,
 )
 from torch.optim.adam import Adam
 from torch.optim.optimizer import Optimizer
@@ -89,6 +90,8 @@ def get_domain_configuration(
         recon_loss_function = L1Loss()
     elif recon_loss_fct_type == "mse":
         recon_loss_function = MSELoss()
+    elif recon_loss_fct_type == "weighted_mse":
+        recon_loss_function = RobustWeightedMSELoss()
     elif recon_loss_fct_type == "bce":
         recon_loss_function = BCELoss()
     elif recon_loss_fct_type == "bce_ll":
@@ -150,6 +153,8 @@ def get_latent_model_configuration(
         latent_loss = RobustMSELoss()
     elif loss_type == "mae":
         latent_loss = RobustL1Loss()
+    elif loss_type == "weighted_mse":
+        latent_loss = RobustWeightedMSELoss()
     else:
         raise NotImplementedError('Unknown loss type "{}"'.format(loss_type))
 

@@ -8,6 +8,16 @@ from torch.nn import MSELoss, L1Loss, BCELoss, BCEWithLogitsLoss, CrossEntropyLo
 # Todo make the implementation more general and not actively broadcast for the regression losses
 
 
+class RobustWeightedMSELoss(MSELoss, ABC):
+    def __init__(self, size_average=None, reduce=None, reduction: str = "mean"):
+        super(RobustWeightedMSELoss, self).__init__(size_average=size_average, reduce=reduce, reduction=reduction)
+
+    def forward(self, input: Tensor, target: Tensor) -> Tensor:
+        #target = target.float().view(-1,1)
+        loss = torch.mean(torch.pow((target - input), 4))
+        return loss
+
+
 class RobustMSELoss(MSELoss, ABC):
     def __init__(self, size_average=None, reduce=None, reduction: str = "mean"):
         super().__init__(size_average=size_average, reduce=reduce, reduction=reduction)

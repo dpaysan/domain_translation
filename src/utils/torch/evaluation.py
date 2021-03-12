@@ -83,6 +83,36 @@ def evaluate_latent_integration(
     return metrics
 
 
+def get_cycle_latents_for_domain(
+    domain_config: DomainConfig, dataset_type: str, device: str = "cuda:0"
+):
+    model = domain_config.domain_model_config.model.to(device)
+    dataloader = domain_config.data_loader_dict[dataset_type]
+    data_key = domain_config.data_key
+    label_key = domain_config.label_key
+
+    all_latents = []
+    all_cycle_latents = []
+
+    for i, sample in enumerate(dataloader):
+        inputs = sample[data_key].to(device)
+        labels = sample[label_key].to(device)
+
+        model_output = model(inputs)
+        latents = model_output["latents"]
+        recons = model_output["recons"]
+        cycle_latents = model(recons)["latents"]
+
+        all_latents.extend(list(latents.clone().detach().cpu().numpy()))
+        all_cycle_latents.extend(list(cycle_latents.clone().detach().cpu().numpy()))
+
+    latent_dict = {
+        "latents": np.array(all_latents),
+        "cycle_latents": np.array(all_cycle_latents),
+    }
+    return latent_dict
+
+
 def get_latent_representations_for_model(
     model: Module,
     dataset: Dataset,
@@ -486,6 +516,7 @@ def get_geneset_activities_and_translated_images_sequences(
     all_reconstructed_rna_inputs = []
     all_translated_images = []
     all_image_latents = []
+    all_reenconded_rna_latents = []
 
     image_cell_ids = []
     all_image_labels = []
@@ -506,8 +537,11 @@ def get_geneset_activities_and_translated_images_sequences(
         geneset_ae_output = geneset_ae(rna_inputs)
         latents = geneset_ae_output["latents"]
         geneset_activities = geneset_ae_output["geneset_activities"]
-        reconstructed_geneset_activities = geneset_ae_output["decoded_geneset_activities"]
+        reconstructed_geneset_activities = geneset_ae_output[
+            "decoded_geneset_activities"
+        ]
         reconstructed_rna_inputs = geneset_ae_output["recons"]
+        reencoded_rna_latents = geneset_ae(reconstructed_rna_inputs)["latents"]
         translated_images = image_ae.decode(latents)
         translated_image_latents = image_ae(translated_images)["latents"]
 
@@ -526,8 +560,13 @@ def get_geneset_activities_and_translated_images_sequences(
 
         all_rna_latents.extend(list(latents.clone().detach().cpu().numpy()))
 
-        all_reconstructed_geneset_activities.extend(list(reconstructed_geneset_activities.clone().detach().cpu().numpy()))
-        all_reconstructed_rna_inputs.extend(list(reconstructed_rna_inputs.clone().detach().cpu().numpy()))
+        all_reconstructed_geneset_activities.extend(
+            list(reconstructed_geneset_activities.clone().detach().cpu().numpy())
+        )
+        all_reconstructed_rna_inputs.extend(
+            list(reconstructed_rna_inputs.clone().detach().cpu().numpy())
+        )
+        all_reenconded_rna_latents.extend(list(reencoded_rna_latents.clone().detach().cpu().numpy()))
 
     for i, sample in enumerate(image_data_loader):
         image_inputs = sample[image_domain_config.data_key].to(device)
@@ -562,7 +601,8 @@ def get_geneset_activities_and_translated_images_sequences(
         "rna_latents": all_rna_latents,
         "geneset_activities": all_geneset_activities,
         "reconstructed_geneset_activities": all_reconstructed_geneset_activities,
-        "reconstructed_rna_inputs":all_reconstructed_rna_inputs,
+        "reconstructed_rna_inputs": all_reconstructed_rna_inputs,
+        "reencoded_rna_latents": all_reenconded_rna_latents,
         "translated_images": all_translated_images,
         "translated_image_latents": all_translated_image_latents,
         "image_cell_ids": image_cell_ids,
@@ -653,9 +693,15 @@ def perform_latent_walk_in_umap_space(
 
     test_pts = np.array(
         [
-            (np.array([min_umap_c1, max_umap_c2]) * (1 - x) + np.array([max_umap_c1, max_umap_c2]) * x)
+            (
+                np.array([min_umap_c1, max_umap_c2]) * (1 - x)
+                + np.array([max_umap_c1, max_umap_c2]) * x
+            )
             * (1 - y)
-            + (np.array([min_umap_c1, min_umap_c2]) * (1 - x) + np.array([max_umap_c1, min_umap_c2]) * x)
+            + (
+                np.array([min_umap_c1, min_umap_c2]) * (1 - x)
+                + np.array([max_umap_c1, min_umap_c2]) * x
+            )
             * y
             for y in np.linspace(0, 1, 10)
             for x in np.linspace(0, 1, 10)
@@ -663,7 +709,9 @@ def perform_latent_walk_in_umap_space(
     )
 
     inv_transformed_points = mapper.inverse_transform(test_pts)
-    test_pts_ds = torch.utils.data.TensorDataset(torch.from_numpy(inv_transformed_points))
+    test_pts_ds = torch.utils.data.TensorDataset(
+        torch.from_numpy(inv_transformed_points)
+    )
     test_pts_loader = torch.utils.data.DataLoader(
         test_pts_ds, batch_size=64, shuffle=False
     )

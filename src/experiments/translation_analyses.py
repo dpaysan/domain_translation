@@ -210,6 +210,7 @@ class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
         rna_labels = data_dict["rna_labels"]
         rna_inputs = data_dict["rna_inputs"]
         rna_latents = data_dict["rna_latents"]
+        rna_reencoded_latents = data_dict["reencoded_rna_latents"]
         pathway_activities = data_dict["geneset_activities"]
         reconstructed_pathway_activities = data_dict["reconstructed_geneset_activities"]
         reconstructed_rna_inputs = data_dict["reconstructed_rna_inputs"]
@@ -243,6 +244,9 @@ class ImageSeqTranslationExperimentAnalysis(ImageSeqTranslationExperiment):
 
         rna_latents_df = pd.DataFrame(np.array(rna_latents), index=rna_cell_ids)
         rna_latents_df.to_csv(os.path.join(self.output_dir, "rna_latents.csv"))
+
+        rna_reencoded_latents_df = pd.DataFrame(np.array(rna_reencoded_latents), index=rna_cell_ids)
+        rna_reencoded_latents_df.to_csv(os.path.join(self.output_dir, "reencoded_rna_latents.csv"))
 
         reconstructed_pathway_activities_df = pd.DataFrame(np.array(reconstructed_pathway_activities), columns=pathways,
                                                            index=rna_cell_ids)

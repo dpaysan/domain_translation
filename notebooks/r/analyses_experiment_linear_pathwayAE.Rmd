@@ -45,10 +45,9 @@ seq.data
 Next, we will load the pathway activity scores inferred by the Pathway-Autoencoder that in its first layer has sparse connections representing the gene-pathway associations. Note that we for now only load the pathway activity scores for the subset of cell that was part of the training data.
 
 ```{r}
-pathway.activities <- read.csv("~/PycharmProjects/domain_translation/data/cd4/experiments/analyses_of_current_best/pathway_activities.csv", header = T, row.names = 1)
+pathway.activities <- read.csv("~/PycharmProjects/domain_translation/data/cd4/experiments/analyses_of_outlier_vae/pathway_activities.csv", header = T, row.names = 1)
 # The cell label was used to guide the learning of the latent space.
-cell.labels <- pathway.activities$label
-pathway.activities <- pathway.activities[,1:(NCOL(pathway.activities)-1)]
+cell.labels <- read.csv("~/PycharmProjects/domain_translation/data/cd4/experiments/analyses_of_outlier_vae/rna_labels.csv", header = T, row.names = 1)$label
 # Rename the cells in the pathway activity scores by replacing a . with a - to match the names in the Seurat object
 rownames(pathway.activities) <- gsub("[.]", "-", rownames(pathway.activities))
 names(cell.labels) <- rownames(pathway.activities)
@@ -123,7 +122,7 @@ dpa.results
 
 ```{r, fig.width=12}
 color = brewer.pal(n = 10, name = "RdBu")
-pheatmap(log(t(as.matrix(pathway.activities[,rownames(dpa.results[order(dpa.results[,"fdr"]),])[1:10]][order(-cell.labels),]))+1e-20), show_rownames = T, show_colnames = F, scale = "row", cluster_rows = T, cluster_cols = F, gaps_col = 667, fontsize_row = 12)
+pheatmap(t(as.matrix(pathway.activities[,rownames(dpa.results[order(dpa.results[,"fdr"]),])[1:20]][order(-cell.labels),])), show_rownames = T, show_colnames = F, scale = "row", cluster_rows = T, cluster_cols = F, gaps_col = 667, fontsize_row = 12, color = color)
 ```
 
 
@@ -254,7 +253,7 @@ While we potentially could test for all pathways we will start with analyzing a 
 
 ```{r}
 get_silent_active_cells_for_pathway <- function(pathway, pathway.activities){
-  silent.cells.ids <- pathway.activities[,pathway] == 0
+  silent.cells.ids <- pathway.activities[,pathway] <= mean(pathway.activities[,pathway])
   silent.cells <- rownames(pathway.activities[silent.cells.ids,])
   active.cells <- rownames(pathway.activities[!silent.cells.ids,])
   result <- list(silent.cells=silent.cells, active.cells=active.cells)
@@ -503,7 +502,7 @@ pathways.genes.list <- construct_pathway_list(pathway.adjacencies = pathway.adja
 get_dge_genes_for_pathway_active_vs_silent <- function(pathway, pathway.activities, seq.data, fdr = 0.05){
   silent.active.cells <- get_silent_active_cells_for_pathway(pathway=pathway, pathway.activities = pathway.activities)
   if(min(length(silent.active.cells$silent.cells), length(silent.active.cells$active.cells)) > 5){
-     dge.pathway <- FindMarkers(object = seq.data, ident.1 = silent.active.cells$silent.cells, ident.2 = silent.active.cells$active.cells, logfc.threshold = 0.05)
+     dge.pathway <- FindMarkers(object = seq.data, ident.1 = silent.active.cells$silent.cells, ident.2 = silent.active.cells$active.cells, logfc.threshold = 0.25)
      dge.genes <- rownames(dge.pathway[dge.pathway$p_val_adj < fdr,])
   }else{
     dge.genes <- NA
@@ -532,7 +531,7 @@ get_dge_genes_for_all_pathways_active_vs_silent <- function(pathway.activities, 
 ```
 
 ```{r}
-pathway.geneset.ora.results.active.silent <- get_dge_genes_for_all_pathways_active_vs_silent(pathway.activities = pathway.activities, pathway.genes.list = pathway.genes.list, seq.data = seq.data, fdr = 0.05)
+pathway.geneset.ora.results.active.silent <- get_dge_genes_for_all_pathways_active_vs_silent(pathway.activities = pathway.activities, pathway.genes.list = pathway.genes.list, seq.data = seq.data, fdr = 1.00)
 ```
 
 As first quantitive measure of how well the activity score is descriptive for the activity of a specific pathway, we will look at the pathways for which the differentially expressed genes are enriched when comparing the cell populations that were predicted to be active with those that were predicted to be silent by our PathwayAE and compute the top-1/top-5 accuracy for all of them. That is we compute the percentage of all pathways for which the differentially expressed genes are enriched most for the respective pathway or where the respective pathway is among the 5 most enriched pathways.
@@ -557,15 +556,15 @@ compute_top_n_accuracy_pathway_prediction_enrichment <- function(pathway.ora.res
 
 
 ```{r}
-top_n_accs <- numeric(20)
-for(i in 1:20){
+top_n_accs <- numeric(50)
+for(i in 1:50){
   top_n_accs[i] <- compute_top_n_accuracy_pathway_prediction_enrichment(pathway.ora.results = pathway.geneset.ora.results.active.silent, i)
 }
 ```
 
 
 ```{r}
-plot(1:20, top_n_accs, xlab = "n", ylim=c(0.8,1), type = 'b', ylab="Top-n accuracy", main="Top-n accuracy of the pathway activity score specificity")
+plot(1:50, top_n_accs, xlab = "n", ylim=c(0.8,1), type = 'b', ylab="Top-n accuracy", main="Top-n accuracy of the pathway activity score specificity")
 ```
 
 We see that even when we only consider the most significantly enriched pathway as a result of an overrepresentation analysis using a hypergeometric test looking for the enrichment of a KEGG pathway among the sets of differentially expressed genes (comparing the active vs silent cells for a specific pathway as predicted by the AE) this coincides for 91.15 % of the pathways with the queried one. This provides a validation that our model as imposed to some degree by design captures the activity of a certain pathway by encoding the differences in the expression of the respective sequencing data of the cell populations at this level of abstraction.
